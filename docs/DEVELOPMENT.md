@@ -4,7 +4,7 @@ The working plan for getting from empty repo to v1 (see [MVP.md](MVP.md) for sco
 
 **Guiding rule:** engine first, UI second. Milestone 1 had zero UI and proved the only technically risky part — `folder → professional PDF`. Every later milestone is well-understood app work, with one exception left: running the bundled binaries from inside the app (M3 sidecars).
 
-**Status (2026-06-11):** Phase 0 and Milestones 1–4 are complete (M4's clean-machine test is deferred until a clean Windows machine is available — it gates the `v0.1.0` tag, not development). The post-v1 plan is Milestones 5–7 below: writing features (math, tables, citations), cross-platform public releases, and group-report readiness — in that order, except M7 floats to whenever the group report starts.
+**Status (2026-06-11):** Phase 0 and Milestones 1–4 are complete. A second, code-level review (2026-06-11) found two data-loss paths in the editing loop and a few silent-wrong-output risks — those are now Milestone 4.5, which gates the `v0.1.0` tag together with the clean-machine test (un-deferred: Windows Sandbox is the clean machine). The post-v1 plan is Milestones 5–7 below: writing features (math, tables, citations), cross-platform public releases, and group-report readiness — in that order, except M7 floats to whenever the group report starts.
 
 ---
 
@@ -122,9 +122,31 @@ Goal: another student can install it and produce a report unaided.
 
 **Packaging and acceptance:**
 - [x] Windows installer (NSIS via Tauri bundler) with both sidecars included — `tauri build` produces `Paperstack_0.1.0_x64-setup.exe` (38 MB; MSI too). Built and verified on the dev machine (2026-06-10)
-- [ ] Clean-machine test: install on a machine without Node/Rust/pandoc and walk the MVP.md Definition of Done end to end (create → metadata → sections → figure/code/diagram → counter → View Report → export → reopen). This is also the production CSP's first real exercise. *Deferred (2026-06-10): no clean Windows machine at hand — gates the v0.1.0 tag, not further development*
+- [ ] Clean-machine test: install on a machine without Node/Rust/pandoc and walk the MVP.md Definition of Done end to end (create → metadata → sections → figure/code/diagram → counter → View Report → export → reopen). This is also the production CSP's first real exercise. *Un-deferred (2026-06-11): Windows Sandbox (built into the dev machine's Pro SKU) is the clean machine — no longer blocked on hardware; runs as the last step of M4.5*
 - [ ] The author's next real SEA report is written in Paperstack — the v1 bar from PROJECT.md
-- [ ] Tag `v0.1.0`, GitHub release with the installer attached (after the clean-machine test passes)
+- [ ] Tag `v0.1.0`, GitHub release with the installer attached (after the clean-machine test *and* the M4.5 data-integrity fixes pass)
+
+## Milestone 4.5 — Data integrity and the v0.1.0 gate *(S/M — added after the 2026-06-11 code review)*
+
+Goal: nothing in the core loop can lose writing or silently produce a wrong report. A writing app's first job is to never lose writing — these gate the `v0.1.0` tag ahead of every v0.2 feature.
+
+**Data-loss fixes (the review's headline findings):**
+- [ ] `saveActive` race: a keystroke landing during the save's awaited read/write gets its `dirty: true` clobbered by the save's unconditional `set({ dirty: false, baseline: content })` with the stale captured content — newer text then exists only in the editor while the status bar says "saved", and the debounce no-ops on the `!dirty` guard. Fix: clear `dirty`/advance `baseline` only when `get().content` still equals the saved content
+- [ ] Flush on window close: there is no `onCloseRequested`/`beforeunload` handler anywhere — closing the window inside the 800 ms autosave debounce silently drops the last keystrokes. Add a Tauri `onCloseRequested` that awaits `saveActive()` before allowing close
+- [ ] `openMetadata` honors a failed save: it currently discards `saveActive()`'s return value, so a write failure/conflict unmounts the editor and leaves the conflict banner pointing at a section the user can no longer see — bail like `openSection` does
+- [ ] Sidebar actions stop wiping editor undo: `reloadProject` (called by move/rename/add/saveMetadata) bumps `contentVersion`, and `setDoc` rebuilds editor state from scratch — skip the rebuild when the incoming content is string-identical to the buffer
+
+**Silent-wrong-output fixes:**
+- [ ] Unit-test the build string layer: `generateMainTypst`, `escapeTypstString`, `buildLengthLine`, `rewriteImagePaths`, `resolveProjectPath` are pure functions with zero unit tests, covered only by the integration test CI skips — a typo in the assembler ships through green CI today
+- [ ] Interleaved roles silently renumber: a hand-edited `body, front-matter, body` order is schema-legal but re-emits `#counter(heading).update(0)` on re-entry, restarting body numbering from 1 mid-report. Reset counters only on the *first* entry into each mode, and have the loader warn on interleaved roles
+- [ ] Pin the anslag definition: `countAnslag` counts UTF-16 code units, so astral characters (emoji) count as 2 — decide code points vs. units deliberately, document it next to the counter, and test it. (Danish text is unaffected; this is about pinning the project's core domain number)
+
+**Supply chain (ships inside the installer, so it belongs in the gate):**
+- [ ] `fetch-binaries.ps1`: SHA-256 pins for both downloaded archives, verified before extraction — these binaries ship to end users as sidecars
+- [ ] Fix the stale-pin trap: the skip-if-present check only tests `Test-Path`, so bumping a pinned version silently does nothing on machines with old binaries — record the version next to the binary and re-fetch on mismatch
+
+**The gate:**
+- [ ] Run the clean-machine test (docs/CLEAN-MACHINE-TEST.md) in Windows Sandbox, then tag `v0.1.0` per the M4 items above
 
 ---
 
@@ -133,6 +155,8 @@ Goal: another student can install it and produce a report unaided.
 Decided priorities: the next real report (a group report) needs math, tables, and citations; the project goes public open-source on all three desktop platforms; group workflow stays "polish what exists". Same guiding rule as v1: the riskiest pipeline work goes first, UI second.
 
 Revised after the 2026-06-11 full review and the side-by-side against the original report: the remark→Typst emitter moves from "fallback" to M5's first task (math, citations, and table styling all build on it), M6 gains a "deterministic output everywhere" group (bundled fonts, vendored template) and ships the CLI, and M7 gains export self-healing and group-repo CI.
+
+The same day's code-level review added: M4.5 above (data integrity, gates v0.1.0), CI coverage of the real PDF pipeline plus webview privilege hardening in M6, and the rendered-diagrams and line-endings decisions in M7 — the two holes in the group-via-Git story.
 
 ## Milestone 5 — Own the converter, then the writing features *(L)*
 
@@ -165,13 +189,15 @@ Goal: a stranger on Windows, macOS, or Linux installs a release build and trusts
 - [ ] Vendor the template into the project: the first build writes the `.typ` template as a Git-tracked, user-editable project file instead of rewriting it into `output/.build/` on every build — app updates *offer* the new template instead of silently changing a finished report's layout (the figure-float regression caught in review was exactly this failure mode). This is also the honest answer to template customization, currently "explicitly cut"
 
 **Platforms and release machinery:**
-- [ ] `fetch-binaries` becomes cross-platform (TS port run via tsx; per-target typst/pandoc triples for dev and CI)
+- [ ] `fetch-binaries` becomes cross-platform (TS port run via tsx; per-target typst/pandoc triples for dev and CI; carries the M4.5 SHA-256 pins forward)
+- [ ] CI runs the real pipeline: fetch the pinned Linux binaries in CI and run the currently-skipped PDF integration test on every push — today the entire Markdown→Pandoc→Typst→PDF path, the product's one technically risky part, has zero CI coverage (unlocked by the TS port above; pull both forward if the rest of M6 waits). Add a `da`-language fixture build to the matrix so label localization is covered end to end
 - [ ] PDF pane via pdf.js everywhere (the documented upgrade path): webkitgtk on Linux does not render PDFs in iframes, so this is a prerequisite, not polish — and it fixes the accepted scroll-reset-on-recompile annoyance as a side effect
 - [ ] `pnpm smoke` passes on macOS and Linux (needs a desktop session, so it stays a release-checklist step, not CI)
 - [ ] CI release workflow: tag → matrix build (NSIS/MSI, dmg, AppImage + deb) → GitHub release with artifacts attached
 - [ ] Auto-update: tauri-plugin-updater against GitHub releases (the updater's own signing keys are free; OS code signing stays deferred — document the SmartScreen/Gatekeeper first-run path in the README instead)
 - [ ] CLI packaging: `paperstack build <dir>` as an installable artifact — the engine + NodePlatform + `scripts/build-report.ts` already *are* the CLI; this is packaging, not a feature. Enables report builds in a group repo's CI (see M7)
 - [ ] CI: add a `tauri build` job so packaging breakage is caught on push, not at release time (engine tests already run on every push)
+- [ ] Webview privilege hardening (before strangers run release builds): `allow_project_scope` currently grants recursive read/write fs + asset scope to *any* path the webview asks for — reject filesystem roots and the home directory itself, require the directory to exist; and narrow the sidecar permissions from `args: true` toward an argument allowlist. Today one successful script injection converts to whole-disk access plus arbitrary pandoc/typst invocation; the CSP is the only gate
 - [ ] Repo as product: README with screenshots and an install section, LICENSE decision, CONTRIBUTING.md, issue templates
 - [ ] The clean-machine walkthrough (docs/CLEAN-MACHINE-TEST.md) runs per platform before each release
 
@@ -181,7 +207,10 @@ Goal: the group report is written in Paperstack while some group members edit th
 
 - [ ] Auto-reload when the window regains focus and project files changed on disk (the conflict guard already protects unsaved edits; the manual Reload button stays)
 - [ ] Per-section changed-on-disk indicators in the sidebar after an external change
+- [ ] **Decide the rendered-diagrams default (before the group report starts):** scaffolded projects git-ignore `diagrams/rendered/`, so a member adding a Mermaid block in VS Code (the explicitly supported scenario) produces a project that *fails to export for everyone* until someone opens that section in Paperstack. The renders are content-hashed and deterministic, so committing them is conflict-free — recommended: flip the scaffolded `.gitignore` to commit them, which also lets the CLI and group CI build fresh diagrams. Self-healing (next item) then becomes convenience, not the fix
 - [ ] Export self-heals diagrams: render missing Mermaid SVGs in-app before building, instead of telling the user to go open the section — a group member adding a diagram in another editor is exactly this case (the readable error stays for the CLI path, which has no renderer)
+- [ ] Scaffold a `.gitattributes` (`* text=auto`) into new projects alongside the `.gitignore` — mixed Windows/macOS groups hit CRLF diff churn in week one; counters are already CR-insensitive, diffs aren't
+- [ ] Readable error when `document.yaml` contains Git conflict markers (`<<<<<<<`) — the likeliest broken state after a bad merge of the shared ordering file, and exactly the audience that needs the message spelled out
 - [ ] Group repo CI: the report builds and the normalsider count is checked on every push, via the packaged CLI from M6 — members who don't run Paperstack still see the PDF and the count on their changes
 - [ ] Recents: drop entries that fail to open (from the backlog)
 - [ ] Editor: preserve undo history across section switches (from the backlog)
@@ -196,8 +225,15 @@ Known-good improvements that don't gate any milestone — pick up when touching 
 
 - [x] Scripted smoke test for the app shell: `pnpm smoke` scaffolds a scratch project, launches the real app (`tauri dev` + `VITE_SMOKE_SCRIPT`), drives the store through open → edit → save → TODO confirm → export, and asserts the result the app writes to `output/smoke-result.json`. Local only (needs sidecars, port 1420, and a desktop session)
 - [ ] `vite.config.ts`: replace the `@ts-expect-error` on `process` with `@types/node` in devDependencies
+- [ ] Ctrl+S bound to `saveActive` — autosave makes it redundant, but writers will press it; the binding is pure reassurance
+- [ ] "Show in folder" button on the export notice (`tauri-plugin-opener`) instead of only printing the relative path
+- [ ] Sidebar inline rename/add: commit on blur instead of silently discarding (Enter is the only commit path today, and nothing says so)
+- [ ] Section-remove confirm copy tells the user the file stays on disk and how to re-add it (the data is safe; the copy doesn't say so)
+- [ ] `toError`: render non-`Error` throws readably (a thrown plain object currently shows `[object Object]` in the banner)
+- [ ] Sweep stale `.typ` files from `output/.build/converted/` when sections are renamed/removed (diagram renders are swept; these never are)
+- [ ] Derive `ENGINE_VERSION` from package.json instead of a hand-maintained constant that will drift
 
-(The editor-undo, preview-scroll, and recents items moved into Milestone 7.)
+(The editor-undo, preview-scroll, and recents items moved into Milestone 7; the reload-triggered undo wipe — the worse half of the editor-undo item — moved into Milestone 4.5.)
 
 ## Working practices
 
@@ -221,3 +257,7 @@ Known-good improvements that don't gate any milestone — pick up when touching 
 | Remark emitter falls short of pandoc's Markdown edge cases | Golden-file corpus (demo fixture + real report) measures parity before any cutover; pandoc stays behind the Converter interface as the fallback until the real report renders identically |
 | Typst's native bibliography can't express the report's references | M5 engine-only spike against real references from the SEA report — before any citation UI exists (pandoc-citeproc is not a fallback here; it dies with the converter) |
 | Linux webview cannot show PDFs in an iframe | Known going in: pdf.js replaces the built-in viewer in M6 *before* the first Linux release; it also fixes the scroll-reset annoyance |
+| Autosave can lose writing (save race, no flush on close) | Found 2026-06-11 — both fixes are M4.5 items and gate v0.1.0; the smoke test should assert the close-flush once it exists |
+| Unverified binary downloads ship to end users as sidecars | M4.5 adds SHA-256 pins to `fetch-binaries.ps1`; the M6 TS port carries them to every platform and CI |
+| Build string layer (assembler/converter) untested in CI | M4.5 unit-tests the pure functions; M6 runs the full PDF integration test in CI on Linux |
+| Group member adds a diagram outside the app → export breaks for everyone | M7 decision item: commit content-hashed renders (recommended) and/or in-app self-healing; until then, the readable error is the only mitigation |
