@@ -8,6 +8,9 @@ function init(): void {
     startOnLoad: false,
     theme: "dark",
     fontFamily: "ui-sans-serif, system-ui, sans-serif",
+    // On a parse error mermaid would append an error diagram to <body>;
+    // callers show their own inline error box instead.
+    suppressErrorRendering: true,
   });
   initialized = true;
 }

@@ -35,11 +35,16 @@ export function Editor() {
   }, []);
 
   // Content was replaced from outside the editor (section switch, reload).
+  // Only grab focus when the user moved to a different section — a project
+  // reload with the same section open must not steal focus.
+  const lastFocusedFile = useRef<string | null>(null);
   useEffect(() => {
     const editor = editorRef.current;
     if (!editor) return;
     editor.setDoc(useStore.getState().content);
-    if (useStore.getState().activeFile) editor.focus();
+    const file = useStore.getState().activeFile;
+    if (file && file !== lastFocusedFile.current) editor.focus();
+    lastFocusedFile.current = file;
   }, [contentVersion]);
 
   return (

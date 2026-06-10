@@ -10,6 +10,7 @@ import remarkGfm from "remark-gfm";
 import remarkRehype from "remark-rehype";
 import rehypeHighlight from "rehype-highlight";
 import rehypeStringify from "rehype-stringify";
+import { hashDiagram } from "@paperstack/engine";
 import { renderMermaidSvg } from "./mermaid.ts";
 
 export interface MarkdownPreviewOptions {
@@ -23,6 +24,9 @@ export interface MarkdownPreviewOptions {
 export class MarkdownPreview {
   private readonly processor: Processor;
   private seq = 0;
+  /** Rendered SVG per diagram content hash — typing pauses re-render the
+   * HTML every time, but unchanged diagrams should not re-run mermaid. */
+  private readonly svgCache = new Map<string, string>();
 
   constructor(
     private readonly container: HTMLElement,
@@ -71,8 +75,15 @@ export class MarkdownPreview {
     for (const code of mermaidBlocks) {
       const pre = code.closest("pre");
       if (!pre) continue;
+      const source = code.textContent ?? "";
+      const hash = hashDiagram(source.replace(/\r\n?/g, "\n").trim());
       try {
-        const svg = await renderMermaidSvg(`preview-${this.seq++}`, code.textContent ?? "");
+        let svg = this.svgCache.get(hash);
+        if (svg === undefined) {
+          svg = await renderMermaidSvg(`preview-${this.seq++}`, source);
+          if (this.svgCache.size > 100) this.svgCache.clear();
+          this.svgCache.set(hash, svg);
+        }
         const wrapper = document.createElement("div");
         wrapper.className = "my-4 flex justify-center [&_svg]:max-w-full";
         wrapper.innerHTML = svg;
