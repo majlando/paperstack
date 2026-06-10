@@ -4,7 +4,7 @@ The working plan for getting from empty repo to v1 (see [MVP.md](MVP.md) for sco
 
 **Guiding rule:** engine first, UI second. Milestone 1 had zero UI and proved the only technically risky part — `folder → professional PDF`. Every later milestone is well-understood app work, with one exception left: running the bundled binaries from inside the app (M3 sidecars).
 
-**Status (2026-06-10):** Phase 0, Milestone 1, and Milestone 2 are complete — the engine builds real reports to PDF, and the app shell covers create/open project, structure editing, autosaved editing with live preview, counters, and a conflict guard for externally changed files. Milestone 3 (the core report loop) is next; the first task in it is the last genuinely risky integration in the project.
+**Status (2026-06-10):** Phase 0 and Milestones 1–3 are complete — the full core loop works in the app: create/open project, structure editing, autosaved editing with live preview and conflict guard, metadata form, counters with TODO jump, View Report (real PDF in-pane via bundled sidecars), Export PDF, readable errors, and a hardened webview (runtime-scoped fs access, real CSP). What remains is Milestone 4: insert helpers, template/first-run polish, and the installer.
 
 ---
 
@@ -75,7 +75,7 @@ Goal: create or open a project, edit sections with autosave, see a live per-sect
 - [x] Preview pane: vanilla-TS `MarkdownPreview` (remark/rehype + rehype-highlight, Tailwind typography) + thin React bridge; images via the Tauri asset protocol; live Mermaid with inline error boxes, render results cached by content hash; 300 ms debounce. Raw HTML in Markdown is deliberately not rendered (`remark-rehype` default) — keep it that way, it is what makes `innerHTML` safe here
 - [x] Mermaid render hook: on open and on save, render not-yet-rendered ```mermaid blocks to `diagrams/rendered/<hash>.svg` (the files PDF export embeds); invalid diagrams skipped (visible in preview, readable error at export)
 
-## Milestone 3 — Report workflow *(M/L — next)*
+## Milestone 3 — Report workflow *(M/L — done)*
 
 Goal: the full core loop — edit → save → **View Report** → **Export PDF** — plus the metadata form. Ordered risk-first: the sidecars (bundled typst/pandoc running from inside the app) are the last real integration risk in the project, so they come before any of the UI around them.
 
@@ -97,9 +97,9 @@ Goal: the full core loop — edit → save → **View Report** → **Export PDF*
 - [x] Validation is `documentSchema.omit({ sections })` — the loader's own schema, same messages; the engine re-validates the resulting document before writing, so the form can never produce a file the loader rejects
 
 **Finish the workflow:**
-- [ ] Status bar TODO counter click-to-jump: cycle through `[TODO` locations in the active section (the live counters themselves shipped in M2)
-- [ ] Error surfacing polish: every engine error renders readably with the affected file where known; `details` (raw tool output) reachable but never the headline
-- [ ] Webview hardening: set a real CSP in `tauri.conf.json` (currently `null`); revisit the `fs`/asset-protocol scope — the capability text says "user-chosen project folders" but grants `**`; at minimum document the decision, ideally scope it
+- [x] Status bar TODO counter click-to-jump: cycles through `[TODO` markers in the active section, selecting and scrolling to each (engine `findTodoOffsets` shares the counter's regex — one definition of "a TODO"); when the active section is clean it opens the first section that still has one
+- [x] Error surfacing polish: the banner headline stays human-readable; raw tool output (`PaperstackError.details`) is reachable behind a "Technical details" disclosure, never the headline
+- [x] Webview hardening: real CSP (strict in production, Vite-compatible in dev) and **empty static fs/asset scopes** — project folders are granted at runtime by the `allow_project_scope` command when the user opens them, so the webview can only touch folders the user chose. Verified end to end: open → build → View Report all work under the hardened config (the production CSP gets its real exercise in the M4 clean-machine test)
 
 ## Milestone 4 — Helpers, polish, packaging *(M)*
 
@@ -153,5 +153,5 @@ Known-good improvements that don't gate any milestone — pick up when touching 
 | WebView2 PDF viewer UX (scroll reset on recompile) | Verified working (2026-06-10): PDF renders in-pane and recompiles rewrite `report.pdf` in place — the viewer holds no file lock. Scroll reset accepted; pdf.js is the documented upgrade path |
 | Pandoc's Typst output fights the template | Mitigated: proven against the real report in M1; converter stays behind an interface, remark-based emitter is the fallback |
 | Mermaid → SVG → Typst rendering quality | Proven in M1 with real diagrams from the SEA report |
-| Webview scope too broad (fs `**`, no CSP) | Scheduled in M3 hardening; preview already refuses raw HTML by design |
+| Webview scope too broad (fs `**`, no CSP) | Resolved (2026-06-10): empty static scopes + per-project runtime grants, CSP set; preview refuses raw HTML by design. Production CSP gets exercised in the M4 clean-machine test |
 | Scope creep | MVP.md cut list is the contract; this plan has no optional tasks on the milestone path |
