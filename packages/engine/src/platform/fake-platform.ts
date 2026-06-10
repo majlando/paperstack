@@ -55,7 +55,10 @@ export class FakePlatform implements Platform {
     this.files.set(destPath, content);
   }
 
-  async runBinary(): Promise<{ exitCode: number; stdout: string; stderr: string }> {
+  async runBinary(
+    _binary: string,
+    _args: string[],
+  ): Promise<{ exitCode: number; stdout: string; stderr: string }> {
     throw new Error("not supported in FakePlatform");
   }
 }

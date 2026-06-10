@@ -139,6 +139,17 @@ export async function buildReport(
   // Only after a successful export: renders for since-edited diagrams are stale.
   await sweepStaleRenders(platform, projectDir, referencedRenders);
 
+  // Converted .typ files for renamed/removed sections linger forever
+  // otherwise (harmless — main.typ never includes them — but they pile up).
+  // Same rule as the diagram sweep: only files matching this builder's own
+  // NNN-*.typ naming scheme are ever deleted, and best-effort only.
+  const keepTyp = new Set(converted.map((c) => c.path.slice(c.path.lastIndexOf("/") + 1)));
+  const typEntries = await platform.listDir(`${buildDir}/converted`).catch(() => []);
+  for (const name of typEntries) {
+    if (!/^\d{3}-.*\.typ$/.test(name) || keepTyp.has(name)) continue;
+    await platform.removeFile(`${buildDir}/converted/${name}`).catch(() => {});
+  }
+
   return { pdfPath: `${projectDir}/${pdfRel}`, counts, warnings };
 }
 
