@@ -55,7 +55,9 @@ export async function runScriptedSmoke(projectDir: string): Promise<void> {
     check(
       "forced export compiles via the sidecars",
       state().error === null && (state().notice?.startsWith("Report exported") ?? false),
-      state().error?.message,
+      // include the technical details — a failed export's headline alone
+      // doesn't say which layer (validation, spawn, tool) refused
+      [state().error?.message, state().error?.details].filter(Boolean).join(" | ") || undefined,
     );
     check("the exported PDF exists", await platform.fileExists(`${dir}/output/report.pdf`));
   } catch (e) {

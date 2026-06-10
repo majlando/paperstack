@@ -43,9 +43,13 @@ async fn run_sidecar(
     args: Vec<String>,
 ) -> Result<SidecarOutput, String> {
     validate_sidecar_invocation(&binary, &args, &roots)?;
+    // The webview names sidecars by their tauri.conf.json externalBin path
+    // ("binaries/typst"), but the Rust shell API resolves the program file
+    // next to the app executable — it needs the bare name ("typst").
+    let program = binary.rsplit('/').next().unwrap_or(&binary);
     let output = app
         .shell()
-        .sidecar(binary)
+        .sidecar(program)
         .map_err(|e| e.to_string())?
         .args(args)
         .output()
@@ -84,7 +88,18 @@ fn allow_scope(app: &tauri::AppHandle, path: &std::path::Path) -> Result<(), Str
 }
 
 fn normalize_path(path: &std::path::Path) -> String {
-    path.to_string_lossy().replace('\\', "/")
+    let s = path.to_string_lossy().replace('\\', "/");
+    // std canonicalize returns extended-length paths (\\?\C:\...) on Windows.
+    // This string becomes the app's projectDir and ends up in sidecar args —
+    // and pandoc (Haskell, not Rust) rejects the //?/ form outright. Return a
+    // plain drive path; UNC shares keep their //server/share form.
+    if let Some(rest) = s.strip_prefix("//?/UNC/") {
+        return format!("//{rest}");
+    }
+    if let Some(rest) = s.strip_prefix("//?/") {
+        return rest.to_string();
+    }
+    s
 }
 
 fn validate_sidecar_invocation(
