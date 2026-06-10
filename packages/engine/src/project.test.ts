@@ -57,6 +57,35 @@ describe("loadProject error messages", () => {
     expect(error.userMessage).toContain("sections.0.role");
   });
 
+  it("rejects section paths that escape the project folder", async () => {
+    const platform = new FakePlatform(
+      new Map([
+        [
+          "/proj/document.yaml",
+          "title: T\nsections:\n  - { file: ../outside.md, role: body }\n",
+        ],
+      ]),
+    );
+    const error = await loadProject(platform, "/proj").catch((e) => e);
+    expect(error.code).toBe("metadata-invalid");
+    expect(error.userMessage).toContain("stay inside the project folder");
+  });
+
+  it("rejects absolute and backslash section paths", async () => {
+    const platform = new FakePlatform(
+      new Map([
+        [
+          "/proj/document.yaml",
+          "title: T\nsections:\n  - { file: 'C:/x.md', role: body }\n  - { file: 'a\\\\b.md', role: body }\n",
+        ],
+      ]),
+    );
+    const error = await loadProject(platform, "/proj").catch((e) => e);
+    expect(error.code).toBe("metadata-invalid");
+    expect(error.userMessage).toContain("relative to the project folder");
+    expect(error.userMessage).toContain("forward slashes");
+  });
+
   it("lists missing section files by name", async () => {
     const platform = new FakePlatform(
       new Map([

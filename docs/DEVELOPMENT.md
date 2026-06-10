@@ -63,22 +63,30 @@ Goal: open a project, edit sections with autosave, see a live per-section previe
 - [x] Scaffold `apps/desktop`: Tauri 2 + React + Vite + Tailwind (shadcn/ui added when the first form/dialog needs it)
 - [x] `TauriPlatform` implementation of the engine's `Platform` interface (fs plugin; `runBinary` via the shell plugin + sidecar config lands with View Report in M3). The engine package gained a `./node` subpath export so `NodePlatform` (node:fs) never enters the webview bundle.
 - [x] App layout: sidebar | editor panes, error banner, status bar (preview pane next)
-- [ ] Create project (from SEA template, including a project `.gitignore` for `output/` and `diagrams/rendered/`) and open project (folder picker); recent-projects list
-- [ ] Reload project action — picks up files changed outside the app (e.g. after a `git pull`); warn instead of silently overwriting if a file changed on disk while open in the editor
-- [x] Sidebar driven by the engine's `Project` model, grouped by role, with per-section TODO badges (add / rename / delete / move up/down still to come — reordering edits the `sections` list in `document.yaml`, the single source of truth for order)
+- [x] Open project via folder picker (+ `VITE_OPEN_PROJECT` / `VITE_OPEN_SECTION` dev auto-open, used by scripted smoke tests)
+- [x] Reload project button in the sidebar — picks up files changed outside the app (e.g. after a `git pull`); skips re-reading the open section while it has unsaved edits
+- [x] Sidebar driven by the engine's `Project` model, grouped by role, with per-section TODO badges
+- [x] Engine hardening from review: section paths validated (relative, forward slashes, no `..` — a shared document.yaml can never read outside the project folder)
+- [ ] Create project from the SEA template (including a project `.gitignore` for `output/` and `diagrams/rendered/`); recent-projects list
+- [ ] Section actions in the sidebar: add / rename / delete / move up/down (all edit the `sections` list in `document.yaml`, the single source of truth for order)
+- [ ] Conflict guard: warn instead of silently overwriting when a file changed on disk while open with unsaved edits
 - [x] `MarkdownEditor` vanilla-TS class wrapping CodeMirror 6 (markdown mode + fenced-code highlighting via language-data, zinc theme, list-continuation keymap) + the small React mount bridge (`contentVersion` distinguishes external content changes from keystrokes); autosave 800 ms after the last keystroke and on blur
 - [x] Preview pane: vanilla-TS `MarkdownPreview` (remark/rehype + rehype-highlight, Tailwind typography) + thin React bridge; images resolved via the Tauri asset protocol; live Mermaid rendering with inline error boxes; 300 ms debounce
 - [x] Mermaid save hook: on save, render not-yet-rendered ```mermaid blocks to `diagrams/rendered/<hash>.svg` (the files PDF export embeds); invalid diagrams skipped (visible in preview, readable error at export)
 
 ## Milestone 3 — Report workflow *(M)*
 
-Goal: the full loop — metadata, counters, View Report, export.
+Goal: the full core loop — edit → save → View Report → Export PDF.
+Reordered risk-first: the sidecars (bundled typst/pandoc running from inside
+the app) are the last real integration risk in the project, so View Report
+comes before the metadata form.
 
+- [ ] Sidecar wiring: bundle `typst` + `pandoc` as Tauri sidecars (`externalBin`); implement `TauriPlatform.runBinary` via the shell plugin
+- [ ] View Report: compile via the engine, show the real PDF in the WebView2 built-in viewer pane; recompile on demand; TODO warning; locked-file fallback surfaced as a warning
+- [ ] Export PDF button (same pipeline, writes `output/report.pdf`)
 - [ ] Metadata form generated against the zod schema (shadcn form components); writes `document.yaml`, preserving comments where feasible
-- [ ] Status bar: body normalsider vs. cap (live), per-section count, TODO count with click-to-jump
-- [ ] View Report: compile via engine + sidecars, show PDF in WebView2 built-in viewer pane; recompile on demand
-- [ ] Export PDF button (same pipeline, writes `output/report.pdf`), with TODO warning and locked-file fallback
-- [ ] Error surfacing: every engine error renders as a readable message with the affected file/line where known
+- [ ] Status bar click-to-jump on the TODO counter (the live body/section counters already shipped in M2)
+- [ ] Error surfacing polish: every engine error renders readably, with the affected file where known
 
 ## Milestone 4 — Helpers and packaging *(M)*
 

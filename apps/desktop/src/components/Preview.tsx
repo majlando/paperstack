@@ -10,6 +10,7 @@ export function Preview() {
   const activeFile = useStore((s) => s.activeFile);
   const containerRef = useRef<HTMLDivElement | null>(null);
   const previewRef = useRef<MarkdownPreview | null>(null);
+  const lastFileRef = useRef<string | null>(null);
 
   useEffect(() => {
     if (!containerRef.current) return;
@@ -36,7 +37,9 @@ export function Preview() {
       if (!preview || activeFile === null) return;
       const slash = activeFile.lastIndexOf("/");
       const sectionDir = slash === -1 ? "" : activeFile.slice(0, slash);
-      void preview.render(content, sectionDir);
+      const resetScroll = lastFileRef.current !== activeFile;
+      lastFileRef.current = activeFile;
+      void preview.render(content, sectionDir, { resetScroll });
     }, 300);
     return () => clearTimeout(timer);
   }, [content, activeFile]);

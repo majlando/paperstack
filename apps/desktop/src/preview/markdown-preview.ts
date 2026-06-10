@@ -40,8 +40,13 @@ export class MarkdownPreview {
       .use(rehypeStringify) as unknown as Processor;
   }
 
-  async render(markdown: string, sectionDir: string): Promise<void> {
-    const scrollTop = this.container.scrollTop;
+  async render(
+    markdown: string,
+    sectionDir: string,
+    options?: { resetScroll?: boolean },
+  ): Promise<void> {
+    // Keep scroll position while typing; jump to top on section switch.
+    const scrollTop = options?.resetScroll ? 0 : this.container.scrollTop;
 
     let html: string;
     try {

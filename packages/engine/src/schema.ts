@@ -17,8 +17,27 @@ const authorSchema = z.object({
     .transform((v) => (v === undefined ? undefined : String(v))),
 });
 
+/**
+ * Section paths must stay inside the project folder and be portable:
+ * forward slashes, relative, no "..". This is both a safety boundary (a
+ * shared document.yaml must never read files outside the project) and what
+ * keeps projects working across Windows/macOS/Linux group members.
+ */
+const sectionFileSchema = z
+  .string()
+  .min(1, "section file must not be empty")
+  .refine((f) => !f.includes("\\"), "use forward slashes (/) in section paths")
+  .refine(
+    (f) => !f.startsWith("/") && !/^[A-Za-z]:/.test(f),
+    "section paths must be relative to the project folder",
+  )
+  .refine(
+    (f) => !f.split("/").includes(".."),
+    "section paths must stay inside the project folder",
+  );
+
 const sectionSchema = z.object({
-  file: z.string().min(1, "section file must not be empty"),
+  file: sectionFileSchema,
   role: z.enum(SECTION_ROLES),
 });
 

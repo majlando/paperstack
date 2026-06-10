@@ -18,16 +18,26 @@ export function Sidebar() {
   const counts = useStore((s) => s.counts);
   const activeFile = useStore((s) => s.activeFile);
   const openSection = useStore((s) => s.openSection);
+  const reloadProject = useStore((s) => s.reloadProject);
 
   if (!project) return null;
 
   return (
     <aside className="w-64 shrink-0 overflow-y-auto border-r border-zinc-800 bg-zinc-900 text-zinc-300">
-      <div className="px-4 py-3 border-b border-zinc-800">
-        <div className="font-semibold text-zinc-100 truncate" title={project.meta.title}>
-          {project.meta.title}
+      <div className="flex items-start justify-between gap-2 px-4 py-3 border-b border-zinc-800">
+        <div className="min-w-0">
+          <div className="font-semibold text-zinc-100 truncate" title={project.meta.title}>
+            {project.meta.title}
+          </div>
+          <div className="text-xs text-zinc-500 truncate">{project.dir}</div>
         </div>
-        <div className="text-xs text-zinc-500 truncate">{project.dir}</div>
+        <button
+          onClick={() => void reloadProject()}
+          title="Reload project — pick up changes made outside Paperstack (e.g. after a git pull)"
+          className="shrink-0 rounded px-1.5 py-0.5 text-zinc-500 hover:bg-zinc-800 hover:text-zinc-200"
+        >
+          ⟳
+        </button>
       </div>
       {GROUPS.map(({ role, label }) => {
         const sections = project.meta.sections.filter((s) => s.role === role);
