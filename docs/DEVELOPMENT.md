@@ -132,35 +132,46 @@ Goal: another student can install it and produce a report unaided.
 
 Decided priorities: the next real report (a group report) needs math, tables, and citations; the project goes public open-source on all three desktop platforms; group workflow stays "polish what exists". Same guiding rule as v1: the riskiest pipeline work goes first, UI second.
 
-## Milestone 5 — Writing features: math, tables, citations *(M/L)*
+Revised after the 2026-06-11 full review and the side-by-side against the original report: the remark→Typst emitter moves from "fallback" to M5's first task (math, citations, and table styling all build on it), M6 gains a "deterministic output everywhere" group (bundled fonts, vendored template) and ships the CLI, and M7 gains export self-healing and group-repo CI.
 
-Goal: the three writing needs the first real report met by hand stop needing hand-work.
+## Milestone 5 — Own the converter, then the writing features *(L)*
 
-**Citations spike (the unknown — engine only, like M1):**
-- [ ] Prove the pipeline: `references.bib` in the project + `[@key]` in Markdown → numbered citations and a references list in the PDF. Two candidate routes — pandoc `+citations` emitting Typst `#cite`, or handing the `.bib` to Typst's native bibliography — decide while both are still cheap to choose, testing against real references from the migrated SEA report. If this works, the rest of citations is UI
-- [ ] Decide the v1-of-citations scope: numbered style only (SEA reports don't need citation-style choice)
+Goal: the three writing needs the first real report met by hand (tables, math, citations) stop needing hand-work — built on a Markdown→Typst emitter we own, not layered on the converter we always planned to replace (2026-06-11 review decision: emitter first, because math, citations, and the table-styling fix all want control pandoc doesn't give).
 
-**Math (proven tech, high value):**
-- [ ] Engine: enable `tex_math_dollars` in the pandoc reader; verify the Typst writer emits Typst math for inline `$x$` and display `$$…$$` (fixture section with both; readable error when math is invalid)
-- [ ] Preview: remark-math + KaTeX so the preview accepts the same `$` syntax as the pipeline (KaTeX already ships inside the Mermaid bundle — check whether it can be reused before adding a dependency)
+**Remark→Typst emitter (the keystone):**
+- [ ] Golden-file safety net first: snapshot pandoc's `.typ` output for the demo fixture (committed) and the migrated real report (local), so emitter parity is measurable — and pandoc upgrades stop being invisible in the meantime
+- [ ] Emitter behind the existing `Converter` interface: headings, paragraphs, emphasis, links, lists, code fences, images (incl. `{width=…}` attributes), tables, blockquotes — driven to parity against the golden files; pandoc stays as the fallback converter until the real report renders identically
+- [ ] Table output: booktabs-style (horizontal rules, padded) instead of pandoc's full-grid boxes — the biggest body-content gap from the report side-by-side
+- [ ] Banked payoffs once parity lands: conversion becomes a function call (no per-section process spawn), converter errors name the actual line instead of "unusual Markdown", and the pandoc sidecar can eventually be dropped from the bundle
 
-**Tables (small):**
-- [ ] Insert Table helper: rows × columns → GFM table skeleton at the cursor (pipeline and preview already render GFM tables)
+**Math:**
+- [ ] Emit Typst math for inline `$x$` and display `$$…$$` (remark-math in the emitter); invalid math fails with a readable error
+- [ ] Preview: KaTeX for the same `$` syntax (check whether the Mermaid bundle's KaTeX can be reused before adding a dependency)
+
+**Tables (authoring):**
+- [ ] Insert Table helper: rows × columns → GFM table skeleton at the cursor
 - [ ] "Format table" editor command: re-align the pipes of the table under the cursor — a pure text transform, lives in the engine with unit tests
 
-**Citations UX (after the spike has decided the route):**
-- [ ] Insert Citation helper listing `references.bib` entries; inserted at the cursor
-- [ ] Preview shows citations as readable placeholders (`[1]` / `[key]`) — the PDF stays the truth, same one-rendering-path rule
+**Citations:**
+- [ ] Engine spike: `references.bib` handed to Typst's native bibliography, `[@key]` emitted as `#cite` — tested against real references from the migrated report. (The emitter makes Typst-native the only sensible route; the pandoc-citeproc alternative dies with the converter.) Numbered style only — SEA reports don't need citation-style choice
+- [ ] Insert Citation helper listing `references.bib` entries; preview shows readable placeholders (`[key]`) — the PDF stays the truth, same one-rendering-path rule
 
 ## Milestone 6 — Every platform, public release *(L)*
 
-Goal: a stranger on Windows, macOS, or Linux installs a release build and trusts the repo.
+Goal: a stranger on Windows, macOS, or Linux installs a release build and trusts the repo — and the same Git commit produces the same PDF for every group member, on any OS, after any app update.
 
+**Deterministic output everywhere (do these before the group report starts, even if the rest of M6 waits):**
+- [ ] Bundle open fonts and compile with `--font-path`, making them the template default — today Cambria/Consolas silently fall back to Libertinus/DejaVu off-Windows, so the same project would compile visually different PDFs per group member's OS (the Windows look becomes the opt-in, not the default)
+- [ ] Vendor the template into the project: the first build writes the `.typ` template as a Git-tracked, user-editable project file instead of rewriting it into `output/.build/` on every build — app updates *offer* the new template instead of silently changing a finished report's layout (the figure-float regression caught in review was exactly this failure mode). This is also the honest answer to template customization, currently "explicitly cut"
+
+**Platforms and release machinery:**
 - [ ] `fetch-binaries` becomes cross-platform (TS port run via tsx; per-target typst/pandoc triples for dev and CI)
 - [ ] PDF pane via pdf.js everywhere (the documented upgrade path): webkitgtk on Linux does not render PDFs in iframes, so this is a prerequisite, not polish — and it fixes the accepted scroll-reset-on-recompile annoyance as a side effect
 - [ ] `pnpm smoke` passes on macOS and Linux (needs a desktop session, so it stays a release-checklist step, not CI)
 - [ ] CI release workflow: tag → matrix build (NSIS/MSI, dmg, AppImage + deb) → GitHub release with artifacts attached
 - [ ] Auto-update: tauri-plugin-updater against GitHub releases (the updater's own signing keys are free; OS code signing stays deferred — document the SmartScreen/Gatekeeper first-run path in the README instead)
+- [ ] CLI packaging: `paperstack build <dir>` as an installable artifact — the engine + NodePlatform + `scripts/build-report.ts` already *are* the CLI; this is packaging, not a feature. Enables report builds in a group repo's CI (see M7)
+- [ ] CI: add a `tauri build` job so packaging breakage is caught on push, not at release time (engine tests already run on every push)
 - [ ] Repo as product: README with screenshots and an install section, LICENSE decision, CONTRIBUTING.md, issue templates
 - [ ] The clean-machine walkthrough (docs/CLEAN-MACHINE-TEST.md) runs per platform before each release
 
@@ -170,6 +181,8 @@ Goal: the group report is written in Paperstack while some group members edit th
 
 - [ ] Auto-reload when the window regains focus and project files changed on disk (the conflict guard already protects unsaved edits; the manual Reload button stays)
 - [ ] Per-section changed-on-disk indicators in the sidebar after an external change
+- [ ] Export self-heals diagrams: render missing Mermaid SVGs in-app before building, instead of telling the user to go open the section — a group member adding a diagram in another editor is exactly this case (the readable error stays for the CLI path, which has no renderer)
+- [ ] Group repo CI: the report builds and the normalsider count is checked on every push, via the packaged CLI from M6 — members who don't run Paperstack still see the PDF and the count on their changes
 - [ ] Recents: drop entries that fail to open (from the backlog)
 - [ ] Editor: preserve undo history across section switches (from the backlog)
 - [ ] Preview scroll: restore by anchor rather than raw `scrollTop` (from the backlog)
@@ -205,5 +218,6 @@ Known-good improvements that don't gate any milestone — pick up when touching 
 | Mermaid → SVG → Typst rendering quality | Proven in M1 with real diagrams from the SEA report |
 | Webview scope too broad (fs `**`, no CSP) | Resolved (2026-06-10): empty static scopes + per-project runtime grants, CSP set; preview refuses raw HTML by design. Production CSP gets exercised in the M4 clean-machine test |
 | Scope creep | MVP.md cut list is the contract; this plan has no optional tasks on the milestone path |
-| Citation pipeline (pandoc citeproc vs Typst bibliography) fights the template | M5 starts with an engine-only spike against real references from the SEA report — route decided before any UI exists |
+| Remark emitter falls short of pandoc's Markdown edge cases | Golden-file corpus (demo fixture + real report) measures parity before any cutover; pandoc stays behind the Converter interface as the fallback until the real report renders identically |
+| Typst's native bibliography can't express the report's references | M5 engine-only spike against real references from the SEA report — before any citation UI exists (pandoc-citeproc is not a fallback here; it dies with the converter) |
 | Linux webview cannot show PDFs in an iframe | Known going in: pdf.js replaces the built-in viewer in M6 *before* the first Linux release; it also fixes the scroll-reset annoyance |
