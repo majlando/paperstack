@@ -61,6 +61,11 @@ export function generateMainTypst(
     role === "body" ? "body" : role === "appendix" ? "appendix" : "plain";
 
   let current: Mode | null = null;
+  // The heading counter resets only on the FIRST entry into a numbered mode:
+  // an interleaved order like body, front-matter, body is schema-legal (a
+  // hand-edited document.yaml), and re-entering body must continue numbering,
+  // not silently restart at 1 in the middle of a graded report.
+  const entered = new Set<Mode>();
   for (const section of sections) {
     const mode = modeFor(section.role);
     if (mode !== current) {
@@ -69,11 +74,12 @@ export function generateMainTypst(
         lines.push(`#set heading(numbering: none)`);
       } else if (mode === "body") {
         lines.push(`#set heading(numbering: "1.1")`);
-        lines.push(`#counter(heading).update(0)`);
+        if (!entered.has(mode)) lines.push(`#counter(heading).update(0)`);
       } else {
         lines.push(`#set heading(numbering: "A.1.")`);
-        lines.push(`#counter(heading).update(0)`);
+        if (!entered.has(mode)) lines.push(`#counter(heading).update(0)`);
       }
+      entered.add(mode);
       current = mode;
     }
     lines.push(`#include "${section.path}"`);
