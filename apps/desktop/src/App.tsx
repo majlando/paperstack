@@ -56,7 +56,17 @@ export default function App() {
     <div className="flex h-screen flex-col bg-zinc-950 text-zinc-200">
       {error && (
         <div className="flex items-start justify-between gap-4 border-b border-red-900 bg-red-950 px-4 py-2 text-sm text-red-200">
-          <pre className="whitespace-pre-wrap font-sans">{error}</pre>
+          <div className="min-w-0">
+            <pre className="whitespace-pre-wrap font-sans">{error.message}</pre>
+            {error.details && (
+              <details className="pt-1 text-xs text-red-400/80">
+                <summary className="cursor-pointer select-none">Technical details</summary>
+                <pre className="max-h-40 overflow-y-auto whitespace-pre-wrap pt-1">
+                  {error.details}
+                </pre>
+              </details>
+            )}
+          </div>
           <button onClick={clearError} className="shrink-0 text-red-400 hover:text-red-200">
             dismiss
           </button>

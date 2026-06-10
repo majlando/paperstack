@@ -46,7 +46,8 @@ interface AppState {
    */
   contentVersion: number;
   dirty: boolean;
-  error: string | null;
+  /** `message` is the readable headline; `details` is raw tool output for diagnostics. */
+  error: { message: string; details?: string } | null;
   /** Success message (e.g. after export) — the friendly counterpart of `error`. */
   notice: string | null;
   /** A report compile is running (View Report / Export PDF). */
@@ -92,8 +93,10 @@ interface AppState {
   clearNotice(): void;
 }
 
-function message(e: unknown): string {
-  return e instanceof PaperstackError ? e.userMessage : String(e);
+function toError(e: unknown): { message: string; details?: string } {
+  return e instanceof PaperstackError
+    ? { message: e.userMessage, details: e.details }
+    : { message: String(e) };
 }
 
 /** Filename-safe slug: "Løsning & Design" → "loesning-design". */
@@ -232,7 +235,7 @@ export const useStore = create<AppState>((set, get) => {
       set({ counts: result.counts, error: null });
       return result;
     } catch (e) {
-      set({ error: message(e) });
+      set({ error: toError(e) });
       return null;
     } finally {
       set({ building: false });
@@ -280,7 +283,7 @@ export const useStore = create<AppState>((set, get) => {
       const first = project.meta.sections.find((s) => s.role === "body") ?? project.meta.sections[0];
       if (first) await get().openSection(first.file);
     } catch (e) {
-      set({ error: message(e) });
+      set({ error: toError(e) });
     }
   },
 
@@ -298,7 +301,7 @@ export const useStore = create<AppState>((set, get) => {
       }
       await get().openProject(normalized);
     } catch (e) {
-      set({ error: message(e) });
+      set({ error: toError(e) });
     }
   },
 
@@ -315,7 +318,7 @@ export const useStore = create<AppState>((set, get) => {
         set({ content, baseline: content, contentVersion: get().contentVersion + 1 });
       }
     } catch (e) {
-      set({ error: message(e) });
+      set({ error: toError(e) });
     }
   },
 
@@ -339,7 +342,7 @@ export const useStore = create<AppState>((set, get) => {
       // Sections edited outside the app may contain never-rendered diagrams.
       void renderDiagramsToDisk(projectDir, content);
     } catch (e) {
-      set({ error: message(e) });
+      set({ error: toError(e) });
     }
   },
 
@@ -357,7 +360,7 @@ export const useStore = create<AppState>((set, get) => {
       await get().reloadProject();
       await get().openSection(file);
     } catch (e) {
-      set({ error: message(e) });
+      set({ error: toError(e) });
     }
   },
 
@@ -380,7 +383,7 @@ export const useStore = create<AppState>((set, get) => {
       }
       await get().reloadProject();
     } catch (e) {
-      set({ error: message(e) });
+      set({ error: toError(e) });
     }
   },
 
@@ -391,7 +394,7 @@ export const useStore = create<AppState>((set, get) => {
       await editDocumentYaml(projectDir, (t) => moveSectionInYaml(t, file, direction));
       await get().reloadProject();
     } catch (e) {
-      set({ error: message(e) });
+      set({ error: toError(e) });
     }
   },
 
@@ -407,7 +410,7 @@ export const useStore = create<AppState>((set, get) => {
     if (file === activeFile && !(await saveActive())) return;
     try {
       if (await platform.fileExists(`${projectDir}/${newFile}`)) {
-        set({ error: `A file named "${newFile}" already exists in the project.` });
+        set({ error: { message: `A file named "${newFile}" already exists in the project.` } });
         return;
       }
       // Validate against document.yaml before touching the file system.
@@ -427,7 +430,7 @@ export const useStore = create<AppState>((set, get) => {
       if (get().activeFile === file) set({ activeFile: newFile });
       await get().reloadProject();
     } catch (e) {
-      set({ error: message(e) });
+      set({ error: toError(e) });
     }
   },
 
@@ -470,7 +473,7 @@ export const useStore = create<AppState>((set, get) => {
       void renderDiagramsToDisk(projectDir, content);
       return true;
     } catch (e) {
-      set({ error: message(e) });
+      set({ error: toError(e) });
       return false;
     }
   },
@@ -536,7 +539,7 @@ export const useStore = create<AppState>((set, get) => {
       set({ metadataOpen: false });
       return true;
     } catch (e) {
-      set({ error: message(e) });
+      set({ error: toError(e) });
       return false;
     }
   },
