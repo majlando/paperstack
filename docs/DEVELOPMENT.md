@@ -108,23 +108,23 @@ Goal: another student can install it and produce a report unaided.
 **Real-report dogfood (2026-06-10):** the migrated SEA report (23 sections, ~37 normalsider, 80+ images, flat layout with assets under `resources/`) opens, edits, and builds in the app — full compile ≈ 2 s, 6.2 MB PDF renders in the pane, counters match the old toolchain. It exposed that the section-add path hardcoded the scaffold layout (fixed: new files follow where same-role sections already live, numbering and appendix letters scan the project's actual files). Remaining lesson lives in the Insert Figure item below.
 
 **Insert helpers:**
-- [ ] Insert Figure: file dialog → copy into the project's images folder (needs `Platform.copyFile`) → prompt for the caption → insert the image Markdown at the cursor (alt text becomes the numbered caption; `MarkdownEditor` gains an insert-at-cursor API). **Don't hardcode `figures/`** — the real report keeps assets under `resources/`; default to where the project already keeps images, falling back to `figures/`
-- [ ] Insert Code Block and Insert Diagram (Mermaid stub) — snippet insertion via the same editor API
+- [x] Insert Figure: file dialog → copied into the project's own images folder (first of `figures/`, `images/`, `assets/`, `resources/` that exists; collision-safe numeric suffixes, never overwrites) → caption prompt (becomes the numbered figure caption) → root-absolute image Markdown inserted at the cursor via `MarkdownEditor.insertBlock`
+- [x] Insert Code Block (cursor lands on the language position) and Insert Diagram (Mermaid stub that renders in the preview immediately) — same editor API, buttons in the editor header
 
 **Template polish (the M1 acceptance gaps, decided deliberately rather than patched ad hoc):**
-- [ ] Cover page: optional `logo` / `cover_image` metadata fields and a details table — judged against the real SEA report's hand-built LaTeX cover
-- [ ] Large-figure placement: figures that leave a page gap (the old report managed this with manual `\newpage`) — try `set figure(placement: auto)` or smarter spacing
-- [ ] Heading/link colors: old report used navy headings + teal links; current template is black + navy — pick the default look
+- [x] Cover page: optional `logo` metadata field (validated project-relative path; metadata-form field; rendered centered above the title). `cover_image` and a details table deliberately skipped — the logo + title + authors cover reads clean; revisit only if a side-by-side against the old cover demands it
+- [x] Large-figure placement: `set figure(placement: auto)` — figures float to the top/bottom of pages instead of leaving gaps. Measured on the real report: 127 → 113 pages of reclaimed whitespace
+- [x] Heading/link colors decided: navy headings (`#1f3864`, the old report's look) + navy links (`#1a4b8b`)
 
 **First-run polish:**
-- [ ] Sensible window state (size/position remembered), empty-state screens, real app icon (replace the default Tauri icon)
-- [ ] A `[TODO]`-count warning moment before export (the engine warning exists; give it UI)
+- [x] Window size/position remembered (`tauri-plugin-window-state`); empty-state screens already shipped with M2/M3; real app icon (paper-stack motif, generated for all platforms via `tauri icon`); window title shows the report title
+- [x] `[TODO]`-count warning before export: Export PDF asks "Export it anyway?" while placeholders remain, instead of warning after the file is written
 
 **Packaging and acceptance:**
-- [ ] Windows installer (NSIS via Tauri bundler) with sidecar binaries included
-- [ ] Clean-machine test: install on a machine without Node/Rust/pandoc and walk the MVP.md Definition of Done end to end (create → metadata → sections → figure/code/diagram → counter → View Report → export → reopen)
+- [x] Windows installer (NSIS via Tauri bundler) with both sidecars included — `tauri build` produces `Paperstack_0.1.0_x64-setup.exe` (38 MB; MSI too). Built and verified on the dev machine (2026-06-10)
+- [ ] Clean-machine test: install on a machine without Node/Rust/pandoc and walk the MVP.md Definition of Done end to end (create → metadata → sections → figure/code/diagram → counter → View Report → export → reopen). This is also the production CSP's first real exercise
 - [ ] The author's next real SEA report is written in Paperstack — the v1 bar from PROJECT.md
-- [ ] Tag `v0.1.0`, GitHub release with the installer attached
+- [ ] Tag `v0.1.0`, GitHub release with the installer attached (after the clean-machine test passes)
 
 ---
 
