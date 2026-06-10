@@ -132,7 +132,7 @@ Goal: another student can install it and produce a report unaided.
 
 Known-good improvements that don't gate any milestone — pick up when touching the area anyway:
 
-- [ ] Scripted smoke test for the app shell: drive `VITE_OPEN_PROJECT` against a scratch project and assert the store reaches the expected state (today the UI is verified by use; engine paths are unit-tested)
+- [x] Scripted smoke test for the app shell: `pnpm smoke` scaffolds a scratch project, launches the real app (`tauri dev` + `VITE_SMOKE_SCRIPT`), drives the store through open → edit → save → TODO confirm → export, and asserts the result the app writes to `output/smoke-result.json`. Local only (needs sidecars, port 1420, and a desktop session)
 - [ ] Editor: preserve undo history across section switches (currently each switch resets CodeMirror state — acceptable, but surprising for heavy switchers)
 - [ ] Preview scroll: restore by anchor rather than raw `scrollTop` (image loads shift layout slightly)
 - [ ] Recent-projects list: drop entries that fail to open (currently they just error)
