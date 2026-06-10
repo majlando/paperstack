@@ -76,17 +76,17 @@ Goal: create or open a project, edit sections with autosave, see a live per-sect
 
 Goal: the full core loop — edit → save → **View Report** → **Export PDF** — plus the metadata form. Ordered risk-first: the sidecars (bundled typst/pandoc running from inside the app) are the last real integration risk in the project, so they come before any of the UI around them.
 
-**Sidecars (the risk — do first):**
-- [ ] Bundle `typst` + `pandoc` as Tauri sidecars (`bundle.externalBin`, target-triple-named binaries; extend `fetch-binaries.ps1` to place dev copies where `tauri dev` finds them)
-- [ ] Shell-plugin capability scoped to exactly the two sidecars (no general process execution)
-- [ ] `TauriPlatform.runBinary` via the shell plugin: spawn sidecar, write stdin (Pandoc converts via stdin/stdout), capture stdout/stderr/exit code
-- [ ] Adapt the engine's dependency preflight: "does this binary exist" is a `Platform` question, and a sidecar is referenced by name, not by an absolute path the fs plugin can `exists()` — adjust `BuildOptions`/preflight so both Node (paths) and Tauri (sidecar names) answer it honestly
-- [ ] Smoke test: build the demo fixture to PDF from inside the running app
+**Sidecars (the risk — done, and proven):**
+- [x] Bundle `typst` + `pandoc` as Tauri sidecars (`bundle.externalBin`, target-triple-named binaries; `fetch-binaries.ps1` places dev copies under `src-tauri/binaries/`, git-ignored)
+- [x] Shell-plugin capability scoped to exactly the two sidecars (no general process execution)
+- [x] `TauriPlatform.runBinary` via the shell plugin. Pandoc input travels by temp file, not stdin — the shell plugin cannot close a child's stdin, and pandoc reads stdin until EOF
+- [x] Engine preflight runs each binary with `--version` instead of checking paths — works identically for Node paths and sidecar names, and catches exists-but-broken binaries too
+- [x] Smoke test: `VITE_SMOKE_EXPORT=1` dev hook exports the demo fixture from inside the running app — verified, 98 KB PDF written by the sidecars
 
 **The loop:**
-- [ ] View Report: compile via the engine, show the real PDF in a pane (WebView2 built-in viewer first; upgrade path is pdf.js if scroll reset on recompile gets annoying — decision documented in STACK.md); recompile on demand; surface engine warnings (TODO count, over cap, locked-file fallback) in report wording
-- [ ] Export PDF button — same pipeline, writes `output/report.pdf`, confirms with the written path; locked-file fallback surfaced as a warning, not an error
-- [ ] Stale-render sweep at export: delete `diagrams/rendered/*.svg` whose hash no longer appears in any section (needs `Platform.removeFile`; engine logic + unit test)
+- [x] View Report: Preview/Report tabs in the right pane; compile via the engine, PDF in WebView2's built-in viewer (iframe; pdf.js is the documented upgrade path if scroll reset annoys); clicking the tab recompiles on demand; engine warnings (TODOs, over cap, locked-file fallback) shown in an amber strip
+- [x] Export PDF button — same pipeline, writes `output/report.pdf`, green notice with the written path; locked-file fallback arrives as a warning, not an error
+- [x] Stale-render sweep after successful export: hash-named `diagrams/rendered/*.svg` no longer referenced by any section are deleted (strictly 8-hex-digit names — user files untouched)
 
 **Metadata form:**
 - [ ] Engine: comment-preserving metadata edits on `document.yaml` via the yaml Document API (same approach as `section-edit.ts`; one function per field group, unit-tested round-trips)
@@ -146,7 +146,7 @@ Known-good improvements that don't gate any milestone — pick up when touching 
 
 | Risk | Status / mitigation |
 |---|---|
-| Tauri sidecar/permission friction | **The open risk** — first task of M3, isolated in `TauriPlatform.runBinary`; Electron remains the documented fallback |
+| Tauri sidecar/permission friction | **Cleared (2026-06-10)** — sidecars run scoped via the shell plugin; in-app export verified on the demo fixture |
 | WebView2 PDF viewer UX (scroll reset on recompile) | Accept first; pdf.js is the documented upgrade path |
 | Pandoc's Typst output fights the template | Mitigated: proven against the real report in M1; converter stays behind an interface, remark-based emitter is the fallback |
 | Mermaid → SVG → Typst rendering quality | Proven in M1 with real diagrams from the SEA report |
