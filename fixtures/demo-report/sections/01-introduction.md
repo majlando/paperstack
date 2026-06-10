@@ -1,12 +1,12 @@
 # Introduction
 
-This chapter introduces the demo system. It contains exactly the kinds of
-content a real SEA report body chapter contains: prose, a list, and an inline
+This section introduces the demo system. It contains exactly the kinds of
+content a real SEA report body section contains: prose, a list, and an inline
 reference to a figure.
 
 The goals of the demo system are:
 
-- demonstrate a structured Markdown chapter
+- demonstrate a structured Markdown section
 - include a figure with a caption
 - include a `[TODO]` written as inline code, which must NOT be counted
 

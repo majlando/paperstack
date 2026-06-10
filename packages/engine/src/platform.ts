@@ -9,6 +9,8 @@ export interface Platform {
   writeTextFile(path: string, content: string): Promise<void>;
   fileExists(path: string): Promise<boolean>;
   listDir(path: string): Promise<string[]>;
+  /** Create a directory, including missing parents. No error if it exists. */
+  mkdir(path: string): Promise<void>;
   /** Run a bundled binary (typst, pandoc) and capture its output. */
   runBinary(
     binary: string,

@@ -1,4 +1,4 @@
-import { readFile, writeFile, readdir, access } from "node:fs/promises";
+import { readFile, writeFile, readdir, access, mkdir } from "node:fs/promises";
 import { execFile } from "node:child_process";
 import type { Platform } from "./platform.ts";
 
@@ -23,6 +23,10 @@ export class NodePlatform implements Platform {
 
   async listDir(path: string): Promise<string[]> {
     return readdir(path);
+  }
+
+  async mkdir(path: string): Promise<void> {
+    await mkdir(path, { recursive: true });
   }
 
   runBinary(

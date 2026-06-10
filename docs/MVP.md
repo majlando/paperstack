@@ -7,12 +7,12 @@ This is the main focus. Nothing outside this document blocks a v1 release.
 ## Features
 
 1. **Create / open a project** — one SEA template; all changes saved to plain files on disk. New projects include a ready-made `.gitignore` (build output, rendered diagrams) so group repos stay clean, and reopening/reloading a project picks up changes made outside the app (e.g. after a `git pull`).
-2. **Structure sidebar** — sections grouped by role (front matter / chapters / appendices), with add, rename, delete, and move up/down. Section order lives in the `sections` list in `document.yaml` (the single source of truth — filename number prefixes are just a human-friendly convention), so reordering is a simple list edit. Drag-and-drop later.
+2. **Structure sidebar** — sections grouped by role (front matter / sections / appendices), with add, rename, delete, and move up/down. Section order lives in the `sections` list in `document.yaml` (the single source of truth — filename number prefixes are just a human-friendly convention), so reordering is a simple list edit. Drag-and-drop later.
 3. **Markdown editor** — CodeMirror 6: syntax highlighting, fenced code blocks, autosave.
-4. **Per-chapter live preview** — headings, lists, tables, code with highlighting, images, Mermaid.
+4. **Per-section live preview** — headings, lists, tables, code with highlighting, images, Mermaid.
 5. **Metadata form** — edits `document.yaml`; no raw YAML required.
 6. **Insert helpers** — Insert Code Block, Insert Figure (copies the image into `figures/` and inserts the Markdown), Insert Diagram (Mermaid stub). No bold/italic/table toolbar buttons in v1 — Markdown handles those.
-7. **Length counter** — normalsider per chapter + body total vs. cap, always visible. **TODO counter** — `[TODO]` placeholders per chapter, warning before export.
+7. **Length counter** — normalsider per section + body total vs. cap, always visible. **TODO counter** — `[TODO]` placeholders per section, warning before export.
 8. **View Report** — compile and show the real PDF in-app.
 9. **Export PDF** — to `output/report.pdf`.
 10. **Human-readable errors** for the known failure cases:
@@ -26,7 +26,7 @@ This is the main focus. Nothing outside this document blocks a v1 release.
 
 - Math/equations
 - Table editing helpers
-- Citations / BibTeX (a hand-written references chapter is the v1 answer)
+- Citations / BibTeX (a hand-written references section is the v1 answer)
 - Multiple templates, template customization
 - Drag-and-drop reordering
 - Full-report HTML view (the PDF pane *is* the full-report view)
@@ -49,7 +49,7 @@ This de-risks everything. If the PDF looks right here, the rest is UI work.
 
 ### 2. App shell
 
-Tauri app: create/open project, sidebar, CodeMirror editor with autosave, per-chapter preview with Mermaid.
+Tauri app: create/open project, sidebar, CodeMirror editor with autosave, per-section preview with Mermaid.
 
 ### 3. Report workflow
 
@@ -65,7 +65,7 @@ A student can, without a terminal and without installing anything else:
 
 1. Install Paperstack and create a new SEA report project
 2. Fill in metadata via the form
-3. Add and edit chapters; see the live preview
+3. Add and edit sections; see the live preview
 4. Insert a code block, a figure, and a Mermaid diagram
 5. See the normalsider count against the cap
 6. View the assembled PDF in-app and export it

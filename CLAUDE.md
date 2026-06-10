@@ -2,7 +2,9 @@
 
 Paperstack is a Tauri 2 desktop app for writing structured technical reports in Markdown and exporting professional PDFs via bundled Typst. Read `docs/MVP.md` for scope, `docs/STACK.md` for the stack, `docs/DEVELOPMENT.md` for the plan.
 
-## Architecture rules (do not violate)
+## Architecture rules
+
+Deliberate defaults, not dogma — deviate when something is clearly better, and update this file when you do.
 
 - **`packages/engine` is pure TypeScript with zero framework imports** — no React, no Tauri APIs. All fs/process access goes through the injected `Platform` interface (`NodePlatform` in tests/CLI, `TauriPlatform` in the app).
 - **React is used thin.** CodeMirror, Mermaid, and the PDF embed are vanilla TS classes wrapped once in small React mount components via refs. Do not add third-party React wrapper packages (`@uiw/react-codemirror` etc.).
@@ -22,6 +24,7 @@ Paperstack is a Tauri 2 desktop app for writing structured technical reports in 
 
 ## Domain terms
 
-- **Normalside** — Danish academic page unit: 2400 characters, HTML comments stripped. Body chapters only count toward the cap (default 40).
+- **Normalside** — Danish academic page unit: 2400 characters, HTML comments stripped. Body sections only count toward the cap (default 40).
+- **Sections** — the report's top-level divisions (academic-report terminology; not "chapters"). Use "section" in code, docs, and UI wording.
 - **Section roles** — `front-matter | body | back-matter | appendix`; only `body` counts toward the cap.
 - **SEA report** — the target report format for v1 (Danish academy CS exam report).

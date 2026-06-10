@@ -4,14 +4,14 @@
 
 Paperstack is an open-source desktop app for writing structured technical reports in Markdown and exporting them as professional PDFs.
 
-The first concrete target is one report type done extremely well: the **SEA exam report** (Danish academy CS project report) — Markdown chapters, a metadata form, figures, diagrams, code blocks, a normalsider counter, and one-click PDF export. If it works for that, it generalizes to other CS reports later.
+The first concrete target is one report type done extremely well: the **SEA exam report** (Danish academy CS project report) — Markdown sections, a metadata form, figures, diagrams, code blocks, a normalsider counter, and one-click PDF export. If it works for that, it generalizes to other CS reports later.
 
 The core user journey:
 
 ```
 Create report project
 → fill in metadata (form, not YAML)
-→ write chapters in Markdown
+→ write sections in Markdown
 → insert code, figures, diagrams
 → watch the length counter
 → View Report (the actual PDF)
@@ -30,7 +30,7 @@ Word is weak for code-heavy structured reports. LaTeX/Overleaf and Pandoc produc
 2. Other SEA / Danish academy CS students with the same report requirements — people who don't want Word but also don't want LaTeX.
 3. Later: CS students generally, and anyone writing structured technical documents.
 
-The **app** is single-user in v1, but the next real report is a group report — so the **project format** must be group-ready from the start: plain text, deterministic file writes (clean diffs), generated files git-ignored. A team can then share a report project over plain Git even if only some members use Paperstack, while others edit chapters in any editor. Actual collaboration features (sync, comments, review) remain future directions.
+The **app** is single-user in v1, but the next real report is a group report — so the **project format** must be group-ready from the start: plain text, deterministic file writes (clean diffs), generated files git-ignored. A team can then share a report project over plain Git even if only some members use Paperstack, while others edit sections in any editor. Actual collaboration features (sync, comments, review) remain future directions.
 
 ## Positioning
 
@@ -41,16 +41,16 @@ Paperstack is **not**: a Word replacement, a LaTeX IDE, a general Markdown edito
 ## Locked design decisions
 
 1. **PDF engine: Typst, bundled with the app.**
-   Markdown chapters are converted to Typst markup and compiled with a bundled `typst` binary. No LaTeX, no MiKTeX, no system dependencies. The SEA template is a `.typ` template (cover page, ToC, numbered headings, code styling, figure numbering, appendix handling).
+   Markdown sections are converted to Typst markup and compiled with a bundled `typst` binary. No LaTeX, no MiKTeX, no system dependencies. The SEA template is a `.typ` template (cover page, ToC, numbered headings, code styling, figure numbering, appendix handling).
 
 2. **Diagrams: Mermaid, pre-rendered to SVG inside the app.**
    Preview renders Mermaid live with the Mermaid JS library. On save, the app renders each diagram to an SVG file in the project folder; the PDF export embeds those SVGs. Export stays deterministic, needs no headless browser, and the project stays portable.
 
 3. **One rendering path for the full report: "View Report" shows the real PDF.**
-   There is no separate assembled-HTML view. Typst compiles fast enough that View Report = compile + show the PDF in a pane. The per-chapter HTML preview is for fast feedback while typing; the PDF is the truth. This removes the entire class of "preview doesn't match export" bugs.
+   There is no separate assembled-HTML view. Typst compiles fast enough that View Report = compile + show the PDF in a pane. The per-section HTML preview is for fast feedback while typing; the PDF is the truth. This removes the entire class of "preview doesn't match export" bugs.
 
 4. **Projects are plain folders with open formats — and Git-friendly by design.**
-   Markdown, YAML, Mermaid source, SVG/PNG assets. Editable outside the app. The app automates the workflow; it does not own the document. Files are written deterministically (stable formatting, minimal diffs), generated output is git-ignored, and the app handles chapters changed outside it (e.g. after a `git pull`) gracefully — because real reports are group reports shared over version control.
+   Markdown, YAML, Mermaid source, SVG/PNG assets. Editable outside the app. The app automates the workflow; it does not own the document. Files are written deterministically (stable formatting, minimal diffs), generated output is git-ignored, and the app handles files changed outside it (e.g. after a `git pull`) gracefully — because real reports are group reports shared over version control.
 
 5. **One template.** The SEA report template, polished. More templates later.
 
@@ -58,9 +58,9 @@ Paperstack is **not**: a Word replacement, a LaTeX IDE, a general Markdown edito
 
 Features that generic Markdown→PDF tools don't have, proven necessary by the hand-built toolchain this project replaces:
 
-- **Length tracking against a cap.** Live "Body: 39,1 / 40 normalsider" in the UI (1 normalside = 2400 characters, HTML comments stripped, body chapters only, cap configurable). Danish academies grade against this.
-- **Section roles.** A chapter is front-matter, body, back-matter, or appendix. Only body counts toward the cap; appendices get appropriate ToC treatment.
-- **TODO tracking.** Count of `[TODO]` placeholders per chapter, with a warning before export.
+- **Length tracking against a cap.** Live "Body: 39,1 / 40 normalsider" in the UI (1 normalside = 2400 characters, HTML comments stripped, body sections only, cap configurable). Danish academies grade against this.
+- **Section roles.** A section is front-matter, body, back-matter, or appendix. Only body counts toward the cap; appendices get appropriate ToC treatment.
+- **TODO tracking.** Count of `[TODO]` placeholders per section, with a warning before export.
 - **A figure convention that produces numbered captions.** The Markdown image alt text becomes "Figure N: <alt text>" in the PDF (label localized via the document language — "Figur" for Danish). No raw uncaptioned images.
 
 ## Project structure on disk
@@ -68,7 +68,7 @@ Features that generic Markdown→PDF tools don't have, proven necessary by the h
 ```
 my-report/
 ├─ document.yaml
-├─ chapters/
+├─ sections/
 │  ├─ 01-introduction.md
 │  └─ ...
 ├─ appendices/
@@ -95,7 +95,7 @@ date: 2026-06-10
 language: en          # en is the default; da switches labels (Figur, Indholdsfortegnelse)
 body_cap_normalsider: 40
 sections:
-  - { file: chapters/01-introduction.md, role: body }
+  - { file: sections/01-introduction.md, role: body }
   - { file: appendices/appendix-a-install.md, role: appendix }
 ```
 

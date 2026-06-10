@@ -1,6 +1,6 @@
 # Paperstack
 
-**Professional reports from Markdown chapters.**
+**Professional reports from Markdown sections.**
 
 Paperstack is an open-source desktop app for writing structured technical reports in Markdown and exporting them as clean, professional PDFs — without Word, and without the complexity of LaTeX.
 
@@ -16,15 +16,15 @@ The existing tools all have a catch:
 - **LaTeX / Overleaf** — professional output, steep learning curve.
 - **Pandoc + scripts** — powerful, but you end up maintaining a build system instead of writing.
 
-Paperstack packages the Markdown-to-PDF workflow into a focused app. You write chapters in Markdown, fill in report metadata in a form, insert figures and diagrams with a click, watch a live length counter, and export a polished PDF. Everything needed ships inside the installer — no LaTeX, no terminal, no PATH setup.
+Paperstack packages the Markdown-to-PDF workflow into a focused app. You write the report's sections in Markdown, fill in report metadata in a form, insert figures and diagrams with a click, watch a live length counter, and export a polished PDF. Everything needed ships inside the installer — no LaTeX, no terminal, no PATH setup.
 
 The first target is the **SEA exam report** (Danish academy CS project report), done extremely well — including a live *normalsider* counter against the page cap. If it works for that, it generalizes.
 
 ## Planned v1 features
 
 - Report projects as plain folders — Markdown, YAML, and images you can edit with any tool
-- Structure-aware sidebar: front matter, chapters, appendices
-- Markdown editor (CodeMirror) with live per-chapter preview
+- Structure-aware sidebar: front matter, sections, appendices
+- Markdown editor (CodeMirror) with live per-section preview
 - Metadata form — no raw YAML required
 - Mermaid diagrams, rendered live in preview and embedded as SVG in the PDF
 - Insert helpers for code blocks, figures, and diagrams
@@ -40,7 +40,7 @@ A Paperstack project is just a folder:
 ```
 my-report/
 ├─ document.yaml      # title, authors, course, section order
-├─ chapters/          # 01-introduction.md, 02-background.md, ...
+├─ sections/          # 01-introduction.md, 02-background.md, ...
 ├─ appendices/
 ├─ figures/
 ├─ diagrams/          # Mermaid sources + rendered SVGs

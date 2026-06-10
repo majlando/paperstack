@@ -16,8 +16,8 @@ describe("NodePlatform against the demo fixture", () => {
     expect(content).toContain("title:");
   });
 
-  it("lists chapter files", async () => {
-    const files = await platform.listDir(join(fixtureDir, "chapters"));
+  it("lists section files", async () => {
+    const files = await platform.listDir(join(fixtureDir, "sections"));
     expect(files).toContain("01-introduction.md");
   });
 
