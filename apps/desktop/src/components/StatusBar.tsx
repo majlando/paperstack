@@ -1,4 +1,37 @@
+import { findTodoOffsets } from "@paperstack/engine";
 import { useStore } from "../store.ts";
+import { activeEditor } from "../editor/editor-registry.ts";
+
+/**
+ * Cycle to the next [TODO] in the active section; when it has none, open the
+ * first section that still has one. The deferred select after a section
+ * switch waits for the editor to receive the new content.
+ */
+async function jumpToNextTodo(): Promise<void> {
+  const { content, counts, openSection } = useStore.getState();
+  const editor = activeEditor();
+  if (!editor) return;
+
+  const select = (text: string, offset: number) => {
+    const end = text.indexOf("]", offset);
+    editor.select(offset, end === -1 ? offset + "[TODO".length : end + 1);
+  };
+
+  const offsets = findTodoOffsets(content);
+  if (offsets.length > 0) {
+    const next = offsets.find((o) => o > editor.cursorOffset()) ?? offsets[0]!;
+    select(content, next);
+    return;
+  }
+  const target = counts?.sections.find((s) => s.todos > 0);
+  if (!target) return;
+  await openSection(target.file);
+  setTimeout(() => {
+    const opened = useStore.getState().content;
+    const first = findTodoOffsets(opened)[0];
+    if (first !== undefined) select(opened, first);
+  }, 50);
+}
 
 export function StatusBar() {
   const counts = useStore((s) => s.counts);
@@ -17,7 +50,13 @@ export function StatusBar() {
         {over && " — over the cap"}
       </span>
       {counts.todosTotal > 0 && (
-        <span className="text-amber-400">{counts.todosTotal} TODO</span>
+        <button
+          onClick={() => void jumpToNextTodo()}
+          title="Jump to the next [TODO]"
+          className="rounded px-1 text-amber-400 hover:bg-zinc-800 hover:text-amber-300"
+        >
+          {counts.todosTotal} TODO
+        </button>
       )}
       <span className="ml-auto flex items-center gap-3">
         {active && (

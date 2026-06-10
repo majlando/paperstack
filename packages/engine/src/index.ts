@@ -16,6 +16,7 @@ export {
   CHARS_PER_NORMALSIDE,
   countAnslag,
   countTodos,
+  findTodoOffsets,
   countProject,
   applySectionContent,
   type SectionCount,

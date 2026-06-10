@@ -127,6 +127,23 @@ export class MarkdownEditor {
     return this.view.state.doc.toString();
   }
 
+  /** Current cursor position (selection head) as a character offset. */
+  cursorOffset(): number {
+    return this.view.state.selection.main.head;
+  }
+
+  /** Select a range, scroll it into view, and focus the editor. */
+  select(from: number, to: number): void {
+    const length = this.view.state.doc.length;
+    const anchor = Math.min(from, length);
+    const head = Math.min(to, length);
+    this.view.dispatch({
+      selection: { anchor, head },
+      effects: EditorView.scrollIntoView(anchor, { y: "center" }),
+    });
+    this.view.focus();
+  }
+
   focus(): void {
     this.view.focus();
   }

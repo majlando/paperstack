@@ -1,6 +1,7 @@
 import { useEffect, useRef } from "react";
 import { useStore } from "../store.ts";
 import { MarkdownEditor } from "../editor/markdown-editor.ts";
+import { registerEditor } from "../editor/editor-registry.ts";
 
 /**
  * Thin React bridge for the vanilla-TS CodeMirror wrapper: mounts it once
@@ -27,8 +28,10 @@ export function Editor() {
       onBlur: () => void useStore.getState().saveActive(),
     });
     editorRef.current = editor;
+    registerEditor(editor);
     return () => {
       if (timer.current) clearTimeout(timer.current);
+      registerEditor(null);
       editor.destroy();
       editorRef.current = null;
     };

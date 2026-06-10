@@ -3,6 +3,7 @@ import {
   applySectionContent,
   countAnslag,
   countTodos,
+  findTodoOffsets,
   type ProjectCounts,
 } from "./counters.ts";
 
@@ -59,6 +60,11 @@ describe("applySectionContent", () => {
 describe("countTodos", () => {
   it("counts [TODO markers", () => {
     expect(countTodos("[TODO: write intro]\nsome text\n[TODO later]")).toBe(2);
+  });
+
+  it("reports marker offsets for click-to-jump", () => {
+    expect(findTodoOffsets("[TODO: a]\ntext\n[TODO: b]")).toEqual([0, 15]);
+    expect(findTodoOffsets("only `[TODO]` in code")).toEqual([]);
   });
 
   it("ignores inline-code mentions like `[TODO]`", () => {

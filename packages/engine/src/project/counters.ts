@@ -15,11 +15,18 @@ export function countAnslag(markdown: string): number {
 }
 
 /**
- * Counts genuine `[TODO` placeholders. A backtick directly before (inline
- * code like `` `[TODO]` ``) means the text *discusses* a TODO and is not one.
+ * Genuine `[TODO` placeholders. A backtick directly before (inline code like
+ * `` `[TODO]` ``) means the text *discusses* a TODO and is not one.
  */
+const TODO_MARKER = /(?<!`)\[TODO/g;
+
+/** Character offsets of every `[TODO` marker — drives the editor's click-to-jump. */
+export function findTodoOffsets(markdown: string): number[] {
+  return [...markdown.matchAll(TODO_MARKER)].map((m) => m.index ?? 0);
+}
+
 export function countTodos(markdown: string): number {
-  return (markdown.match(/(?<!`)\[TODO/g) ?? []).length;
+  return findTodoOffsets(markdown).length;
 }
 
 export interface SectionCount {
