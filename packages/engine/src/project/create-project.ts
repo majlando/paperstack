@@ -1,5 +1,5 @@
-import type { Platform } from "./platform.ts";
-import { PaperstackError } from "./errors.ts";
+import type { Platform } from "../platform/platform.ts";
+import { PaperstackError } from "../errors.ts";
 
 export interface CreateProjectOptions {
   title: string;

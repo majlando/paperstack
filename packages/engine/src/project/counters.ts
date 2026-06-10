@@ -1,5 +1,5 @@
-import type { Platform } from "./platform.ts";
-import type { Project } from "./project.ts";
+import type { Platform } from "../platform/platform.ts";
+import type { Project } from "./load-project.ts";
 import type { SectionRole } from "./schema.ts";
 
 /** Danish academic page unit: 1 normalside = 2400 characters (anslag). */

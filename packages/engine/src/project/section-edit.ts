@@ -6,7 +6,7 @@
  * show up as churn across the whole file.
  */
 import { parseDocument, YAMLMap, YAMLSeq } from "yaml";
-import { PaperstackError } from "./errors.ts";
+import { PaperstackError } from "../errors.ts";
 import { sectionFileSchema, SECTION_ROLES, type SectionRole } from "./schema.ts";
 
 function loadSections(yamlText: string): { doc: ReturnType<typeof parseDocument>; seq: YAMLSeq } {

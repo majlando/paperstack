@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { extractMermaidBlocks, hashDiagram, sweepStaleRenders } from "./mermaid.ts";
-import { FakePlatform } from "./test-utils.ts";
+import { FakePlatform } from "../platform/fake-platform.ts";
 
 describe("extractMermaidBlocks", () => {
   it("replaces mermaid blocks with rendered-SVG image references", () => {

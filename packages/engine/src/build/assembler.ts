@@ -1,5 +1,5 @@
-import type { DocumentMeta, SectionRole } from "./schema.ts";
-import type { ProjectCounts } from "./counters.ts";
+import type { DocumentMeta, SectionRole } from "../project/schema.ts";
+import type { ProjectCounts } from "../project/counters.ts";
 
 export function escapeTypstString(s: string): string {
   return s.replace(/\\/g, "\\\\").replace(/"/g, '\\"');

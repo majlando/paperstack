@@ -7,7 +7,7 @@
  * FNV-1a is used instead of node:crypto so this module also runs in the
  * Tauri webview.
  */
-import type { Platform } from "./platform.ts";
+import type { Platform } from "../platform/platform.ts";
 
 export function hashDiagram(code: string): string {
   let h = 0x811c9dc5;

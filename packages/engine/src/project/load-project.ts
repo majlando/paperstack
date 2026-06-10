@@ -1,6 +1,6 @@
 import { parse } from "yaml";
-import type { Platform } from "./platform.ts";
-import { PaperstackError } from "./errors.ts";
+import type { Platform } from "../platform/platform.ts";
+import { PaperstackError } from "../errors.ts";
 import { documentSchema, type DocumentMeta } from "./schema.ts";
 
 export interface Project {

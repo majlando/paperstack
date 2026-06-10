@@ -1,7 +1,7 @@
-import type { Platform } from "./platform.ts";
-import { PaperstackError } from "./errors.ts";
-import { loadProject } from "./project.ts";
-import { countProject, type ProjectCounts } from "./counters.ts";
+import type { Platform } from "../platform/platform.ts";
+import { PaperstackError } from "../errors.ts";
+import { loadProject } from "../project/load-project.ts";
+import { countProject, type ProjectCounts } from "../project/counters.ts";
 import { extractMermaidBlocks, sweepStaleRenders } from "./mermaid.ts";
 import { PandocConverter, type Converter } from "./converter.ts";
 import { SEA_TEMPLATE } from "./template.ts";

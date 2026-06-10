@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
-import { FakePlatform } from "./test-utils.ts";
+import { FakePlatform } from "../platform/fake-platform.ts";
 import { buildReport } from "./builder.ts";
-import { PaperstackError } from "./errors.ts";
+import { PaperstackError } from "../errors.ts";
 
 describe("buildReport preflight", () => {
   it("reports missing typst/pandoc binaries in plain language", async () => {

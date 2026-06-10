@@ -5,7 +5,7 @@ import { NodePlatform } from "./node-platform.ts";
 
 const fixtureDir = join(
   fileURLToPath(new URL(".", import.meta.url)),
-  "../../../fixtures/demo-report",
+  "../../../../fixtures/demo-report",
 );
 
 describe("NodePlatform against the demo fixture", () => {

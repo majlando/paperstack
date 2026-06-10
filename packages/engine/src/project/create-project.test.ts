@@ -1,8 +1,8 @@
 import { describe, expect, it } from "vitest";
-import { FakePlatform } from "./test-utils.ts";
+import { FakePlatform } from "../platform/fake-platform.ts";
 import { createProject } from "./create-project.ts";
-import { loadProject } from "./project.ts";
-import { PaperstackError } from "./errors.ts";
+import { loadProject } from "./load-project.ts";
+import { PaperstackError } from "../errors.ts";
 
 describe("createProject", () => {
   it("scaffolds a project that loadProject accepts as-is", async () => {

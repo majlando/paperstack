@@ -5,7 +5,7 @@ import {
   removeSectionFromYaml,
   renameSectionInYaml,
 } from "./section-edit.ts";
-import { PaperstackError } from "./errors.ts";
+import { PaperstackError } from "../errors.ts";
 
 const YAML = `# Group report — order is the single source of truth
 title: "Demo"

@@ -1,15 +1,15 @@
 import { describe, expect, it } from "vitest";
 import { fileURLToPath } from "node:url";
 import { join } from "node:path";
-import { NodePlatform } from "./node-platform.ts";
-import { FakePlatform } from "./test-utils.ts";
-import { loadProject } from "./project.ts";
+import { NodePlatform } from "../platform/node-platform.ts";
+import { FakePlatform } from "../platform/fake-platform.ts";
+import { loadProject } from "./load-project.ts";
 import { countProject } from "./counters.ts";
-import { PaperstackError } from "./errors.ts";
+import { PaperstackError } from "../errors.ts";
 
 const fixtureDir = join(
   fileURLToPath(new URL(".", import.meta.url)),
-  "../../../fixtures/demo-report",
+  "../../../../fixtures/demo-report",
 ).replaceAll("\\", "/");
 
 describe("loadProject on the demo fixture", () => {

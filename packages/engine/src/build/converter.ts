@@ -1,5 +1,5 @@
-import type { Platform } from "./platform.ts";
-import { PaperstackError } from "./errors.ts";
+import type { Platform } from "../platform/platform.ts";
+import { PaperstackError } from "../errors.ts";
 
 /**
  * Markdown → Typst conversion, behind an interface so the Pandoc sidecar can

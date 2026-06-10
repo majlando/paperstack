@@ -13,7 +13,10 @@ The working plan for getting from empty repo to v1 (see [MVP.md](MVP.md) for sco
 - [x] pnpm workspace monorepo:
   ```
   paperstack/
-  ├─ packages/engine/        # pure TS library (Milestone 1)
+  ├─ packages/engine/        # pure TS library; src grouped by domain:
+  │                          #   platform/ (fs/process abstraction + impls)
+  │                          #   project/  (schema, loader, scaffold, edits, counters)
+  │                          #   build/    (converter, template, assembler, builder, mermaid)
   ├─ apps/desktop/           # Tauri + React app (Milestone 2+)
   ├─ fixtures/
   │  └─ demo-report/         # committed, synthetic SEA-style fixture

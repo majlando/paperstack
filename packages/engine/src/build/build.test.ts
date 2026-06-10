@@ -3,11 +3,11 @@ import { existsSync, statSync } from "node:fs";
 import { readFile, writeFile, mkdir } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
 import { join } from "node:path";
-import { NodePlatform } from "./node-platform.ts";
+import { NodePlatform } from "../platform/node-platform.ts";
 import { buildReport } from "./builder.ts";
 import { extractMermaidBlocks } from "./mermaid.ts";
 
-const root = join(fileURLToPath(new URL(".", import.meta.url)), "../../..");
+const root = join(fileURLToPath(new URL(".", import.meta.url)), "../../../..");
 const fixtureDir = join(root, "fixtures/demo-report").replaceAll("\\", "/");
 const exe = process.platform === "win32" ? ".exe" : "";
 const typstPath = join(root, "bin", `typst${exe}`);
