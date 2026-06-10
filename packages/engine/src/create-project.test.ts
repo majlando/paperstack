@@ -31,6 +31,26 @@ describe("createProject", () => {
     }
   });
 
+  it("appends to an existing .gitignore instead of overwriting it", async () => {
+    const platform = new FakePlatform(
+      new Map([["/proj/.gitignore", "node_modules/\n"]]),
+    );
+    await createProject(platform, "/proj", { title: "T" });
+
+    const gitignore = platform.files.get("/proj/.gitignore")!;
+    expect(gitignore).toContain("node_modules/");
+    expect(gitignore).toContain("output/");
+    expect(gitignore).toContain("diagrams/rendered/");
+  });
+
+  it("never overwrites existing section files", async () => {
+    const platform = new FakePlatform(
+      new Map([["/proj/sections/01-introduction.md", "# Mine\n"]]),
+    );
+    await createProject(platform, "/proj", { title: "T" });
+    expect(platform.files.get("/proj/sections/01-introduction.md")).toBe("# Mine\n");
+  });
+
   it("localizes the starter sections for Danish reports", async () => {
     const platform = new FakePlatform();
     await createProject(platform, "/proj", { title: "T", language: "da" });
