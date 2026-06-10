@@ -45,6 +45,17 @@ describe("loadProject error messages", () => {
     expect(error.userMessage).toContain("document.yaml");
   });
 
+  it("names Git conflict markers instead of surfacing a YAML parse error", async () => {
+    const yaml =
+      "title: Mine\n<<<<<<< HEAD\nbody_cap_normalsider: 40\n=======\nbody_cap_normalsider: 35\n>>>>>>> main\nsections:\n  - { file: a.md, role: body }\n";
+    const platform = new FakePlatform(new Map([["/proj/document.yaml", yaml]]));
+    const error = await loadProject(platform, "/proj").catch((e) => e);
+    expect(error).toBeInstanceOf(PaperstackError);
+    expect(error.code).toBe("metadata-conflict-markers");
+    expect(error.userMessage).toContain("merge conflict");
+    expect(error.userMessage).not.toMatch(/exit|code \d+/i);
+  });
+
   it("reports invalid metadata with field names", async () => {
     const platform = new FakePlatform(
       new Map([

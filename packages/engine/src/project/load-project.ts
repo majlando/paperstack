@@ -20,6 +20,17 @@ export async function loadProject(platform: Platform, dir: string): Promise<Proj
 
   const raw = await platform.readTextFile(metaPath);
 
+  // The likeliest broken state after a bad merge of the shared structure
+  // file — name it instead of surfacing a YAML parse error.
+  if (/^<{7}( |$)/m.test(raw)) {
+    throw new PaperstackError(
+      "metadata-conflict-markers",
+      `document.yaml contains unresolved Git merge conflict markers (<<<<<<<). ` +
+        `Open it in a text editor, keep the lines that are right, delete the ` +
+        `<<<<<<<, =======, and >>>>>>> lines, then reload the project.`,
+    );
+  }
+
   let parsed: unknown;
   try {
     parsed = parse(raw);
