@@ -50,8 +50,22 @@ export const documentSchema = z.object({
   subtitle: z.string().optional(),
   course: z.string().optional(),
   institution: z.string().optional(),
-  /** Project-relative image path shown at the top of the cover page. */
-  logo: projectRelativePath("logo path").optional(),
+  /**
+   * Project-relative image path shown at the top of the cover page.
+   * Tolerant of hand-edited values (the file is shared over Git): a leading
+   * slash and backslashes are normalized away, and an empty/null value means
+   * "no logo" — a logo must never make an existing project fail to open.
+   * Genuinely unusable values (absolute paths, "..") are still rejected.
+   */
+  logo: z
+    .union([z.string(), z.null()])
+    .optional()
+    .transform((v) => {
+      if (v == null) return undefined;
+      const cleaned = v.trim().replaceAll("\\", "/").replace(/^\/+/, "");
+      return cleaned === "" ? undefined : cleaned;
+    })
+    .pipe(projectRelativePath("logo path").optional()),
   authors: z.array(authorSchema).default([]),
   date: z.string().optional(),
   language: z.enum(["en", "da"]).default("en"),

@@ -7,7 +7,10 @@
 export interface Platform {
   readTextFile(path: string): Promise<string>;
   writeTextFile(path: string, content: string): Promise<void>;
+  /** True when a file exists at the path. For directories use `dirExists`. */
   fileExists(path: string): Promise<boolean>;
+  /** True when the path exists and is a directory. */
+  dirExists(path: string): Promise<boolean>;
   listDir(path: string): Promise<string[]>;
   /** Create a directory, including missing parents. No error if it exists. */
   mkdir(path: string): Promise<void>;

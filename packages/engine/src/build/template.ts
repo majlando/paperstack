@@ -23,7 +23,8 @@ export const SEA_TEMPLATE = `// Paperstack SEA report template (written by Paper
   set document(title: title)
   set text(lang: language, size: 11pt, font: ("Cambria", "Libertinus Serif", "New Computer Modern"))
   show raw: set text(font: ("Consolas", "DejaVu Sans Mono"), size: 9pt)
-  set page(paper: "a4", margin: (x: 2.4cm, top: 2.6cm, bottom: 2.6cm))
+  let margins = (x: 2.4cm, top: 2.6cm, bottom: 2.6cm)
+  set page(paper: "a4", margin: margins)
   set par(justify: true)
   set heading(numbering: "1.1")
   show heading.where(level: 1): it => {
@@ -35,7 +36,18 @@ export const SEA_TEMPLATE = `// Paperstack SEA report template (written by Paper
   show figure.caption: set text(size: 9.5pt)
   // Large images float to the top/bottom of a page instead of leaving a gap
   // (the old hand-built report managed this with manual newpage hints).
-  set figure(placement: auto)
+  // Only figures taller than ~a third of the text area float: small figures
+  // must stay exactly where they are written, and floating is a Typst error
+  // inside containers (blockquotes, lists), which small figures can sit in.
+  show figure: it => context {
+    let text-w = page.width - 2 * margins.x
+    let text-h = page.height - margins.top - margins.bottom
+    if measure(block(width: text-w, it)).height > 0.35 * text-h {
+      place(auto, float: true, block(width: 100%, it))
+    } else {
+      it
+    }
+  }
   // Navy headings + navy links: the deliberate default look (M4 decision),
   // matching the original report's heading color.
   show heading: set text(fill: rgb("#1f3864"))

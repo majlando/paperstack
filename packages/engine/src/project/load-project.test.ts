@@ -100,6 +100,25 @@ describe("loadProject error messages", () => {
     expect(error.userMessage).toContain("more than once");
   });
 
+  it("tolerates hand-edited logo values instead of refusing to open", async () => {
+    // The logo was once stripped as an unknown key — projects that carry a
+    // leading-slash or empty value must keep loading after the upgrade.
+    const yaml = (logo: string) =>
+      `title: T\n${logo}\nsections:\n  - { file: a.md, role: body }\n`;
+    const load = (logo: string) =>
+      loadProject(
+        new FakePlatform(new Map([["/proj/document.yaml", yaml(logo)], ["/proj/a.md", "# A\n"]])),
+        "/proj",
+      );
+    expect((await load("logo: /resources/logo.png")).meta.logo).toBe("resources/logo.png");
+    expect((await load("logo:")).meta.logo).toBeUndefined();
+    expect((await load("logo: ''")).meta.logo).toBeUndefined();
+    // genuinely unusable values still fail with the field named
+    const error = await load("logo: ../logo.png").catch((e) => e);
+    expect(error.code).toBe("metadata-invalid");
+    expect(error.userMessage).toContain("stay inside the project folder");
+  });
+
   it("lists missing section files by name", async () => {
     const platform = new FakePlatform(
       new Map([

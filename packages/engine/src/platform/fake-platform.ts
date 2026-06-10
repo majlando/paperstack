@@ -18,6 +18,12 @@ export class FakePlatform implements Platform {
     return this.files.has(path);
   }
 
+  /** A directory exists when any stored file lives under it. */
+  async dirExists(path: string): Promise<boolean> {
+    const prefix = path.endsWith("/") ? path : `${path}/`;
+    return [...this.files.keys()].some((f) => f.startsWith(prefix));
+  }
+
   /** Names of entries directly under `path` (files and subdirectories). */
   async listDir(path: string): Promise<string[]> {
     const prefix = path.endsWith("/") ? path : `${path}/`;

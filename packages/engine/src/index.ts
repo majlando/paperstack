@@ -42,6 +42,17 @@ export {
   renameSectionInYaml,
 } from "./project/section-edit.ts";
 export { editMetadataInYaml, type MetadataEdit } from "./project/metadata-edit.ts";
+export {
+  normalizeSlashes,
+  dirOf,
+  baseOf,
+  stemOf,
+  extOf,
+  slugify,
+  humanize,
+} from "./project/paths.ts";
+export { newSectionFile } from "./project/new-section-file.ts";
+export { importFigure, suggestedCaption, figureMarkdown } from "./project/import-figure.ts";
 export { buildReport, type BuildOptions, type BuildResult } from "./build/builder.ts";
 
 export const ENGINE_VERSION = "0.0.1";

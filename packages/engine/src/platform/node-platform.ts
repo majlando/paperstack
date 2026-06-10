@@ -7,6 +7,7 @@ import {
   rename,
   rm,
   copyFile,
+  stat,
 } from "node:fs/promises";
 import { execFile } from "node:child_process";
 import type { Platform } from "./platform.ts";
@@ -25,6 +26,14 @@ export class NodePlatform implements Platform {
     try {
       await access(path);
       return true;
+    } catch {
+      return false;
+    }
+  }
+
+  async dirExists(path: string): Promise<boolean> {
+    try {
+      return (await stat(path)).isDirectory();
     } catch {
       return false;
     }
