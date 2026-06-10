@@ -108,6 +108,38 @@ describe("buildReport orchestration (stub converter, fake compile)", () => {
     expect(platform.files.has("/proj/output/.build/converted/notes.txt")).toBe(true);
   });
 
+  it("warns when body sections come after an appendix (shared heading counter)", async () => {
+    const files = projectFiles();
+    files.set(
+      "/proj/document.yaml",
+      "title: T\nsections:\n  - { file: a.md, role: body }\n  - { file: x.md, role: appendix }\n  - { file: b.md, role: body }\n",
+    );
+    files.set("/proj/x.md", "# X\n");
+    const platform = new RunnablePlatform(files);
+    const result = await buildReport(platform, "/proj", {
+      typst: "typst",
+      pandoc: "pandoc",
+      converter: stubConverter,
+    });
+
+    expect(result.warnings.some((w) => w.includes("appendix"))).toBe(true);
+  });
+
+  it("warns when a section contains Git merge conflict markers", async () => {
+    const files = projectFiles();
+    files.set("/proj/a.md", "# A\n<<<<<<< HEAD\nmine\n=======\ntheirs\n>>>>>>> main\n");
+    const platform = new RunnablePlatform(files);
+    const result = await buildReport(platform, "/proj", {
+      typst: "typst",
+      pandoc: "pandoc",
+      converter: stubConverter,
+    });
+
+    expect(result.warnings).toHaveLength(1);
+    expect(result.warnings[0]).toContain(`"a.md"`);
+    expect(result.warnings[0]).toContain("merge conflict");
+  });
+
   it("falls back to a timestamped PDF when report.pdf is locked, as a warning", async () => {
     const platform = new RunnablePlatform(
       projectFiles(),

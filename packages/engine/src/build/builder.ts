@@ -67,6 +67,18 @@ export async function buildReport(
       `The body is over the length cap: ${counts.bodyNormalsider.toFixed(2)} of ${counts.cap} normalsider.`,
     );
   }
+  // Appendices share the body's heading counter, so body sections placed
+  // after an appendix get wrong (often duplicate) numbers. Only a hand-edited
+  // document.yaml can produce this order — warn rather than block.
+  const firstAppendix = project.meta.sections.findIndex((s) => s.role === "appendix");
+  if (
+    firstAppendix !== -1 &&
+    project.meta.sections.slice(firstAppendix + 1).some((s) => s.role === "body")
+  ) {
+    warnings.push(
+      "Some body sections come after an appendix, so their heading numbers may be wrong. Move appendices to the end of the report.",
+    );
+  }
 
   const buildDir = `${projectDir}/output/.build`;
   await platform.mkdir(`${buildDir}/converted`);
@@ -78,6 +90,14 @@ export async function buildReport(
   for (let i = 0; i < project.meta.sections.length; i++) {
     const section = project.meta.sections[i]!;
     const source = await platform.readTextFile(`${projectDir}/${section.file}`);
+
+    // Unlike document.yaml (where markers break the load), markers in a
+    // section build fine — straight into the hand-in PDF. Warn loudly.
+    if (/^<{7}( |$)/m.test(source)) {
+      warnings.push(
+        `"${section.file}" contains unresolved Git merge conflict markers (<<<<<<<), which will show up in the PDF.`,
+      );
+    }
 
     const { markdown, blocks } = extractMermaidBlocks(source);
     for (const block of blocks) {
