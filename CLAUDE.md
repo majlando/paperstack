@@ -24,7 +24,7 @@ Deliberate defaults, not dogma — deviate when something is clearly better, and
 
 - TypeScript strict mode everywhere; pnpm workspaces; Vitest for engine tests.
 - State: Zustand. Markdown parsing: unified/remark. Schema validation: zod (the `document.yaml` zod schema drives both validation and the metadata form).
-- Engine logic requires unit tests; UI chrome does not.
+- Engine logic requires unit tests; UI chrome does not. The Zustand store's save path is logic, not chrome — every real data-loss bug found in review lived there. Until the desktop test harness exists (see the backlog), changes to the save path require an adversarial review pass before merging.
 - Small commits, imperative messages, scoped prefix: `engine:`, `app:`, `docs:`.
 - `report/` is the author's real exam report — git-ignored, local quality reference only. Never commit it or quote its contents into the repo. Committed tests use `fixtures/demo-report/`.
 - `bin/` holds dev downloads of `typst`/`pandoc` (git-ignored); they ship as Tauri sidecars in releases.

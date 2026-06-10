@@ -145,6 +145,14 @@ Goal: nothing in the core loop can lose writing or silently produce a wrong repo
 - [x] `fetch-binaries.ps1`: SHA-256 pins for both downloaded archives, verified before extraction — a mismatch refuses to install (2026-06-11)
 - [x] Stale-pin trap fixed: the skip-if-present check asks the binary for its version instead of only `Test-Path`, so a pin bump re-fetches on machines holding an old binary (2026-06-11)
 
+**Adversarial review round (2026-06-11, evening):** an independent review pass on the branch found a real bug *in the first round's headline fix* — worth repeating for anything that touches the save path.
+- [x] `settle()` no longer touches state after a mid-save section switch (it cleared `dirty` and planted the old section's content as the new section's baseline — the same bug class the fix claimed to close)
+- [x] Single-flight saves: blur, the debounce, Ctrl+S, and the close-flush join the running save chain instead of racing it with overlapping writes and conflict reads
+- [x] Window close guards the report-details form (`metadataDirty`) instead of silently dropping form edits — the close-flush guarantee now actually covers everything on screen
+- [x] A repeatedly failing close-save no longer makes the window unclosable: the first failure blocks with an explanation, the next close may discard; conflicts always block (their banner resolves them)
+- [x] Export warns when body sections come after an appendix (shared heading counter → duplicate numbers; verified against real Typst) and when a section contains Git merge conflict markers (they would land in the hand-in PDF)
+- [x] fetch-binaries version probe anchored — pin `0.13.1` no longer matches a stray `0.13.10`
+
 **The gate:**
 - [ ] Run the clean-machine test (docs/CLEAN-MACHINE-TEST.md) in Windows Sandbox, then tag `v0.1.0` per the M4 items above
 
@@ -225,6 +233,7 @@ Known-good improvements that don't gate any milestone — pick up when touching 
 
 - [x] Scripted smoke test for the app shell: `pnpm smoke` scaffolds a scratch project, launches the real app (`tauri dev` + `VITE_SMOKE_SCRIPT`), drives the store through open → edit → save → TODO confirm → export, and asserts the result the app writes to `output/smoke-result.json`. Local only (needs sidecars, port 1420, and a desktop session)
 - [ ] `vite.config.ts`: replace the `@ts-expect-error` on `process` with `@types/node` in devDependencies
+- [ ] Store unit tests: every real data-loss bug found in review (both rounds) lived in `store.ts`, not the engine — vitest for `apps/desktop` with a mocked platform (the Tauri imports need stubbing) would have caught them before review did. The save path especially deserves a delayed-write fake-platform test
 - [x] Ctrl+S bound to `saveActive` — autosave makes it redundant, but writers will press it; the binding is pure reassurance (2026-06-11)
 - [ ] "Show in folder" button on the export notice (`tauri-plugin-opener`) instead of only printing the relative path
 - [ ] Sidebar inline rename/add: commit on blur instead of silently discarding (Enter is the only commit path today, and nothing says so)
