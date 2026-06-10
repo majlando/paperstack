@@ -53,6 +53,31 @@ The app automates the workflow; it never owns your document. Everything stays po
 
 Tauri 2 · TypeScript · React + Vite · CodeMirror 6 · Mermaid · Pandoc → Typst (bundled, no system dependencies). Details and rationale in [docs/STACK.md](docs/STACK.md).
 
+## Development
+
+Prerequisites: [Node.js](https://nodejs.org/) 22+, [pnpm](https://pnpm.io/), and PowerShell 7 (`pwsh`).
+
+```powershell
+# Setup (once)
+pnpm install                          # install workspace dependencies
+pwsh ./scripts/fetch-binaries.ps1     # download pinned typst + pandoc into bin/ (git-ignored)
+
+# Daily commands
+pnpm test          # engine tests (the PDF integration test auto-skips if bin/ is empty)
+pnpm typecheck     # strict TypeScript check across the workspace
+pnpm build:demo    # build fixtures/demo-report to a PDF and print the length table
+
+# Build any report project folder
+pnpm tsx scripts/build-report.ts <path-to-project>
+
+# Watch mode while working on the engine
+pnpm --filter @paperstack/engine test:watch
+```
+
+Set `$env:DEBUG=1` before a build command to see the underlying Pandoc/Typst output when an error message isn't enough.
+
+The desktop app (Milestone 2, `apps/desktop`) doesn't exist yet — once it does, `pnpm tauri dev` will run it, and the Rust toolchain becomes a prerequisite. See [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md) for the full plan and progress.
+
 ## Documentation
 
 - [docs/PROJECT.md](docs/PROJECT.md) — vision, design decisions, architecture
