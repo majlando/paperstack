@@ -32,10 +32,17 @@ function maskRanges(text: string, ranges: Range[]): string {
 }
 
 function findCommentRanges(markdown: string): Range[] {
-  return [...markdown.matchAll(/<!--[\s\S]*?-->/g)].map((m) => ({
-    start: m.index ?? 0,
-    end: (m.index ?? 0) + m[0].length,
-  }));
+  const ranges: Range[] = [];
+  let cursor = 0;
+  while (cursor < markdown.length) {
+    const start = markdown.indexOf("<!--", cursor);
+    if (start === -1) break;
+    const endMarker = markdown.indexOf("-->", start + 4);
+    const end = endMarker === -1 ? markdown.length : endMarker + 3;
+    ranges.push({ start, end });
+    cursor = end;
+  }
+  return ranges;
 }
 
 function findFenceRanges(markdown: string): Range[] {
@@ -52,14 +59,22 @@ function findFenceRanges(markdown: string): Range[] {
     const match = line.match(/^ {0,3}([`~]{3,})/);
 
     if (!fenceChar && match) {
-      const marker = match[1]!;
+      const marker = match[1];
+      if (!marker) {
+        lineStart = lineStop;
+        continue;
+      }
       fenceChar = marker[0] as "`" | "~";
       fenceLen = marker.length;
       fenceStart = lineStart;
     } else if (fenceChar) {
       const close = line.match(/^ {0,3}([`~]{3,})/);
       if (close) {
-        const marker = close[1]!;
+        const marker = close[1];
+        if (!marker) {
+          lineStart = lineStop;
+          continue;
+        }
         if (marker[0] === fenceChar && marker.length >= fenceLen) {
           ranges.push({ start: fenceStart ?? lineStart, end: lineStop });
           fenceStart = null;
