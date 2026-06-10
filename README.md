@@ -107,6 +107,7 @@ Dev hooks for scripted smoke tests (the folder dialog and buttons can't be drive
 $env:VITE_OPEN_PROJECT = "E:/path/to/report-project"    # auto-open a project at launch
 $env:VITE_OPEN_SECTION = "sections/01-introduction.md"  # then jump to a section
 $env:VITE_SMOKE_EXPORT = "1"                            # then run Export PDF immediately
+$env:VITE_SMOKE_VIEW = "1"                              # then run View Report ("2": recompile once more while the PDF pane is open)
 pnpm --filter @paperstack/desktop tauri dev
 ```
 

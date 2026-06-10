@@ -150,7 +150,7 @@ Known-good improvements that don't gate any milestone — pick up when touching 
 | Risk | Status / mitigation |
 |---|---|
 | Tauri sidecar/permission friction | **Cleared (2026-06-10)** — sidecars run scoped via the shell plugin; in-app export verified on the demo fixture |
-| WebView2 PDF viewer UX (scroll reset on recompile) | Accept first; pdf.js is the documented upgrade path |
+| WebView2 PDF viewer UX (scroll reset on recompile) | Verified working (2026-06-10): PDF renders in-pane and recompiles rewrite `report.pdf` in place — the viewer holds no file lock. Scroll reset accepted; pdf.js is the documented upgrade path |
 | Pandoc's Typst output fights the template | Mitigated: proven against the real report in M1; converter stays behind an interface, remark-based emitter is the fallback |
 | Mermaid → SVG → Typst rendering quality | Proven in M1 with real diagrams from the SEA report |
 | Webview scope too broad (fs `**`, no CSP) | Scheduled in M3 hardening; preview already refuses raw HTML by design |

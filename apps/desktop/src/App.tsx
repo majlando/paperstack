@@ -8,11 +8,14 @@ import { StatusBar } from "./components/StatusBar.tsx";
 
 // Dev convenience: VITE_OPEN_PROJECT=<path> auto-opens a project on launch,
 // VITE_OPEN_SECTION=<file> jumps to a section, VITE_SMOKE_EXPORT=1 runs
-// Export PDF right after opening (smoke tests; the folder dialog and buttons
-// can't be driven from scripts).
+// Export PDF right after opening, VITE_SMOKE_VIEW=1 runs View Report
+// (=2 recompiles once more while the PDF pane is showing — exercises the
+// file-locked-by-viewer path). Smoke tests; the folder dialog and buttons
+// can't be driven from scripts.
 const devProject = import.meta.env.VITE_OPEN_PROJECT as string | undefined;
 const devSection = import.meta.env.VITE_OPEN_SECTION as string | undefined;
 const devSmokeExport = import.meta.env.VITE_SMOKE_EXPORT as string | undefined;
+const devSmokeView = import.meta.env.VITE_SMOKE_VIEW as string | undefined;
 // Module-level guard: StrictMode runs effects twice, and two concurrent
 // openProject calls race — the loser would override the devSection jump.
 let devAutoOpened = false;
@@ -34,6 +37,13 @@ export default function App() {
       void openProject(devProject).then(() => {
         if (devSection) void useStore.getState().openSection(devSection);
         if (devSmokeExport) void useStore.getState().exportPdf();
+        if (devSmokeView) {
+          void useStore.getState().viewReport().then(() => {
+            if (devSmokeView === "2") {
+              setTimeout(() => void useStore.getState().viewReport(), 4000);
+            }
+          });
+        }
       });
     }
   }, [openProject]);
