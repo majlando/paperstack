@@ -1,7 +1,7 @@
 {
   "$schema": "../gen/schemas/desktop-schema.json",
   "identifier": "default",
-  "description": "Main window: folder picker + full fs access to user-chosen project folders",
+  "description": "Main window. No static fs/asset scope: project folders are granted at runtime via the allow_project_scope command when the user opens them.",
   "windows": ["main"],
   "permissions": [
     "core:default",
@@ -13,10 +13,6 @@
     "fs:allow-mkdir",
     "fs:allow-rename",
     "fs:allow-remove",
-    {
-      "identifier": "fs:scope",
-      "allow": [{ "path": "**" }]
-    },
     {
       "identifier": "shell:allow-execute",
       "allow": [

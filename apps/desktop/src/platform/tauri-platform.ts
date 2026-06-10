@@ -8,7 +8,17 @@ import {
   remove,
 } from "@tauri-apps/plugin-fs";
 import { Command } from "@tauri-apps/plugin-shell";
+import { invoke } from "@tauri-apps/api/core";
 import type { Platform } from "@paperstack/engine";
+
+/**
+ * Grants the webview access to a project folder. The app ships with empty
+ * static fs/asset scopes — every folder must be granted here (or picked via
+ * the OS dialog) before the engine can touch it.
+ */
+export async function allowProjectScope(dir: string): Promise<void> {
+  await invoke("allow_project_scope", { dir });
+}
 
 /** Sidecar names as configured in tauri.conf.json `bundle.externalBin`. */
 export const SIDECARS = { typst: "binaries/typst", pandoc: "binaries/pandoc" } as const;
