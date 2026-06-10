@@ -1,6 +1,7 @@
 import { create } from "zustand";
 import {
   loadProject,
+  createProject as scaffoldProject,
   countProject,
   applySectionContent,
   extractMermaidBlocks,
@@ -45,6 +46,8 @@ interface AppState {
   error: string | null;
 
   openProject(dir: string): Promise<void>;
+  /** Scaffolds a new SEA report in `dir` (or just opens it if it already is one). */
+  createProject(dir: string): Promise<void>;
   reloadProject(): Promise<void>;
   openSection(file: string): Promise<void>;
   /** Creates the section file (heading stub) and adds it to document.yaml. */
@@ -103,6 +106,39 @@ function newSectionFile(sections: Section[], role: SectionRole, name: string): s
     if (m) max = Math.max(max, Number(m[1]));
   }
   return `sections/${String(max + 1).padStart(2, "0")}-${slug}.md`;
+}
+
+/**
+ * Recently opened projects, newest first. Stored in the webview's
+ * localStorage — app-private state never goes into the project folder.
+ */
+const RECENTS_KEY = "paperstack.recentProjects";
+
+export function getRecentProjects(): string[] {
+  try {
+    const list: unknown = JSON.parse(localStorage.getItem(RECENTS_KEY) ?? "[]");
+    return Array.isArray(list) ? list.filter((p): p is string => typeof p === "string") : [];
+  } catch {
+    return [];
+  }
+}
+
+function rememberProject(dir: string): void {
+  try {
+    const list = [dir, ...getRecentProjects().filter((p) => p !== dir)].slice(0, 8);
+    localStorage.setItem(RECENTS_KEY, JSON.stringify(list));
+  } catch {
+    // recents are a convenience — never fail an open over them
+  }
+}
+
+/** "C:/repos/smart-home-hub" → "Smart home hub". */
+function titleFromDir(dir: string): string {
+  const base = dir
+    .slice(dir.lastIndexOf("/") + 1)
+    .replace(/[-_]+/g, " ")
+    .trim();
+  return base ? base.charAt(0).toUpperCase() + base.slice(1) : "Report";
 }
 
 /** Read–edit–write document.yaml; skips the write when nothing changed. */
@@ -170,8 +206,27 @@ export const useStore = create<AppState>((set, get) => ({
         dirty: false,
         error: null,
       });
+      rememberProject(normalized);
       const first = project.meta.sections.find((s) => s.role === "body") ?? project.meta.sections[0];
       if (first) await get().openSection(first.file);
+    } catch (e) {
+      set({ error: message(e) });
+    }
+  },
+
+  async createProject(dir: string) {
+    const normalized = dir.replaceAll("\\", "/").replace(/\/+$/, "");
+    try {
+      // Picking a folder that already is a report just opens it.
+      if (!(await platform.fileExists(`${normalized}/document.yaml`))) {
+        const now = new Date();
+        const pad = (n: number) => String(n).padStart(2, "0");
+        await scaffoldProject(platform, normalized, {
+          title: titleFromDir(normalized),
+          date: `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`,
+        });
+      }
+      await get().openProject(normalized);
     } catch (e) {
       set({ error: message(e) });
     }
