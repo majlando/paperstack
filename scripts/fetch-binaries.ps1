@@ -21,7 +21,8 @@ function Fetch-Zip([string]$Name, [string]$Version, [string]$Url, [string]$Sha25
         # would silently keep an old binary after a pinned-version bump.
         $current = ''
         try { $current = (& $Target --version 2>$null | Select-Object -First 1) -join ' ' } catch {}
-        if ($current -match [regex]::Escape($Version)) {
+        # Anchored so pin 0.13.1 never matches a stray 0.13.10 binary.
+        if ($current -match "(^|\s)$([regex]::Escape($Version))(\s|$|\()") {
             Write-Output "$Name $Version already present: $Target"
             return
         }

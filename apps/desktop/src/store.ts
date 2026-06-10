@@ -444,7 +444,11 @@ export const useStore = create<AppState>((set, get) => {
     // Advance the baseline to what was just synced and chain a save for the
     // newer text instead of marking it saved.
     const settle = (): Promise<boolean> | true => {
-      if (get().activeFile === activeFile && get().content !== content) {
+      // The user switched sections while this save was in flight: the
+      // captured file is fully written, and the store now describes a
+      // different section — its state is not this save's to touch.
+      if (get().activeFile !== activeFile) return true;
+      if (get().content !== content) {
         set({ baseline: content, conflict: null });
         return get().saveActive();
       }
