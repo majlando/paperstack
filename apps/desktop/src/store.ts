@@ -109,9 +109,14 @@ interface AppState {
 }
 
 function toError(e: unknown): { message: string; details?: string } {
-  return e instanceof PaperstackError
-    ? { message: e.userMessage, details: e.details }
-    : { message: String(e) };
+  if (e instanceof PaperstackError) return { message: e.userMessage, details: e.details };
+  if (e instanceof Error) return { message: e.message };
+  // A thrown plain object would render as "[object Object]" via String().
+  try {
+    return { message: typeof e === "string" ? e : JSON.stringify(e) ?? String(e) };
+  } catch {
+    return { message: String(e) };
+  }
 }
 
 /**
