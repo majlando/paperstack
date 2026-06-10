@@ -19,13 +19,16 @@ describe("createProject", () => {
     expect(project.meta.sections.map((s) => s.role)).toEqual(["body", "back-matter"]);
   });
 
-  it("writes a project .gitignore covering generated files, with trailing newlines", async () => {
+  it("writes a project .gitignore covering build output, with trailing newlines", async () => {
     const platform = new FakePlatform();
     await createProject(platform, "/proj", { title: "T" });
 
     const gitignore = platform.files.get("/proj/.gitignore")!;
     expect(gitignore).toContain("output/");
-    expect(gitignore).toContain("diagrams/rendered/");
+    // Rendered diagrams are deliberately committed: content-hashed renders
+    // are conflict-free, and group members/CI can build sections containing
+    // diagrams they never opened in Paperstack.
+    expect(gitignore).not.toContain("diagrams/rendered/");
     for (const [, content] of platform.files) {
       expect(content.endsWith("\n")).toBe(true);
     }
@@ -40,7 +43,20 @@ describe("createProject", () => {
     const gitignore = platform.files.get("/proj/.gitignore")!;
     expect(gitignore).toContain("node_modules/");
     expect(gitignore).toContain("output/");
-    expect(gitignore).toContain("diagrams/rendered/");
+  });
+
+  it("writes a .gitattributes that normalizes line endings", async () => {
+    const platform = new FakePlatform();
+    await createProject(platform, "/proj", { title: "T" });
+    expect(platform.files.get("/proj/.gitattributes")).toBe("* text=auto\n");
+  });
+
+  it("never overwrites an existing .gitattributes", async () => {
+    const platform = new FakePlatform(
+      new Map([["/proj/.gitattributes", "*.md text eol=lf\n"]]),
+    );
+    await createProject(platform, "/proj", { title: "T" });
+    expect(platform.files.get("/proj/.gitattributes")).toBe("*.md text eol=lf\n");
   });
 
   it("never overwrites existing section files", async () => {
