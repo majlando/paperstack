@@ -31,7 +31,8 @@ interface AppState {
   reloadProject(): Promise<void>;
   openSection(file: string): Promise<void>;
   setContent(content: string): void;
-  saveActive(): Promise<void>;
+  /** Returns false when the content could not be written (the section stays dirty). */
+  saveActive(): Promise<boolean>;
   clearError(): void;
 }
 
@@ -46,18 +47,22 @@ function message(e: unknown): string {
  * shows the error inline, and export reports it readably.
  */
 async function renderDiagramsToDisk(projectDir: string, content: string): Promise<void> {
-  const { blocks } = extractMermaidBlocks(content);
-  if (blocks.length === 0) return;
-  await platform.mkdir(`${projectDir}/diagrams/rendered`);
-  for (const block of blocks) {
-    const path = `${projectDir}/${block.renderedPath}`;
-    if (await platform.fileExists(path)) continue;
-    try {
-      const svg = await renderMermaidSvg(`save-${block.hash}`, block.code);
-      await platform.writeTextFile(path, svg);
-    } catch {
-      // invalid diagram source — handled visibly in preview and at export
+  try {
+    const { blocks } = extractMermaidBlocks(content);
+    if (blocks.length === 0) return;
+    await platform.mkdir(`${projectDir}/diagrams/rendered`);
+    for (const block of blocks) {
+      const path = `${projectDir}/${block.renderedPath}`;
+      if (await platform.fileExists(path)) continue;
+      try {
+        const svg = await renderMermaidSvg(`save-${block.hash}`, block.code);
+        await platform.writeTextFile(path, svg);
+      } catch {
+        // invalid diagram source — handled visibly in preview and at export
+      }
     }
+  } catch {
+    // best-effort: rendering must never block a save; export reports missing renders readably
   }
 }
 
@@ -112,8 +117,10 @@ export const useStore = create<AppState>((set, get) => ({
   async openSection(file: string) {
     const { projectDir, dirty, saveActive } = get();
     if (!projectDir) return;
+    // A failed save must not be papered over: stay on the current section so
+    // the unsaved edits and the error stay visible.
+    if (dirty && !(await saveActive())) return;
     try {
-      if (dirty) await saveActive();
       const content = await platform.readTextFile(`${projectDir}/${file}`);
       set({
         activeFile: file,
@@ -122,6 +129,8 @@ export const useStore = create<AppState>((set, get) => ({
         dirty: false,
         error: null,
       });
+      // Sections edited outside the app may contain never-rendered diagrams.
+      void renderDiagramsToDisk(projectDir, content);
     } catch (e) {
       set({ error: message(e) });
     }
@@ -138,14 +147,19 @@ export const useStore = create<AppState>((set, get) => ({
   },
 
   async saveActive() {
-    const { projectDir, activeFile, content } = get();
-    if (!projectDir || !activeFile) return;
+    const { projectDir, activeFile, content, dirty } = get();
+    if (!projectDir || !activeFile) return true;
+    // Never write when there is nothing to save: a no-op write would churn
+    // mtimes and could clobber a file refreshed outside the app (git pull).
+    if (!dirty) return true;
     try {
       await platform.writeTextFile(`${projectDir}/${activeFile}`, content);
       set({ dirty: false });
       void renderDiagramsToDisk(projectDir, content);
+      return true;
     } catch (e) {
       set({ error: message(e) });
+      return false;
     }
   },
 
