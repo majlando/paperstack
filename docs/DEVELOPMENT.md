@@ -108,12 +108,12 @@ Goal: another student can install it and produce a report unaided.
 **Real-report dogfood (2026-06-10):** the migrated SEA report (23 sections, ~37 normalsider, 80+ images, flat layout with assets under `resources/`) opens, edits, and builds in the app — full compile ≈ 2 s, 6.2 MB PDF renders in the pane, counters match the old toolchain. It exposed that the section-add path hardcoded the scaffold layout (fixed: new files follow where same-role sections already live, numbering and appendix letters scan the project's actual files). Remaining lesson lives in the Insert Figure item below.
 
 **Insert helpers:**
-- [x] Insert Figure: file dialog → copied into the project's own images folder (first of `figures/`, `images/`, `assets/`, `resources/` that exists; collision-safe numeric suffixes, never overwrites) → caption prompt (becomes the numbered figure caption) → root-absolute image Markdown inserted at the cursor via `MarkdownEditor.insertBlock`
+- [x] Insert Figure: file dialog → copied into the project's own images folder (first of `figures/`, `images/`, `assets/`, `resources/` that exists; filenames slugified so the Markdown link always parses; collision-safe numeric suffixes, never overwrites) → caption prompt (becomes the numbered figure caption) → root-absolute image Markdown inserted as its own paragraph via `MarkdownEditor.insertBlock`. The convention logic lives in the engine (`import-figure.ts`, `new-section-file.ts`) with unit tests
 - [x] Insert Code Block (cursor lands on the language position) and Insert Diagram (Mermaid stub that renders in the preview immediately) — same editor API, buttons in the editor header
 
 **Template polish (the M1 acceptance gaps, decided deliberately rather than patched ad hoc):**
 - [x] Cover page: optional `logo` metadata field (validated project-relative path; metadata-form field; rendered centered above the title). `cover_image` and a details table deliberately skipped — the logo + title + authors cover reads clean; revisit only if a side-by-side against the old cover demands it
-- [x] Large-figure placement: `set figure(placement: auto)` — figures float to the top/bottom of pages instead of leaving gaps. Measured on the real report: 127 → 113 pages of reclaimed whitespace
+- [x] Large-figure placement: figures taller than ~a third of the text area float to the top/bottom of a page instead of leaving gaps; small figures stay exactly where they are written, and figures inside blockquotes/lists no longer error (floating everything did both). The float-all measurement on the real report (127 → 113 pages) came from the tall figures, which still float
 - [x] Heading/link colors decided: navy headings (`#1f3864`, the old report's look) + navy links (`#1a4b8b`)
 
 **First-run polish:**
@@ -122,7 +122,7 @@ Goal: another student can install it and produce a report unaided.
 
 **Packaging and acceptance:**
 - [x] Windows installer (NSIS via Tauri bundler) with both sidecars included — `tauri build` produces `Paperstack_0.1.0_x64-setup.exe` (38 MB; MSI too). Built and verified on the dev machine (2026-06-10)
-- [ ] Clean-machine test: install on a machine without Node/Rust/pandoc and walk the MVP.md Definition of Done end to end (create → metadata → sections → figure/code/diagram → counter → View Report → export → reopen). This is also the production CSP's first real exercise
+- [ ] Clean-machine test: install on a machine without Node/Rust/pandoc and walk the MVP.md Definition of Done end to end (create → metadata → sections → figure/code/diagram → counter → View Report → export → reopen). This is also the production CSP's first real exercise. *Deferred (2026-06-10): no clean Windows machine at hand — gates the v0.1.0 tag, not further development*
 - [ ] The author's next real SEA report is written in Paperstack — the v1 bar from PROJECT.md
 - [ ] Tag `v0.1.0`, GitHub release with the installer attached (after the clean-machine test passes)
 
