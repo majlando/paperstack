@@ -1,47 +1,58 @@
 import { useEffect, useRef } from "react";
 import { useStore } from "../store.ts";
+import { MarkdownEditor } from "../editor/markdown-editor.ts";
 
 /**
- * Plain-textarea editor as the Milestone 2 starting point — replaced by the
- * CodeMirror 6 wrapper next. Autosaves 800 ms after the last keystroke.
+ * Thin React bridge for the vanilla-TS CodeMirror wrapper: mounts it once
+ * via a ref, pushes store content in only when it changed outside the
+ * editor (contentVersion), and forwards edits to the store. Autosaves
+ * 800 ms after the last keystroke and on blur.
  */
 export function Editor() {
   const activeFile = useStore((s) => s.activeFile);
-  const content = useStore((s) => s.content);
-  const setContent = useStore((s) => s.setContent);
-  const saveActive = useStore((s) => s.saveActive);
+  const contentVersion = useStore((s) => s.contentVersion);
+  const containerRef = useRef<HTMLDivElement | null>(null);
+  const editorRef = useRef<MarkdownEditor | null>(null);
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
+    if (!containerRef.current) return;
+    const editor = new MarkdownEditor(containerRef.current, {
+      doc: useStore.getState().content,
+      onChange: (doc) => {
+        useStore.getState().setContent(doc);
+        if (timer.current) clearTimeout(timer.current);
+        timer.current = setTimeout(() => void useStore.getState().saveActive(), 800);
+      },
+      onBlur: () => void useStore.getState().saveActive(),
+    });
+    editorRef.current = editor;
     return () => {
       if (timer.current) clearTimeout(timer.current);
+      editor.destroy();
+      editorRef.current = null;
     };
   }, []);
 
-  if (!activeFile) {
-    return (
-      <div className="flex flex-1 items-center justify-center text-zinc-600">
-        Select a section to start writing
-      </div>
-    );
-  }
+  // Content was replaced from outside the editor (section switch, reload).
+  useEffect(() => {
+    const editor = editorRef.current;
+    if (!editor) return;
+    editor.setDoc(useStore.getState().content);
+    if (useStore.getState().activeFile) editor.focus();
+  }, [contentVersion]);
 
   return (
-    <div className="flex min-w-0 flex-1 flex-col">
+    <div className="relative flex min-w-0 flex-1 flex-col">
       <div className="border-b border-zinc-800 bg-zinc-900/60 px-4 py-1.5 text-xs text-zinc-500">
-        {activeFile}
+        {activeFile ?? "no section open"}
       </div>
-      <textarea
-        className="flex-1 resize-none bg-zinc-950 p-4 font-mono text-sm leading-relaxed text-zinc-200 outline-none"
-        value={content}
-        spellCheck={false}
-        onChange={(e) => {
-          setContent(e.target.value);
-          if (timer.current) clearTimeout(timer.current);
-          timer.current = setTimeout(() => void saveActive(), 800);
-        }}
-        onBlur={() => void saveActive()}
-      />
+      <div ref={containerRef} className="min-h-0 flex-1 bg-zinc-950" />
+      {!activeFile && (
+        <div className="absolute inset-0 top-7 flex items-center justify-center bg-zinc-950 text-zinc-600">
+          Select a section to start writing
+        </div>
+      )}
     </div>
   );
 }

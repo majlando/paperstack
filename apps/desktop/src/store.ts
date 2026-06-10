@@ -16,6 +16,12 @@ interface AppState {
   /** Project-relative path of the section open in the editor. */
   activeFile: string | null;
   content: string;
+  /**
+   * Bumped whenever `content` is replaced from outside the editor (section
+   * switch, project reload) — the editor component watches this to know when
+   * to push the store content into CodeMirror. Keystrokes do not bump it.
+   */
+  contentVersion: number;
   dirty: boolean;
   error: string | null;
 
@@ -37,6 +43,7 @@ export const useStore = create<AppState>((set, get) => ({
   counts: null,
   activeFile: null,
   content: "",
+  contentVersion: 0,
   dirty: false,
   error: null,
 
@@ -71,7 +78,7 @@ export const useStore = create<AppState>((set, get) => ({
       // re-read the open section unless the user has unsaved changes
       if (activeFile && !dirty && project.meta.sections.some((s) => s.file === activeFile)) {
         const content = await platform.readTextFile(`${projectDir}/${activeFile}`);
-        set({ content });
+        set({ content, contentVersion: get().contentVersion + 1 });
       }
     } catch (e) {
       set({ error: message(e) });
@@ -84,7 +91,13 @@ export const useStore = create<AppState>((set, get) => ({
     try {
       if (dirty) await saveActive();
       const content = await platform.readTextFile(`${projectDir}/${file}`);
-      set({ activeFile: file, content, dirty: false, error: null });
+      set({
+        activeFile: file,
+        content,
+        contentVersion: get().contentVersion + 1,
+        dirty: false,
+        error: null,
+      });
     } catch (e) {
       set({ error: message(e) });
     }

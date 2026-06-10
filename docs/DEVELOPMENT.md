@@ -66,7 +66,7 @@ Goal: open a project, edit sections with autosave, see a live per-section previe
 - [ ] Create project (from SEA template, including a project `.gitignore` for `output/` and `diagrams/rendered/`) and open project (folder picker); recent-projects list
 - [ ] Reload project action — picks up files changed outside the app (e.g. after a `git pull`); warn instead of silently overwriting if a file changed on disk while open in the editor
 - [x] Sidebar driven by the engine's `Project` model, grouped by role, with per-section TODO badges (add / rename / delete / move up/down still to come — reordering edits the `sections` list in `document.yaml`, the single source of truth for order)
-- [ ] `EditorView` vanilla-TS class wrapping CodeMirror 6 (markdown mode, highlighting) + the small React mount bridge; autosave on idle
+- [x] `MarkdownEditor` vanilla-TS class wrapping CodeMirror 6 (markdown mode + fenced-code highlighting via language-data, zinc theme, list-continuation keymap) + the small React mount bridge (`contentVersion` distinguishes external content changes from keystrokes); autosave 800 ms after the last keystroke and on blur
 - [ ] Preview pane: remark → HTML, syntax-highlighted code, images resolved from the project folder, live Mermaid rendering
 - [ ] Mermaid save hook: on save, render diagrams to `diagrams/rendered/*.svg`
 
