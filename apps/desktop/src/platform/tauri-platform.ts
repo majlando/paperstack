@@ -8,17 +8,21 @@ import {
   remove,
   copyFile,
 } from "@tauri-apps/plugin-fs";
-import { Command } from "@tauri-apps/plugin-shell";
 import { invoke } from "@tauri-apps/api/core";
 import type { Platform } from "@paperstack/engine";
 
 /**
- * Grants the webview access to a project folder. The app ships with empty
- * static fs/asset scopes — every folder must be granted here (or picked via
- * the OS dialog) before the engine can touch it.
+ * Grants the webview access to an existing Paperstack project folder. The app
+ * ships with empty static fs/asset scopes; Rust canonicalizes and validates
+ * folders before adding them to the scopes.
  */
-export async function allowProjectScope(dir: string): Promise<void> {
-  await invoke("allow_project_scope", { dir });
+export async function allowExistingProjectScope(dir: string): Promise<string> {
+  return await invoke<string>("allow_existing_project_scope", { dir });
+}
+
+/** Grants access to a folder selected as the destination for a new project. */
+export async function allowNewProjectScope(dir: string): Promise<string> {
+  return await invoke<string>("allow_new_project_scope", { dir });
 }
 
 /** Sidecar names as configured in tauri.conf.json `bundle.externalBin`. */
@@ -79,10 +83,18 @@ export class TauriPlatform implements Platform {
     args: string[],
   ): Promise<{ exitCode: number; stdout: string; stderr: string }> {
     try {
-      const output = await Command.sidecar(binary, args).execute();
-      return { exitCode: output.code ?? -1, stdout: output.stdout, stderr: output.stderr };
+      const output = await invoke<{
+        exit_code: number;
+        stdout: string;
+        stderr: string;
+      }>("run_sidecar", { binary, args });
+      return {
+        exitCode: output.exit_code,
+        stdout: output.stdout,
+        stderr: output.stderr,
+      };
     } catch (e) {
-      // spawn failure (sidecar missing/not permitted) — same shape as a
+      // spawn/validation failure — same shape as a
       // failed run so the engine's preflight reports it readably
       return { exitCode: -1, stdout: "", stderr: String(e) };
     }

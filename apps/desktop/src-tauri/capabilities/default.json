@@ -1,7 +1,7 @@
 {
   "$schema": "../gen/schemas/desktop-schema.json",
   "identifier": "default",
-  "description": "Main window. No static fs/asset scope: project folders are granted at runtime via the allow_project_scope command when the user opens them.",
+  "description": "Main window. No static fs/asset scope: project folders are granted at runtime via the validating allow_existing_project_scope / allow_new_project_scope commands when the user opens them.",
   "windows": ["main"],
   "permissions": [
     "core:default",
@@ -14,13 +14,6 @@
     "fs:allow-mkdir",
     "fs:allow-rename",
     "fs:allow-remove",
-    "fs:allow-copy-file",
-    {
-      "identifier": "shell:allow-execute",
-      "allow": [
-        { "name": "binaries/typst", "sidecar": true, "args": true },
-        { "name": "binaries/pandoc", "sidecar": true, "args": true }
-      ]
-    }
+    "fs:allow-copy-file"
   ]
 }

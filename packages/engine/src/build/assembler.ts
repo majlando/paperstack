@@ -31,9 +31,10 @@ export function generateMainTypst(
   meta: DocumentMeta,
   sections: ConvertedSection[],
   lengthLine: string,
+  templatePath = "/paperstack-template.typ",
 ): string {
   const lines: string[] = [];
-  lines.push(`#import "/output/.build/sea.typ": report`, "");
+  lines.push(`#import "${escapeTypstString(templatePath)}": report`, "");
   lines.push(`#show: report.with(`);
   lines.push(`  title: "${escapeTypstString(meta.title)}",`);
   if (meta.subtitle) lines.push(`  subtitle: "${escapeTypstString(meta.subtitle)}",`);

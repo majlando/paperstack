@@ -61,7 +61,8 @@ describe("generateMainTypst", () => {
 
   it("imports the template and includes sections in order", () => {
     const main = generateMainTypst(meta(), [body("/o/a.typ"), body("/o/b.typ")], "L");
-    expect(main).toContain(`#import "/output/.build/sea.typ": report`);
+    // the project-vendored template is the default; the builder may override
+    expect(main).toContain(`#import "/paperstack-template.typ": report`);
     expect(main.indexOf(`#include "/o/a.typ"`)).toBeLessThan(
       main.indexOf(`#include "/o/b.typ"`),
     );
