@@ -38,6 +38,15 @@ Fetch-Zip 'pandoc' `
 
 if (Test-Path $tmp) { Remove-Item -Recurse -Force $tmp }
 
+# Tauri sidecars: the app expects target-triple-named copies under
+# apps/desktop/src-tauri/binaries/ (git-ignored). Same binaries, new names.
+$triple = 'x86_64-pc-windows-msvc'
+$sidecars = Join-Path $root 'apps/desktop/src-tauri/binaries'
+New-Item -ItemType Directory -Force $sidecars | Out-Null
+Copy-Item (Join-Path $bin 'typst.exe') (Join-Path $sidecars "typst-$triple.exe") -Force
+Copy-Item (Join-Path $bin 'pandoc.exe') (Join-Path $sidecars "pandoc-$triple.exe") -Force
+Write-Output "Sidecar copies placed in $sidecars"
+
 Write-Output ''
 & (Join-Path $bin 'typst.exe') --version
 & (Join-Path $bin 'pandoc.exe') --version | Select-Object -First 1

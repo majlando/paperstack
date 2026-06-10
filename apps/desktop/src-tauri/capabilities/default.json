@@ -15,6 +15,13 @@
     {
       "identifier": "fs:scope",
       "allow": [{ "path": "**" }]
+    },
+    {
+      "identifier": "shell:allow-execute",
+      "allow": [
+        { "name": "binaries/typst", "sidecar": true, "args": true },
+        { "name": "binaries/pandoc", "sidecar": true, "args": true }
+      ]
     }
   ]
 }
