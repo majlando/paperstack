@@ -59,22 +59,14 @@ function findFenceRanges(markdown: string): Range[] {
     const match = line.match(/^ {0,3}([`~]{3,})/);
 
     if (!fenceChar && match) {
-      const marker = match[1];
-      if (!marker) {
-        lineStart = lineStop;
-        continue;
-      }
+      const marker = match[1] as string;
       fenceChar = marker[0] as "`" | "~";
       fenceLen = marker.length;
       fenceStart = lineStart;
     } else if (fenceChar) {
       const close = line.match(/^ {0,3}([`~]{3,})/);
       if (close) {
-        const marker = close[1];
-        if (!marker) {
-          lineStart = lineStop;
-          continue;
-        }
+        const marker = close[1] as string;
         if (marker[0] === fenceChar && marker.length >= fenceLen) {
           ranges.push({ start: fenceStart ?? lineStart, end: lineStop });
           fenceStart = null;
