@@ -1,17 +1,11 @@
 import { useState } from "react";
 import { open } from "@tauri-apps/plugin-dialog";
+import { figureMarkdown, suggestedCaption } from "@paperstack/engine";
 import { useStore } from "../store.ts";
 import { activeEditor } from "../editor/editor-registry.ts";
 
 const CODE_SNIPPET = "```\n\n```";
 const DIAGRAM_SNIPPET = "```mermaid\nflowchart TD\n    A[Start] --> B[Next step]\n```";
-
-/** "resources/screenshot-3.png" → "Screenshot 3" — a starting point for the caption. */
-function captionFromFile(path: string): string {
-  const base = path.replaceAll("\\", "/").split("/").pop() ?? "";
-  const stem = base.replace(/\.[^.]+$/, "").replace(/[-_]+/g, " ").trim();
-  return stem ? stem.charAt(0).toUpperCase() + stem.slice(1) : "";
-}
 
 /**
  * The editor-header insert actions. Figure: pick an image, give it the
@@ -30,7 +24,7 @@ export function InsertControls() {
       filters: [{ name: "Images", extensions: ["png", "jpg", "jpeg", "svg", "gif", "webp"] }],
     });
     if (typeof file !== "string") return;
-    setCaption(captionFromFile(file));
+    setCaption(suggestedCaption(file));
     setPendingFigure(file);
   }
 
@@ -40,7 +34,7 @@ export function InsertControls() {
     if (!source) return;
     const rel = await useStore.getState().importFigure(source);
     if (!rel) return; // error banner already explains
-    activeEditor()?.insertBlock(`![${caption.trim()}](/${rel})`);
+    activeEditor()?.insertBlock(figureMarkdown(rel, caption.trim()));
   }
 
   const buttonCls = "rounded px-1.5 py-0.5 text-zinc-500 hover:bg-zinc-800 hover:text-zinc-200";

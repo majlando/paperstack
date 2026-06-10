@@ -42,6 +42,17 @@ export class TauriPlatform implements Platform {
     return exists(path);
   }
 
+  async dirExists(path: string): Promise<boolean> {
+    // The capability set has no fs:allow-stat — readDir doubles as the
+    // directory probe (it errors on plain files and missing paths).
+    try {
+      await readDir(path);
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
   async listDir(path: string): Promise<string[]> {
     const entries = await readDir(path);
     return entries.map((e) => e.name);

@@ -1,6 +1,6 @@
 import { useEffect, useRef } from "react";
 import { convertFileSrc } from "@tauri-apps/api/core";
-import { resolveProjectPath } from "@paperstack/engine";
+import { dirOf, resolveProjectPath } from "@paperstack/engine";
 import { MarkdownPreview } from "../preview/markdown-preview.ts";
 import { useStore } from "../store.ts";
 
@@ -66,8 +66,7 @@ export function Preview() {
     const timer = setTimeout(() => {
       const preview = previewRef.current;
       if (!preview || activeFile === null) return;
-      const slash = activeFile.lastIndexOf("/");
-      const sectionDir = slash === -1 ? "" : activeFile.slice(0, slash);
+      const sectionDir = dirOf(activeFile);
       const resetScroll = lastFileRef.current !== activeFile;
       lastFileRef.current = activeFile;
       void preview.render(content, sectionDir, { resetScroll });

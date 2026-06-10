@@ -133,18 +133,27 @@ export class MarkdownEditor {
   }
 
   /**
-   * Insert block-level Markdown at the cursor, kept on its own lines (a
-   * blank line is added when the cursor sits inside existing text).
+   * Insert block-level Markdown at the cursor as its own paragraph: a blank
+   * line on each side, however the cursor sits in existing text. (Pandoc only
+   * turns an image into a captioned figure when it is alone in a paragraph.)
    * `cursorAt` places the cursor that many characters into the inserted
    * text — e.g. just after a code fence so the language can be typed.
    */
   insertBlock(text: string, cursorAt?: number): void {
     const state = this.view.state;
     const { from, to } = state.selection.main;
-    const line = state.doc.lineAt(from);
-    const prefix = line.text.trim() === "" ? "" : "\n\n";
+    const doc = state.doc;
+    const startLine = doc.lineAt(from);
+    const endLine = doc.lineAt(to);
+    const before = startLine.text.slice(0, from - startLine.from);
+    const after = endLine.text.slice(to - endLine.from);
+    const prevLineBlank =
+      startLine.number === 1 || doc.line(startLine.number - 1).text.trim() === "";
+    const prefix =
+      before.trim() !== "" ? "\n\n" : before !== "" || !prevLineBlank ? "\n" : "";
+    const suffix = after.trim() !== "" ? "\n\n" : "\n";
     this.view.dispatch({
-      changes: { from, to, insert: `${prefix}${text}\n` },
+      changes: { from, to, insert: `${prefix}${text}${suffix}` },
       selection: { anchor: from + prefix.length + (cursorAt ?? text.length) },
       effects: EditorView.scrollIntoView(from, { y: "center" }),
     });

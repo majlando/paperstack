@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, type ReactNode } from "react";
 import { useStore } from "./store.ts";
 import { Welcome } from "./components/Welcome.tsx";
 import { Sidebar } from "./components/Sidebar.tsx";
@@ -21,6 +21,35 @@ const devSmokeMetadata = import.meta.env.VITE_SMOKE_METADATA as string | undefin
 // Module-level guard: StrictMode runs effects twice, and two concurrent
 // openProject calls race — the loser would override the devSection jump.
 let devAutoOpened = false;
+
+/** Amber warning banner asking for a decision (export with TODOs, edit conflict). */
+function WarningBanner(props: {
+  message: ReactNode;
+  primaryLabel: string;
+  onPrimary: () => void;
+  secondaryLabel: string;
+  onSecondary: () => void;
+}) {
+  return (
+    <div className="flex items-center justify-between gap-4 border-b border-amber-900 bg-amber-950 px-4 py-2 text-sm text-amber-200">
+      <span>{props.message}</span>
+      <span className="flex shrink-0 gap-2">
+        <button
+          onClick={props.onPrimary}
+          className="rounded border border-amber-700 px-2.5 py-0.5 font-medium hover:bg-amber-900"
+        >
+          {props.primaryLabel}
+        </button>
+        <button
+          onClick={props.onSecondary}
+          className="rounded border border-amber-700 px-2.5 py-0.5 hover:bg-amber-900"
+        >
+          {props.secondaryLabel}
+        </button>
+      </span>
+    </div>
+  );
+}
 
 export default function App() {
   const project = useStore((s) => s.project);
@@ -84,48 +113,32 @@ export default function App() {
         </div>
       )}
       {confirmExport !== null && (
-        <div className="flex items-center justify-between gap-4 border-b border-amber-900 bg-amber-950 px-4 py-2 text-sm text-amber-200">
-          <span>
-            The report still contains {confirmExport} [TODO] placeholder
-            {confirmExport === 1 ? "" : "s"}. Export it anyway?
-          </span>
-          <span className="flex shrink-0 gap-2">
-            <button
-              onClick={() => void exportPdf(true)}
-              className="rounded border border-amber-700 px-2.5 py-0.5 font-medium hover:bg-amber-900"
-            >
-              Export anyway
-            </button>
-            <button
-              onClick={cancelExport}
-              className="rounded border border-amber-700 px-2.5 py-0.5 hover:bg-amber-900"
-            >
-              Cancel
-            </button>
-          </span>
-        </div>
+        <WarningBanner
+          message={
+            <>
+              The report still contains {confirmExport} [TODO] placeholder
+              {confirmExport === 1 ? "" : "s"}. Export it anyway?
+            </>
+          }
+          primaryLabel="Export anyway"
+          onPrimary={() => void exportPdf(true)}
+          secondaryLabel="Cancel"
+          onSecondary={cancelExport}
+        />
       )}
       {conflict && (
-        <div className="flex items-center justify-between gap-4 border-b border-amber-900 bg-amber-950 px-4 py-2 text-sm text-amber-200">
-          <span>
-            “{conflict.file}” changed on disk while you were editing — probably a git pull or
-            another editor. Which version do you want to keep?
-          </span>
-          <span className="flex shrink-0 gap-2">
-            <button
-              onClick={() => void keepMine()}
-              className="rounded border border-amber-700 px-2.5 py-0.5 font-medium hover:bg-amber-900"
-            >
-              Keep my version
-            </button>
-            <button
-              onClick={useDisk}
-              className="rounded border border-amber-700 px-2.5 py-0.5 hover:bg-amber-900"
-            >
-              Use the version on disk
-            </button>
-          </span>
-        </div>
+        <WarningBanner
+          message={
+            <>
+              “{conflict.file}” changed on disk while you were editing — probably a git pull
+              or another editor. Which version do you want to keep?
+            </>
+          }
+          primaryLabel="Keep my version"
+          onPrimary={() => void keepMine()}
+          secondaryLabel="Use the version on disk"
+          onSecondary={useDisk}
+        />
       )}
       {project ? (
         <>

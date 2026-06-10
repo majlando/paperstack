@@ -1,6 +1,6 @@
 import { useState, type ReactNode } from "react";
 import { useStore } from "../store.ts";
-import type { SectionRole } from "@paperstack/engine";
+import { baseOf, type SectionRole } from "@paperstack/engine";
 
 const GROUPS: { role: SectionRole; label: string; addHint: string }[] = [
   { role: "front-matter", label: "Front matter", addHint: "Add front matter" },
@@ -11,7 +11,7 @@ const GROUPS: { role: SectionRole; label: string; addHint: string }[] = [
 
 /** "sections/02-implementation.md" → "02-implementation" (what rename edits). */
 function fileStem(file: string): string {
-  return file.slice(file.lastIndexOf("/") + 1).replace(/\.md$/i, "");
+  return baseOf(file).replace(/\.md$/i, "");
 }
 
 function displayName(file: string): string {

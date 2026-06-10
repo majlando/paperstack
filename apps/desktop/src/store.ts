@@ -11,11 +11,15 @@ import {
   moveSectionInYaml,
   renameSectionInYaml,
   editMetadataInYaml,
+  newSectionFile,
+  importFigure as importFigureFile,
+  dirOf,
+  baseOf,
+  humanize,
   PaperstackError,
   type MetadataEdit,
   type Project,
   type ProjectCounts,
-  type Section,
   type SectionRole,
 } from "@paperstack/engine";
 import { platform, SIDECARS, allowProjectScope } from "./platform/tauri-platform.ts";
@@ -110,62 +114,6 @@ function toError(e: unknown): { message: string; details?: string } {
     : { message: String(e) };
 }
 
-/** Filename-safe slug: "Løsning & Design" → "loesning-design". */
-function slugify(name: string): string {
-  const danish: Record<string, string> = { æ: "ae", ø: "oe", å: "aa" };
-  const slug = name
-    .trim()
-    .toLowerCase()
-    .replace(/[æøå]/g, (c) => danish[c]!)
-    .normalize("NFKD")
-    .replace(/[̀-ͯ]/g, "") // strip combining diacritics (é → e)
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/^-+|-+$/g, "");
-  return slug || "section";
-}
-
-function dirOf(file: string): string {
-  return file.slice(0, Math.max(0, file.lastIndexOf("/")));
-}
-
-function baseOf(file: string): string {
-  return file.slice(file.lastIndexOf("/") + 1);
-}
-
-/**
- * Picks a file path for a new section, following the project's own filename
- * conventions (purely cosmetic — order lives in document.yaml). New files go
- * where existing sections of the same role live: migrated reports may keep
- * everything at the project root, so never hardcode sections//appendices/.
- */
-function newSectionFile(sections: Section[], role: SectionRole, name: string): string {
-  const slug = slugify(name);
-  const sameRole = sections.filter((s) => s.role === role);
-  const fallbackDir = role === "appendix" ? "appendices" : "sections";
-  const dir = sameRole.length > 0 ? dirOf(sameRole[sameRole.length - 1]!.file) : fallbackDir;
-  const prefix = dir === "" ? "" : `${dir}/`;
-
-  if (role === "appendix") {
-    // Next letter after the highest in use — counting would repeat letters
-    // after a removal (remove appendix-a, add → "a" again beside appendix-b).
-    let used = 0;
-    for (const s of sections) {
-      const m = baseOf(s.file).match(/^appendix-([a-z])[-_.]/);
-      if (m) used = Math.max(used, m[1]!.charCodeAt(0) - 96);
-    }
-    const letter = String.fromCharCode(97 + Math.min(used, 25));
-    return `${prefix}appendix-${letter}-${slug}.md`;
-  }
-  // Numbered prefixes share one sequence per folder, whatever the role.
-  let max = 0;
-  for (const s of sections) {
-    if (dirOf(s.file) !== dir) continue;
-    const m = baseOf(s.file).match(/^(\d+)/);
-    if (m) max = Math.max(max, Number(m[1]));
-  }
-  return `${prefix}${String(max + 1).padStart(2, "0")}-${slug}.md`;
-}
-
 /**
  * Recently opened projects, newest first. Stored in the webview's
  * localStorage — app-private state never goes into the project folder.
@@ -195,11 +143,12 @@ function rememberProject(dir: string): void {
 
 /** "C:/repos/smart-home-hub" → "Smart home hub". */
 function titleFromDir(dir: string): string {
-  const base = dir
-    .slice(dir.lastIndexOf("/") + 1)
-    .replace(/[-_]+/g, " ")
-    .trim();
-  return base ? base.charAt(0).toUpperCase() + base.slice(1) : "Report";
+  return humanize(baseOf(dir)) || "Report";
+}
+
+/** The window chrome shows the report title wherever the project (re)loads. */
+function setWindowTitle(reportTitle: string): void {
+  document.title = `${reportTitle} — Paperstack`;
 }
 
 /** Read–edit–write document.yaml; skips the write when nothing changed. */
@@ -305,11 +254,12 @@ export const useStore = create<AppState>((set, get) => {
         error: null,
         notice: null,
         report: null,
+        confirmExport: null,
         pane: "preview",
         metadataOpen: false,
       });
       rememberProject(normalized);
-      document.title = `${project.meta.title} — Paperstack`;
+      setWindowTitle(project.meta.title);
       const first = project.meta.sections.find((s) => s.role === "body") ?? project.meta.sections[0];
       if (first) await get().openSection(first.file);
     } catch (e) {
@@ -343,7 +293,7 @@ export const useStore = create<AppState>((set, get) => {
       const project = await loadProject(platform, projectDir);
       const counts = await countProject(platform, project);
       set({ project, counts, error: null });
-      document.title = `${project.meta.title} — Paperstack`;
+      setWindowTitle(project.meta.title);
       // re-read the open section unless the user has unsaved changes
       if (activeFile && !dirty && project.meta.sections.some((s) => s.file === activeFile)) {
         const content = await platform.readTextFile(`${projectDir}/${activeFile}`);
@@ -437,8 +387,8 @@ export const useStore = create<AppState>((set, get) => {
     if (!projectDir) return;
     // Tolerate a typed ".md" — the input shows stems, but users type filenames.
     const stem = newStem.trim().replace(/\.md$/i, "");
-    const dir = file.slice(0, file.lastIndexOf("/") + 1);
-    const newFile = `${dir}${stem}.md`;
+    const dir = dirOf(file);
+    const newFile = `${dir ? `${dir}/` : ""}${stem}.md`;
     if (newFile === file || !stem) return;
     // Flush pending edits to the old path so nothing is in flight mid-rename.
     if (file === activeFile && !(await saveActive())) return;
@@ -568,26 +518,7 @@ export const useStore = create<AppState>((set, get) => {
     const { projectDir } = get();
     if (!projectDir) return null;
     try {
-      const fileName = baseOf(sourcePath.replaceAll("\\", "/"));
-      // Follow the project's own convention for where images live.
-      let dir = "figures";
-      for (const candidate of ["figures", "images", "assets", "resources"]) {
-        if (await platform.fileExists(`${projectDir}/${candidate}`)) {
-          dir = candidate;
-          break;
-        }
-      }
-      await platform.mkdir(`${projectDir}/${dir}`);
-      // Never overwrite an existing asset — same name gets a numeric suffix.
-      const dot = fileName.lastIndexOf(".");
-      const stem = dot === -1 ? fileName : fileName.slice(0, dot);
-      const ext = dot === -1 ? "" : fileName.slice(dot);
-      let dest = `${dir}/${fileName}`;
-      for (let n = 2; await platform.fileExists(`${projectDir}/${dest}`); n++) {
-        dest = `${dir}/${stem}-${n}${ext}`;
-      }
-      await platform.copyFile(sourcePath, `${projectDir}/${dest}`);
-      return dest;
+      return await importFigureFile(platform, projectDir, sourcePath);
     } catch (e) {
       set({ error: toError(e) });
       return null;

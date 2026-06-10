@@ -1,4 +1,5 @@
 import { open } from "@tauri-apps/plugin-dialog";
+import { baseOf } from "@paperstack/engine";
 import { useStore, getRecentProjects } from "../store.ts";
 
 export function Welcome() {
@@ -52,7 +53,7 @@ export function Welcome() {
               title={dir}
               className="block w-full truncate rounded px-2 py-1 text-left text-sm hover:bg-zinc-900"
             >
-              <span className="text-zinc-200">{dir.slice(dir.lastIndexOf("/") + 1)}</span>
+              <span className="text-zinc-200">{baseOf(dir)}</span>
               <span className="ml-2 text-xs text-zinc-600">{dir}</span>
             </button>
           ))}

@@ -99,7 +99,8 @@ export function MetadataForm() {
       subtitle: values.subtitle,
       course: values.course,
       institution: values.institution,
-      logo: values.logo,
+      // the parsed value is normalized (leading slash stripped) — write that
+      logo: parsed.data.logo ?? "",
       date: values.date,
       language: parsed.data.language,
       body_cap_normalsider: parsed.data.body_cap_normalsider,
