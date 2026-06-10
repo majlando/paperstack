@@ -18,8 +18,11 @@ let devAutoOpened = false;
 export default function App() {
   const project = useStore((s) => s.project);
   const error = useStore((s) => s.error);
+  const conflict = useStore((s) => s.conflict);
   const clearError = useStore((s) => s.clearError);
   const openProject = useStore((s) => s.openProject);
+  const keepMine = useStore((s) => s.resolveConflictKeepMine);
+  const useDisk = useStore((s) => s.resolveConflictUseDisk);
 
   useEffect(() => {
     if (devProject && !devAutoOpened) {
@@ -38,6 +41,28 @@ export default function App() {
           <button onClick={clearError} className="shrink-0 text-red-400 hover:text-red-200">
             dismiss
           </button>
+        </div>
+      )}
+      {conflict && (
+        <div className="flex items-center justify-between gap-4 border-b border-amber-900 bg-amber-950 px-4 py-2 text-sm text-amber-200">
+          <span>
+            “{conflict.file}” changed on disk while you were editing — probably a git pull or
+            another editor. Which version do you want to keep?
+          </span>
+          <span className="flex shrink-0 gap-2">
+            <button
+              onClick={() => void keepMine()}
+              className="rounded border border-amber-700 px-2.5 py-0.5 font-medium hover:bg-amber-900"
+            >
+              Keep my version
+            </button>
+            <button
+              onClick={useDisk}
+              className="rounded border border-amber-700 px-2.5 py-0.5 hover:bg-amber-900"
+            >
+              Use the version on disk
+            </button>
+          </span>
         </div>
       )}
       {project ? (

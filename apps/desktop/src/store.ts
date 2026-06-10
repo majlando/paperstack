@@ -19,6 +19,17 @@ interface AppState {
   activeFile: string | null;
   content: string;
   /**
+   * The active section's content as last read from / written to disk. Saves
+   * compare the file on disk against this to detect edits made outside the
+   * app (e.g. a git pull) before overwriting them.
+   */
+  baseline: string;
+  /**
+   * Set when a save was blocked because the file changed on disk while it had
+   * unsaved edits here. Resolved explicitly by the user via the actions below.
+   */
+  conflict: { file: string; diskContent: string } | null;
+  /**
    * Bumped whenever `content` is replaced from outside the editor (section
    * switch, project reload) — the editor component watches this to know when
    * to push the store content into CodeMirror. Keystrokes do not bump it.
@@ -31,8 +42,14 @@ interface AppState {
   reloadProject(): Promise<void>;
   openSection(file: string): Promise<void>;
   setContent(content: string): void;
-  /** Returns false when the content could not be written (the section stays dirty). */
-  saveActive(): Promise<boolean>;
+  /**
+   * Returns false when the content was not written (write failed, or the file
+   * changed on disk and the save was blocked) — the section stays dirty.
+   * `force` skips the conflict guard (used by "keep my version").
+   */
+  saveActive(force?: boolean): Promise<boolean>;
+  resolveConflictKeepMine(): Promise<void>;
+  resolveConflictUseDisk(): void;
   clearError(): void;
 }
 
@@ -72,6 +89,8 @@ export const useStore = create<AppState>((set, get) => ({
   counts: null,
   activeFile: null,
   content: "",
+  baseline: "",
+  conflict: null,
   contentVersion: 0,
   dirty: false,
   error: null,
@@ -87,6 +106,8 @@ export const useStore = create<AppState>((set, get) => ({
         counts,
         activeFile: null,
         content: "",
+        baseline: "",
+        conflict: null,
         dirty: false,
         error: null,
       });
@@ -107,7 +128,7 @@ export const useStore = create<AppState>((set, get) => ({
       // re-read the open section unless the user has unsaved changes
       if (activeFile && !dirty && project.meta.sections.some((s) => s.file === activeFile)) {
         const content = await platform.readTextFile(`${projectDir}/${activeFile}`);
-        set({ content, contentVersion: get().contentVersion + 1 });
+        set({ content, baseline: content, contentVersion: get().contentVersion + 1 });
       }
     } catch (e) {
       set({ error: message(e) });
@@ -125,6 +146,8 @@ export const useStore = create<AppState>((set, get) => ({
       set({
         activeFile: file,
         content,
+        baseline: content,
+        conflict: null,
         contentVersion: get().contentVersion + 1,
         dirty: false,
         error: null,
@@ -146,21 +169,57 @@ export const useStore = create<AppState>((set, get) => ({
     });
   },
 
-  async saveActive() {
-    const { projectDir, activeFile, content, dirty } = get();
+  async saveActive(force = false) {
+    const { projectDir, activeFile, content, baseline, dirty } = get();
     if (!projectDir || !activeFile) return true;
     // Never write when there is nothing to save: a no-op write would churn
     // mtimes and could clobber a file refreshed outside the app (git pull).
     if (!dirty) return true;
     try {
+      if (!force) {
+        // Conflict guard: the file changed on disk while it had unsaved
+        // edits here — let the user choose instead of silently overwriting.
+        // A read failure means the file is gone; the write below recreates it.
+        const disk = await platform
+          .readTextFile(`${projectDir}/${activeFile}`)
+          .catch(() => null);
+        if (disk === content) {
+          // the disk copy already matches the editor — nothing to write
+          set({ dirty: false, baseline: content, conflict: null });
+          return true;
+        }
+        if (disk !== null && disk !== baseline) {
+          set({ conflict: { file: activeFile, diskContent: disk } });
+          return false;
+        }
+      }
       await platform.writeTextFile(`${projectDir}/${activeFile}`, content);
-      set({ dirty: false });
+      set({ dirty: false, baseline: content, conflict: null });
       void renderDiagramsToDisk(projectDir, content);
       return true;
     } catch (e) {
       set({ error: message(e) });
       return false;
     }
+  },
+
+  async resolveConflictKeepMine() {
+    await get().saveActive(true);
+  },
+
+  resolveConflictUseDisk() {
+    const { conflict, counts } = get();
+    if (!conflict) return;
+    set({
+      content: conflict.diskContent,
+      baseline: conflict.diskContent,
+      conflict: null,
+      contentVersion: get().contentVersion + 1,
+      dirty: false,
+      counts: counts
+        ? applySectionContent(counts, conflict.file, conflict.diskContent)
+        : counts,
+    });
   },
 
   clearError() {
