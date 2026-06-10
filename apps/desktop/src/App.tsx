@@ -1,4 +1,5 @@
 import { useEffect, type ReactNode } from "react";
+import { getCurrentWindow } from "@tauri-apps/api/window";
 import { useStore } from "./store.ts";
 import { Welcome } from "./components/Welcome.tsx";
 import { Sidebar } from "./components/Sidebar.tsx";
@@ -68,6 +69,30 @@ export default function App() {
   const confirmExport = useStore((s) => s.confirmExport);
   const exportPdf = useStore((s) => s.exportPdf);
   const cancelExport = useStore((s) => s.cancelExport);
+
+  // The autosave debounce dies with the webview: flush pending edits before
+  // the window closes. A failed or conflicted save keeps the window open so
+  // the banner can be resolved — closing then would silently drop writing.
+  useEffect(() => {
+    const unlisten = getCurrentWindow().onCloseRequested(async (event) => {
+      const saved = await useStore.getState().saveActive();
+      if (!saved) event.preventDefault();
+    });
+    return () => void unlisten.then((fn) => fn());
+  }, []);
+
+  // Writers press Ctrl+S no matter what autosave promises — honor it instead
+  // of letting the webview's "save page" default swallow it.
+  useEffect(() => {
+    const onKeyDown = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "s") {
+        e.preventDefault();
+        void useStore.getState().saveActive();
+      }
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, []);
 
   useEffect(() => {
     if (devProject && !devAutoOpened) {
