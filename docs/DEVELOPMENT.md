@@ -92,9 +92,9 @@ Goal: the full core loop — edit → save → **View Report** → **Export PDF*
 - [x] Stale-render sweep after successful export: hash-named `diagrams/rendered/*.svg` no longer referenced by any section are deleted (strictly 8-hex-digit names — user files untouched)
 
 **Metadata form:**
-- [ ] Engine: comment-preserving metadata edits on `document.yaml` via the yaml Document API (same approach as `section-edit.ts`; one function per field group, unit-tested round-trips)
-- [ ] Form generated against the zod schema (first shadcn/ui components get vendored here): title/subtitle/course/institution/date/language/cap + authors list with student IDs; no raw YAML required
-- [ ] Validation messages come from the same zod schema the loader uses (one source of truth, no drift)
+- [x] Engine: comment-preserving metadata edits on `document.yaml` via the yaml Document API (`metadata-edit.ts`, unit-tested round-trips; existing scalars are mutated in place so quoting style survives, new keys insert at their canonical position, cleared optional fields remove their key)
+- [x] Form: title/subtitle/course/institution/date/language/cap + authors list with student IDs; full-pane "Report details" view via the ⚙ button (no raw YAML required). shadcn/ui deferred deliberately: the form needs only plain inputs and a native select — no dialog/dropdown plumbing — so vendoring waits for the first real dialog need (M4 Insert Figure)
+- [x] Validation is `documentSchema.omit({ sections })` — the loader's own schema, same messages; the engine re-validates the resulting document before writing, so the form can never produce a file the loader rejects
 
 **Finish the workflow:**
 - [ ] Status bar TODO counter click-to-jump: cycle through `[TODO` locations in the active section (the live counters themselves shipped in M2)

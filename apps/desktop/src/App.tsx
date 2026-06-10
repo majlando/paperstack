@@ -17,6 +17,7 @@ const devProject = import.meta.env.VITE_OPEN_PROJECT as string | undefined;
 const devSection = import.meta.env.VITE_OPEN_SECTION as string | undefined;
 const devSmokeExport = import.meta.env.VITE_SMOKE_EXPORT as string | undefined;
 const devSmokeView = import.meta.env.VITE_SMOKE_VIEW as string | undefined;
+const devSmokeMetadata = import.meta.env.VITE_SMOKE_METADATA as string | undefined;
 // Module-level guard: StrictMode runs effects twice, and two concurrent
 // openProject calls race — the loser would override the devSection jump.
 let devAutoOpened = false;
@@ -39,6 +40,7 @@ export default function App() {
       void openProject(devProject).then(() => {
         if (devSection) void useStore.getState().openSection(devSection);
         if (devSmokeExport) void useStore.getState().exportPdf();
+        if (devSmokeMetadata) void useStore.getState().openMetadata();
         if (devSmokeView) {
           void useStore.getState().viewReport().then(() => {
             if (devSmokeView === "2") {

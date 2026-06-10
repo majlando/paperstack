@@ -108,6 +108,7 @@ $env:VITE_OPEN_PROJECT = "E:/path/to/report-project"    # auto-open a project at
 $env:VITE_OPEN_SECTION = "sections/01-introduction.md"  # then jump to a section
 $env:VITE_SMOKE_EXPORT = "1"                            # then run Export PDF immediately
 $env:VITE_SMOKE_VIEW = "1"                              # then run View Report ("2": recompile once more while the PDF pane is open)
+$env:VITE_SMOKE_METADATA = "1"                          # then open the Report details form
 pnpm --filter @paperstack/desktop tauri dev
 ```
 
