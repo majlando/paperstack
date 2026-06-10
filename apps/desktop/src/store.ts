@@ -434,6 +434,18 @@ export const useStore = create<AppState>((set, get) => {
     // Never write when there is nothing to save: a no-op write would churn
     // mtimes and could clobber a file refreshed outside the app (git pull).
     if (!dirty) return true;
+    // Keystrokes can land while this save awaits disk I/O. They set `dirty`
+    // again, and this save must not clear it — the newer text is not on disk.
+    // Advance the baseline to what was just synced and chain a save for the
+    // newer text instead of marking it saved.
+    const settle = (): Promise<boolean> | true => {
+      if (get().activeFile === activeFile && get().content !== content) {
+        set({ baseline: content, conflict: null });
+        return get().saveActive();
+      }
+      set({ dirty: false, baseline: content, conflict: null });
+      return true;
+    };
     try {
       if (!force) {
         // Conflict guard: the file changed on disk while it had unsaved
@@ -444,8 +456,7 @@ export const useStore = create<AppState>((set, get) => {
           .catch(() => null);
         if (disk === content) {
           // the disk copy already matches the editor — nothing to write
-          set({ dirty: false, baseline: content, conflict: null });
-          return true;
+          return settle();
         }
         if (disk !== null && disk !== baseline) {
           set({ conflict: { file: activeFile, diskContent: disk } });
@@ -453,9 +464,8 @@ export const useStore = create<AppState>((set, get) => {
         }
       }
       await platform.writeTextFile(`${projectDir}/${activeFile}`, content);
-      set({ dirty: false, baseline: content, conflict: null });
       void renderDiagramsToDisk(projectDir, content);
-      return true;
+      return settle();
     } catch (e) {
       set({ error: toError(e) });
       return false;
@@ -528,7 +538,9 @@ export const useStore = create<AppState>((set, get) => {
   async openMetadata() {
     // Flush pending section edits first — the editor unmounts while the
     // form is open, so nothing should be left waiting on an autosave timer.
-    await get().saveActive();
+    // A failed or conflicted save keeps the section visible instead of
+    // hiding it behind the form while a banner asks about it.
+    if (!(await get().saveActive())) return;
     set({ metadataOpen: true });
   },
 
