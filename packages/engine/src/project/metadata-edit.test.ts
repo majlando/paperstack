@@ -39,6 +39,17 @@ describe("editMetadataInYaml", () => {
     expect(lines[titleAt + 1]).toBe("subtitle: A study");
   });
 
+  it("round-trips the cover logo, validating it as a project path", () => {
+    const out = editMetadataInYaml(YAML, { logo: "resources/logos/sea.png" });
+    const lines = out.split("\n");
+    const institutionAt = lines.findIndex((l) => l.startsWith("institution:"));
+    expect(lines[institutionAt + 1]).toBe("logo: resources/logos/sea.png");
+    expect(editMetadataInYaml(out, { logo: "" })).not.toContain("logo:");
+    expect(() => editMetadataInYaml(YAML, { logo: "../logo.png" })).toThrow(
+      "stay inside the project folder",
+    );
+  });
+
   it("removes optional keys when cleared", () => {
     const out = editMetadataInYaml(YAML, { course: "  ", date: "" });
     expect(out).not.toContain("course:");

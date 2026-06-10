@@ -41,6 +41,7 @@ export function MetadataForm() {
       subtitle: meta?.subtitle ?? "",
       course: meta?.course ?? "",
       institution: meta?.institution ?? "",
+      logo: meta?.logo ?? "",
       date: meta?.date ?? "",
       language: meta?.language ?? "en",
       cap: String(meta?.body_cap_normalsider ?? 40),
@@ -73,6 +74,7 @@ export function MetadataForm() {
       subtitle: values.subtitle.trim() || undefined,
       course: values.course.trim() || undefined,
       institution: values.institution.trim() || undefined,
+      logo: values.logo.trim() || undefined,
       date: values.date.trim() || undefined,
       language: values.language,
       // a non-numeric input must still produce the schema's own message
@@ -97,6 +99,7 @@ export function MetadataForm() {
       subtitle: values.subtitle,
       course: values.course,
       institution: values.institution,
+      logo: values.logo,
       date: values.date,
       language: parsed.data.language,
       body_cap_normalsider: parsed.data.body_cap_normalsider,
@@ -153,6 +156,14 @@ export function MetadataForm() {
               />
             </Field>
           </div>
+          <Field label="Cover logo" error={errors.logo}>
+            <input
+              value={values.logo}
+              onChange={(e) => update({ logo: e.target.value })}
+              placeholder="Image path inside the project, e.g. resources/logos/sea.png (optional)"
+              className={inputCls}
+            />
+          </Field>
           <div className="grid grid-cols-3 gap-4">
             <Field label="Date" error={errors.date}>
               <input

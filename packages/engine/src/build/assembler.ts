@@ -40,6 +40,8 @@ export function generateMainTypst(
   if (meta.course) lines.push(`  course: "${escapeTypstString(meta.course)}",`);
   if (meta.institution)
     lines.push(`  institution: "${escapeTypstString(meta.institution)}",`);
+  // Root-absolute so Typst resolves it against --root (the project folder).
+  if (meta.logo) lines.push(`  logo: "${escapeTypstString(`/${meta.logo}`)}",`);
   if (meta.authors.length > 0) {
     const authors = meta.authors
       .map((a) => {

@@ -13,6 +13,7 @@ export const SEA_TEMPLATE = `// Paperstack SEA report template (written by Paper
   subtitle: none,
   course: none,
   institution: none,
+  logo: none,
   authors: (),
   date: none,
   language: "en",
@@ -32,6 +33,12 @@ export const SEA_TEMPLATE = `// Paperstack SEA report template (written by Paper
     v(0.4em)
   }
   show figure.caption: set text(size: 9.5pt)
+  // Large images float to the top/bottom of a page instead of leaving a gap
+  // (the old hand-built report managed this with manual newpage hints).
+  set figure(placement: auto)
+  // Navy headings + navy links: the deliberate default look (M4 decision),
+  // matching the original report's heading color.
+  show heading: set text(fill: rgb("#1f3864"))
   show link: set text(fill: rgb("#1a4b8b"))
   show raw.where(block: true): it => block(
     width: 100%,
@@ -43,7 +50,13 @@ export const SEA_TEMPLATE = `// Paperstack SEA report template (written by Paper
   )
 
   // ----- Cover page (unnumbered) -----
-  v(3cm)
+  if logo != none {
+    v(0.8cm)
+    align(center, image(logo, height: 2.4cm))
+    v(1.4cm)
+  } else {
+    v(3cm)
+  }
   align(center)[
     #text(size: 25pt, weight: "bold")[#title]
     #if subtitle != none {

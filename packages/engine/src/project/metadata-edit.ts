@@ -14,6 +14,7 @@ export interface MetadataEdit {
   subtitle?: string;
   course?: string;
   institution?: string;
+  logo?: string;
   date?: string;
   language?: "en" | "da";
   body_cap_normalsider?: number;
@@ -27,6 +28,7 @@ const CANONICAL_ORDER = [
   "subtitle",
   "course",
   "institution",
+  "logo",
   "authors",
   "date",
   "language",
@@ -92,6 +94,7 @@ export function editMetadataInYaml(yamlText: string, edit: MetadataEdit): string
   setOptionalText("subtitle", edit.subtitle);
   setOptionalText("course", edit.course);
   setOptionalText("institution", edit.institution);
+  setOptionalText("logo", edit.logo);
   setOptionalText("date", edit.date);
   if (edit.language !== undefined) setScalar("language", edit.language);
   if (edit.body_cap_normalsider !== undefined) {

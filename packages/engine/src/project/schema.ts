@@ -18,23 +18,27 @@ const authorSchema = z.object({
 });
 
 /**
- * Section paths must stay inside the project folder and be portable:
+ * Paths in document.yaml must stay inside the project folder and be portable:
  * forward slashes, relative, no "..". This is both a safety boundary (a
  * shared document.yaml must never read files outside the project) and what
  * keeps projects working across Windows/macOS/Linux group members.
  */
-export const sectionFileSchema = z
-  .string()
-  .min(1, "section file must not be empty")
-  .refine((f) => !f.includes("\\"), "use forward slashes (/) in section paths")
-  .refine(
-    (f) => !f.startsWith("/") && !/^[A-Za-z]:/.test(f),
-    "section paths must be relative to the project folder",
-  )
-  .refine(
-    (f) => !f.split("/").includes(".."),
-    "section paths must stay inside the project folder",
-  );
+function projectRelativePath(what: string) {
+  return z
+    .string()
+    .min(1, `${what} must not be empty`)
+    .refine((f) => !f.includes("\\"), `use forward slashes (/) in ${what}s`)
+    .refine(
+      (f) => !f.startsWith("/") && !/^[A-Za-z]:/.test(f),
+      `${what}s must be relative to the project folder`,
+    )
+    .refine(
+      (f) => !f.split("/").includes(".."),
+      `${what}s must stay inside the project folder`,
+    );
+}
+
+export const sectionFileSchema = projectRelativePath("section path");
 
 const sectionSchema = z.object({
   file: sectionFileSchema,
@@ -46,6 +50,8 @@ export const documentSchema = z.object({
   subtitle: z.string().optional(),
   course: z.string().optional(),
   institution: z.string().optional(),
+  /** Project-relative image path shown at the top of the cover page. */
+  logo: projectRelativePath("logo path").optional(),
   authors: z.array(authorSchema).default([]),
   date: z.string().optional(),
   language: z.enum(["en", "da"]).default("en"),
