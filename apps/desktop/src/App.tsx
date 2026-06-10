@@ -4,6 +4,7 @@ import { Welcome } from "./components/Welcome.tsx";
 import { Sidebar } from "./components/Sidebar.tsx";
 import { Editor } from "./components/Editor.tsx";
 import { Preview } from "./components/Preview.tsx";
+import { MetadataForm } from "./components/MetadataForm.tsx";
 import { StatusBar } from "./components/StatusBar.tsx";
 
 // Dev convenience: VITE_OPEN_PROJECT=<path> auto-opens a project on launch,
@@ -22,6 +23,7 @@ let devAutoOpened = false;
 
 export default function App() {
   const project = useStore((s) => s.project);
+  const metadataOpen = useStore((s) => s.metadataOpen);
   const error = useStore((s) => s.error);
   const notice = useStore((s) => s.notice);
   const conflict = useStore((s) => s.conflict);
@@ -92,8 +94,14 @@ export default function App() {
         <>
           <div className="flex min-h-0 flex-1">
             <Sidebar />
-            <Editor />
-            <Preview />
+            {metadataOpen ? (
+              <MetadataForm />
+            ) : (
+              <>
+                <Editor />
+                <Preview />
+              </>
+            )}
           </div>
           <StatusBar />
         </>

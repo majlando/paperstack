@@ -10,7 +10,9 @@ import {
   removeSectionFromYaml,
   moveSectionInYaml,
   renameSectionInYaml,
+  editMetadataInYaml,
   PaperstackError,
+  type MetadataEdit,
   type Project,
   type ProjectCounts,
   type Section,
@@ -53,6 +55,8 @@ interface AppState {
   report: { pdfPath: string; warnings: string[]; builtAt: number } | null;
   /** What the right pane shows: the live section preview or the report PDF. */
   pane: "preview" | "report";
+  /** The report-details form is open (replaces the editor + preview area). */
+  metadataOpen: boolean;
 
   openProject(dir: string): Promise<void>;
   /** Scaffolds a new SEA report in `dir` (or just opens it if it already is one). */
@@ -80,6 +84,10 @@ interface AppState {
   /** Compile the report and write output/report.pdf (or the locked-file fallback). */
   exportPdf(): Promise<void>;
   showPreview(): void;
+  openMetadata(): Promise<void>;
+  closeMetadata(): void;
+  /** Returns false when the save failed — the form stays open with the error visible. */
+  saveMetadata(edit: MetadataEdit): Promise<boolean>;
   clearError(): void;
   clearNotice(): void;
 }
@@ -246,6 +254,7 @@ export const useStore = create<AppState>((set, get) => {
   building: false,
   report: null,
   pane: "preview",
+  metadataOpen: false,
 
   async openProject(dir: string) {
     try {
@@ -265,6 +274,7 @@ export const useStore = create<AppState>((set, get) => {
         notice: null,
         report: null,
         pane: "preview",
+        metadataOpen: false,
       });
       rememberProject(normalized);
       const first = project.meta.sections.find((s) => s.role === "body") ?? project.meta.sections[0];
@@ -504,6 +514,31 @@ export const useStore = create<AppState>((set, get) => {
 
   showPreview() {
     set({ pane: "preview" });
+  },
+
+  async openMetadata() {
+    // Flush pending section edits first — the editor unmounts while the
+    // form is open, so nothing should be left waiting on an autosave timer.
+    await get().saveActive();
+    set({ metadataOpen: true });
+  },
+
+  closeMetadata() {
+    set({ metadataOpen: false });
+  },
+
+  async saveMetadata(edit: MetadataEdit) {
+    const { projectDir } = get();
+    if (!projectDir) return false;
+    try {
+      await editDocumentYaml(projectDir, (t) => editMetadataInYaml(t, edit));
+      await get().reloadProject();
+      set({ metadataOpen: false });
+      return true;
+    } catch (e) {
+      set({ error: message(e) });
+      return false;
+    }
   },
 
   clearError() {

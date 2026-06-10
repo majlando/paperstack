@@ -68,6 +68,7 @@ export function Sidebar() {
   const activeFile = useStore((s) => s.activeFile);
   const openSection = useStore((s) => s.openSection);
   const reloadProject = useStore((s) => s.reloadProject);
+  const openMetadata = useStore((s) => s.openMetadata);
   const addSection = useStore((s) => s.addSection);
   const removeSection = useStore((s) => s.removeSection);
   const moveSection = useStore((s) => s.moveSection);
@@ -88,13 +89,22 @@ export function Sidebar() {
           </div>
           <div className="text-xs text-zinc-500 truncate">{project.dir}</div>
         </div>
-        <button
-          onClick={() => void reloadProject()}
-          title="Reload project — pick up changes made outside Paperstack (e.g. after a git pull)"
-          className="shrink-0 rounded px-1.5 py-0.5 text-zinc-500 hover:bg-zinc-800 hover:text-zinc-200"
-        >
-          ⟳
-        </button>
+        <span className="flex shrink-0 gap-0.5">
+          <button
+            onClick={() => void openMetadata()}
+            title="Report details — title, authors, language, length cap"
+            className="rounded px-1.5 py-0.5 text-zinc-500 hover:bg-zinc-800 hover:text-zinc-200"
+          >
+            ⚙
+          </button>
+          <button
+            onClick={() => void reloadProject()}
+            title="Reload project — pick up changes made outside Paperstack (e.g. after a git pull)"
+            className="rounded px-1.5 py-0.5 text-zinc-500 hover:bg-zinc-800 hover:text-zinc-200"
+          >
+            ⟳
+          </button>
+        </span>
       </div>
       {GROUPS.map(({ role, label, addHint }) => {
         const sections = project.meta.sections.filter((s) => s.role === role);

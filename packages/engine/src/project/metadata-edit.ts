@@ -77,7 +77,7 @@ export function editMetadataInYaml(yamlText: string, edit: MetadataEdit): string
   // Mutating an existing scalar's value keeps its quoting style; only new
   // keys get fresh nodes (inserted in canonical order, not appended).
   const setScalar = (key: string, value: string | number) => {
-    const existing = map.get(key, true);
+    const existing: unknown = map.get(key, true);
     if (existing instanceof Scalar) existing.value = value;
     else setInOrder(doc, map, key, value);
   };
