@@ -51,8 +51,13 @@ export function rewriteImagePaths(typst: string, sectionDir: string): string {
   });
 }
 
-/** Pure-string posix path resolution (no node:path — must run in the webview). */
-function resolveProjectPath(baseDir: string, relative: string): string {
+/**
+ * Pure-string posix path resolution (no node:path — must run in the webview).
+ * Resolves a path relative to a project-relative base dir into a
+ * root-absolute project path: ("sections", "../figures/x.png") → "/figures/x.png".
+ * Also used by the app's preview to resolve image paths.
+ */
+export function resolveProjectPath(baseDir: string, relative: string): string {
   const parts = [...baseDir.split("/"), ...relative.split("/")].filter(
     (p) => p !== "" && p !== ".",
   );

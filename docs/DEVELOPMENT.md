@@ -67,8 +67,8 @@ Goal: open a project, edit sections with autosave, see a live per-section previe
 - [ ] Reload project action — picks up files changed outside the app (e.g. after a `git pull`); warn instead of silently overwriting if a file changed on disk while open in the editor
 - [x] Sidebar driven by the engine's `Project` model, grouped by role, with per-section TODO badges (add / rename / delete / move up/down still to come — reordering edits the `sections` list in `document.yaml`, the single source of truth for order)
 - [x] `MarkdownEditor` vanilla-TS class wrapping CodeMirror 6 (markdown mode + fenced-code highlighting via language-data, zinc theme, list-continuation keymap) + the small React mount bridge (`contentVersion` distinguishes external content changes from keystrokes); autosave 800 ms after the last keystroke and on blur
-- [ ] Preview pane: remark → HTML, syntax-highlighted code, images resolved from the project folder, live Mermaid rendering
-- [ ] Mermaid save hook: on save, render diagrams to `diagrams/rendered/*.svg`
+- [x] Preview pane: vanilla-TS `MarkdownPreview` (remark/rehype + rehype-highlight, Tailwind typography) + thin React bridge; images resolved via the Tauri asset protocol; live Mermaid rendering with inline error boxes; 300 ms debounce
+- [x] Mermaid save hook: on save, render not-yet-rendered ```mermaid blocks to `diagrams/rendered/<hash>.svg` (the files PDF export embeds); invalid diagrams skipped (visible in preview, readable error at export)
 
 ## Milestone 3 — Report workflow *(M)*
 

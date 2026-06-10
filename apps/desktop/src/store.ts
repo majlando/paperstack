@@ -3,11 +3,13 @@ import {
   loadProject,
   countProject,
   applySectionContent,
+  extractMermaidBlocks,
   PaperstackError,
   type Project,
   type ProjectCounts,
 } from "@paperstack/engine";
 import { platform } from "./platform/tauri-platform.ts";
+import { renderMermaidSvg } from "./preview/mermaid.ts";
 
 interface AppState {
   projectDir: string | null;
@@ -35,6 +37,28 @@ interface AppState {
 
 function message(e: unknown): string {
   return e instanceof PaperstackError ? e.userMessage : String(e);
+}
+
+/**
+ * Render any not-yet-rendered ```mermaid blocks to diagrams/rendered/<hash>.svg
+ * (the files PDF export embeds). Hash-named, so unchanged diagrams are free
+ * and edited ones render fresh. Invalid diagrams are skipped — the preview
+ * shows the error inline, and export reports it readably.
+ */
+async function renderDiagramsToDisk(projectDir: string, content: string): Promise<void> {
+  const { blocks } = extractMermaidBlocks(content);
+  if (blocks.length === 0) return;
+  await platform.mkdir(`${projectDir}/diagrams/rendered`);
+  for (const block of blocks) {
+    const path = `${projectDir}/${block.renderedPath}`;
+    if (await platform.fileExists(path)) continue;
+    try {
+      const svg = await renderMermaidSvg(`save-${block.hash}`, block.code);
+      await platform.writeTextFile(path, svg);
+    } catch {
+      // invalid diagram source — handled visibly in preview and at export
+    }
+  }
 }
 
 export const useStore = create<AppState>((set, get) => ({
@@ -119,6 +143,7 @@ export const useStore = create<AppState>((set, get) => ({
     try {
       await platform.writeTextFile(`${projectDir}/${activeFile}`, content);
       set({ dirty: false });
+      void renderDiagramsToDisk(projectDir, content);
     } catch (e) {
       set({ error: message(e) });
     }

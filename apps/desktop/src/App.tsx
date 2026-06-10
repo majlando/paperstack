@@ -3,11 +3,17 @@ import { useStore } from "./store.ts";
 import { Welcome } from "./components/Welcome.tsx";
 import { Sidebar } from "./components/Sidebar.tsx";
 import { Editor } from "./components/Editor.tsx";
+import { Preview } from "./components/Preview.tsx";
 import { StatusBar } from "./components/StatusBar.tsx";
 
-// Dev convenience: VITE_OPEN_PROJECT=<path> auto-opens a project on launch
-// (used by smoke tests; the folder dialog can't be driven from scripts).
+// Dev convenience: VITE_OPEN_PROJECT=<path> auto-opens a project on launch,
+// VITE_OPEN_SECTION=<file> jumps to a section (smoke tests; the folder
+// dialog can't be driven from scripts).
 const devProject = import.meta.env.VITE_OPEN_PROJECT as string | undefined;
+const devSection = import.meta.env.VITE_OPEN_SECTION as string | undefined;
+// Module-level guard: StrictMode runs effects twice, and two concurrent
+// openProject calls race — the loser would override the devSection jump.
+let devAutoOpened = false;
 
 export default function App() {
   const project = useStore((s) => s.project);
@@ -16,7 +22,12 @@ export default function App() {
   const openProject = useStore((s) => s.openProject);
 
   useEffect(() => {
-    if (devProject && !useStore.getState().project) void openProject(devProject);
+    if (devProject && !devAutoOpened) {
+      devAutoOpened = true;
+      void openProject(devProject).then(() => {
+        if (devSection) void useStore.getState().openSection(devSection);
+      });
+    }
   }, [openProject]);
 
   return (
@@ -34,6 +45,7 @@ export default function App() {
           <div className="flex min-h-0 flex-1">
             <Sidebar />
             <Editor />
+            <Preview />
           </div>
           <StatusBar />
         </>

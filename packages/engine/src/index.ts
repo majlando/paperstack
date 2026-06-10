@@ -29,6 +29,7 @@ export {
 export {
   PandocConverter,
   rewriteImagePaths,
+  resolveProjectPath,
   type Converter,
 } from "./converter.ts";
 export { buildReport, type BuildOptions, type BuildResult } from "./builder.ts";
