@@ -58,11 +58,8 @@ Tauri 2 · TypeScript · React + Vite · CodeMirror 6 · Mermaid · Pandoc → T
 - [docs/PROJECT.md](docs/PROJECT.md) — vision, design decisions, architecture
 - [docs/MVP.md](docs/MVP.md) — v1 scope, milestones, definition of done
 - [docs/STACK.md](docs/STACK.md) — technology choices and why
-
-## Contributing
-
-The project is in early shaping — issues, ideas, and feedback are welcome. The primary audience right now is SEA students who want a better report workflow than Word without learning LaTeX, but the design aims to be useful for any structured technical writing.
+- [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md) — the MVP development plan and task tracker
 
 ## License
 
-MIT
+[MIT](LICENSE)

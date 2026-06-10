@@ -6,8 +6,8 @@ This is the main focus. Nothing outside this document blocks a v1 release.
 
 ## Features
 
-1. **Create / open a project** — one SEA template; all changes saved to plain files on disk.
-2. **Structure sidebar** — sections grouped by role (front matter / chapters / appendices), with add, rename, delete. Reordering = renaming the number prefix for now; drag-and-drop later.
+1. **Create / open a project** — one SEA template; all changes saved to plain files on disk. New projects include a ready-made `.gitignore` (build output, rendered diagrams) so group repos stay clean, and reopening/reloading a project picks up changes made outside the app (e.g. after a `git pull`).
+2. **Structure sidebar** — sections grouped by role (front matter / chapters / appendices), with add, rename, delete, and move up/down. Section order lives in the `sections` list in `document.yaml` (the single source of truth — filename number prefixes are just a human-friendly convention), so reordering is a simple list edit. Drag-and-drop later.
 3. **Markdown editor** — CodeMirror 6: syntax highlighting, fenced code blocks, autosave.
 4. **Per-chapter live preview** — headings, lists, tables, code with highlighting, images, Mermaid.
 5. **Metadata form** — edits `document.yaml`; no raw YAML required.
@@ -43,7 +43,7 @@ This is the main focus. Nothing outside this document blocks a v1 release.
 - Markdown→Typst conversion (bundled Pandoc, behind a converter interface)
 - the SEA `.typ` template: cover page, ToC, numbered headings, code styling, figure captions, appendix handling
 - normalsider + TODO counting
-- a real SEA report as the local test fixture
+- fixtures: a small committed demo report for tests, plus a real SEA report kept local (git-ignored) as the quality bar
 
 This de-risks everything. If the PDF looks right here, the rest is UI work.
 

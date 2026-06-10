@@ -3,12 +3,14 @@ node_modules/
 dist/
 target/
 
+# Dev binaries (typst, pandoc) — fetched by scripts/fetch-binaries.ps1
+bin/
+
 # Tauri
 src-tauri/target/
 
-# Test/report output
+# Build output of report projects (incl. fixtures) — never commit built PDFs
 output/
-*.pdf
 
 # The author's actual SEA report (separate private repo, used as a local
 # test fixture only — contains personal exam content, never committed here)

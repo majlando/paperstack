@@ -1,0 +1,50 @@
+import { readFile, writeFile, readdir, access } from "node:fs/promises";
+import { execFile } from "node:child_process";
+import type { Platform } from "./platform.ts";
+
+/** Platform implementation for Node — used by tests and the future CLI. */
+export class NodePlatform implements Platform {
+  async readTextFile(path: string): Promise<string> {
+    return readFile(path, "utf8");
+  }
+
+  async writeTextFile(path: string, content: string): Promise<void> {
+    await writeFile(path, content, "utf8");
+  }
+
+  async fileExists(path: string): Promise<boolean> {
+    try {
+      await access(path);
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
+  async listDir(path: string): Promise<string[]> {
+    return readdir(path);
+  }
+
+  runBinary(
+    binary: string,
+    args: string[],
+    options?: { stdin?: string },
+  ): Promise<{ exitCode: number; stdout: string; stderr: string }> {
+    return new Promise((resolve) => {
+      const child = execFile(
+        binary,
+        args,
+        { encoding: "utf8", maxBuffer: 64 * 1024 * 1024 },
+        (error, stdout, stderr) => {
+          const exitCode =
+            error && typeof error.code === "number" ? error.code : error ? 1 : 0;
+          resolve({ exitCode, stdout, stderr });
+        },
+      );
+      if (options?.stdin !== undefined) {
+        child.stdin?.write(options.stdin);
+      }
+      child.stdin?.end();
+    });
+  }
+}

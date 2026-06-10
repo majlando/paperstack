@@ -30,7 +30,7 @@ Word is weak for code-heavy structured reports. LaTeX/Overleaf and Pandoc produc
 2. Other SEA / Danish academy CS students with the same report requirements — people who don't want Word but also don't want LaTeX.
 3. Later: CS students generally, and anyone writing structured technical documents.
 
-v1 is single-user. Group collaboration (Git/GitHub or other sync) is a future direction — plain-text projects make it possible later without redesign.
+The **app** is single-user in v1, but the next real report is a group report — so the **project format** must be group-ready from the start: plain text, deterministic file writes (clean diffs), generated files git-ignored. A team can then share a report project over plain Git even if only some members use Paperstack, while others edit chapters in any editor. Actual collaboration features (sync, comments, review) remain future directions.
 
 ## Positioning
 
@@ -49,8 +49,8 @@ Paperstack is **not**: a Word replacement, a LaTeX IDE, a general Markdown edito
 3. **One rendering path for the full report: "View Report" shows the real PDF.**
    There is no separate assembled-HTML view. Typst compiles fast enough that View Report = compile + show the PDF in a pane. The per-chapter HTML preview is for fast feedback while typing; the PDF is the truth. This removes the entire class of "preview doesn't match export" bugs.
 
-4. **Projects are plain folders with open formats.**
-   Markdown, YAML, Mermaid source, SVG/PNG assets. Editable outside the app. The app automates the workflow; it does not own the document.
+4. **Projects are plain folders with open formats — and Git-friendly by design.**
+   Markdown, YAML, Mermaid source, SVG/PNG assets. Editable outside the app. The app automates the workflow; it does not own the document. Files are written deterministically (stable formatting, minimal diffs), generated output is git-ignored, and the app handles chapters changed outside it (e.g. after a `git pull`) gracefully — because real reports are group reports shared over version control.
 
 5. **One template.** The SEA report template, polished. More templates later.
 
@@ -61,7 +61,7 @@ Features that generic Markdown→PDF tools don't have, proven necessary by the h
 - **Length tracking against a cap.** Live "Body: 39,1 / 40 normalsider" in the UI (1 normalside = 2400 characters, HTML comments stripped, body chapters only, cap configurable). Danish academies grade against this.
 - **Section roles.** A chapter is front-matter, body, back-matter, or appendix. Only body counts toward the cap; appendices get appropriate ToC treatment.
 - **TODO tracking.** Count of `[TODO]` placeholders per chapter, with a warning before export.
-- **A figure convention that produces numbered captions.** The Markdown image alt text becomes "Figur N: <alt text>" in the PDF. No raw uncaptioned images.
+- **A figure convention that produces numbered captions.** The Markdown image alt text becomes "Figure N: <alt text>" in the PDF (label localized via the document language — "Figur" for Danish). No raw uncaptioned images.
 
 ## Project structure on disk
 
@@ -80,6 +80,8 @@ my-report/
 └─ output/report.pdf               # generated
 ```
 
+Section order is defined by the `sections` list in `document.yaml` — the single source of truth the engine reads. Numbered filename prefixes are a human-friendly convention for browsing the folder, nothing more.
+
 `document.yaml` (illustrative — the schema stays simple, human-readable, and Git-friendly):
 
 ```yaml
@@ -90,7 +92,7 @@ authors:
   - name: "Student Name"
     student_id: "123456"
 date: 2026-06-10
-language: da
+language: en          # en is the default; da switches labels (Figur, Indholdsfortegnelse)
 body_cap_normalsider: 40
 sections:
   - { file: chapters/01-introduction.md, role: body }
