@@ -11,6 +11,8 @@ export interface Platform {
   listDir(path: string): Promise<string[]>;
   /** Create a directory, including missing parents. No error if it exists. */
   mkdir(path: string): Promise<void>;
+  /** Rename/move a file. Fails if the source is missing. */
+  rename(oldPath: string, newPath: string): Promise<void>;
   /** Run a bundled binary (typst, pandoc) and capture its output. */
   runBinary(
     binary: string,

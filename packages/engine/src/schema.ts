@@ -23,7 +23,7 @@ const authorSchema = z.object({
  * shared document.yaml must never read files outside the project) and what
  * keeps projects working across Windows/macOS/Linux group members.
  */
-const sectionFileSchema = z
+export const sectionFileSchema = z
   .string()
   .min(1, "section file must not be empty")
   .refine((f) => !f.includes("\\"), "use forward slashes (/) in section paths")

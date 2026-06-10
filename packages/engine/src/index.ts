@@ -32,6 +32,12 @@ export {
   resolveProjectPath,
   type Converter,
 } from "./converter.ts";
+export {
+  addSectionToYaml,
+  removeSectionFromYaml,
+  moveSectionInYaml,
+  renameSectionInYaml,
+} from "./section-edit.ts";
 export { buildReport, type BuildOptions, type BuildResult } from "./builder.ts";
 
 export const ENGINE_VERSION = "0.0.1";

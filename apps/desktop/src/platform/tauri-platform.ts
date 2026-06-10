@@ -4,6 +4,7 @@ import {
   exists,
   readDir,
   mkdir,
+  rename,
 } from "@tauri-apps/plugin-fs";
 import type { Platform } from "@paperstack/engine";
 
@@ -31,6 +32,10 @@ export class TauriPlatform implements Platform {
 
   async mkdir(path: string): Promise<void> {
     await mkdir(path, { recursive: true });
+  }
+
+  async rename(oldPath: string, newPath: string): Promise<void> {
+    await rename(oldPath, newPath);
   }
 
   async runBinary(): Promise<{ exitCode: number; stdout: string; stderr: string }> {

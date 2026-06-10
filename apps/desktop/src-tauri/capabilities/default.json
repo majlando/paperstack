@@ -11,6 +11,7 @@
     "fs:allow-exists",
     "fs:allow-read-dir",
     "fs:allow-mkdir",
+    "fs:allow-rename",
     {
       "identifier": "fs:scope",
       "allow": [{ "path": "**" }]

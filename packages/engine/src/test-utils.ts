@@ -24,6 +24,13 @@ export class FakePlatform implements Platform {
 
   async mkdir(): Promise<void> {}
 
+  async rename(oldPath: string, newPath: string): Promise<void> {
+    const content = this.files.get(oldPath);
+    if (content === undefined) throw new Error(`ENOENT: ${oldPath}`);
+    this.files.delete(oldPath);
+    this.files.set(newPath, content);
+  }
+
   async runBinary(): Promise<{ exitCode: number; stdout: string; stderr: string }> {
     throw new Error("not supported in FakePlatform");
   }
