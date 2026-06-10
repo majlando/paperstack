@@ -134,16 +134,16 @@ Goal: nothing in the core loop can lose writing or silently produce a wrong repo
 - [x] `saveActive` race: a keystroke landing during the save's awaited read/write got its `dirty: true` clobbered by the save's unconditional `set({ dirty: false, baseline: content })` with the stale captured content — newer text then existed only in the editor while the status bar said "saved". Fixed (2026-06-11): the save advances the baseline only to what it actually synced and chains a save for anything newer
 - [x] Flush on window close: `onCloseRequested` awaits `saveActive()` before allowing close, and keeps the window open when the save fails or conflicts so the banner can be resolved (2026-06-11; needed `core:window:allow-destroy` — registering a close-requested listener makes the JS wrapper responsible for destroying the window)
 - [x] `openMetadata` honors a failed save: bails like `openSection` instead of unmounting the editor over an unresolved conflict (2026-06-11)
-- [ ] Sidebar actions stop wiping editor undo: `reloadProject` (called by move/rename/add/saveMetadata) bumps `contentVersion`, and `setDoc` rebuilds editor state from scratch — skip the rebuild when the incoming content is string-identical to the buffer
+- [x] Sidebar actions stop wiping editor undo: the `setDoc` rebuild is skipped when the same section carries identical text; a different section always rebuilds — undo history must never cross section files (2026-06-11)
 
 **Silent-wrong-output fixes:**
-- [ ] Unit-test the build string layer: `generateMainTypst`, `escapeTypstString`, `buildLengthLine`, `rewriteImagePaths`, `resolveProjectPath` are pure functions with zero unit tests, covered only by the integration test CI skips — a typo in the assembler ships through green CI today
-- [ ] Interleaved roles silently renumber: a hand-edited `body, front-matter, body` order is schema-legal but re-emits `#counter(heading).update(0)` on re-entry, restarting body numbering from 1 mid-report. Reset counters only on the *first* entry into each mode, and have the loader warn on interleaved roles
-- [ ] Pin the anslag definition: `countAnslag` counts UTF-16 code units, so astral characters (emoji) count as 2 — decide code points vs. units deliberately, document it next to the counter, and test it. (Danish text is unaffected; this is about pinning the project's core domain number)
+- [x] Unit-test the build string layer: assembler (escaping, localized length lines, numbering switches), converter path helpers, and `buildReport` orchestration through the `options.converter` seam with a fake compile — including the Windows locked-report.pdf fallback, previously all uncovered in CI (2026-06-11)
+- [x] Interleaved roles silently renumbered: the heading counter now resets only on the *first* entry into each numbered mode, so a schema-legal `body, front-matter, body` order continues numbering instead of restarting at 1 (2026-06-11; loader warning judged unnecessary — the output is now simply correct)
+- [x] Anslag definition pinned: Unicode code points, documented at the counter and tested — an emoji is one anslag, not two UTF-16 units (2026-06-11)
 
 **Supply chain (ships inside the installer, so it belongs in the gate):**
-- [ ] `fetch-binaries.ps1`: SHA-256 pins for both downloaded archives, verified before extraction — these binaries ship to end users as sidecars
-- [ ] Fix the stale-pin trap: the skip-if-present check only tests `Test-Path`, so bumping a pinned version silently does nothing on machines with old binaries — record the version next to the binary and re-fetch on mismatch
+- [x] `fetch-binaries.ps1`: SHA-256 pins for both downloaded archives, verified before extraction — a mismatch refuses to install (2026-06-11)
+- [x] Stale-pin trap fixed: the skip-if-present check asks the binary for its version instead of only `Test-Path`, so a pin bump re-fetches on machines holding an old binary (2026-06-11)
 
 **The gate:**
 - [ ] Run the clean-machine test (docs/CLEAN-MACHINE-TEST.md) in Windows Sandbox, then tag `v0.1.0` per the M4 items above
@@ -210,7 +210,7 @@ Goal: the group report is written in Paperstack while some group members edit th
 - [x] **Rendered-diagrams default decided (2026-06-11): committed, not ignored.** Scaffolded projects no longer git-ignore `diagrams/rendered/` — the renders are content-hashed and deterministic, so committing them is conflict-free, and group members/CLI/CI can build sections containing diagrams they never opened in Paperstack. Self-healing (next item) is now convenience, not the fix. (Projects scaffolded before this keep their old `.gitignore` — removing the line by hand re-enables committing)
 - [ ] Export self-heals diagrams: render missing Mermaid SVGs in-app before building, instead of telling the user to go open the section — a group member adding a diagram in another editor is exactly this case (the readable error stays for the CLI path, which has no renderer)
 - [x] Scaffold a `.gitattributes` (`* text=auto`) into new projects alongside the `.gitignore` — mixed Windows/macOS groups hit CRLF diff churn in week one; counters are already CR-insensitive, diffs weren't (2026-06-11; never overwrites an existing one)
-- [ ] Readable error when `document.yaml` contains Git conflict markers (`<<<<<<<`) — the likeliest broken state after a bad merge of the shared ordering file, and exactly the audience that needs the message spelled out
+- [x] Readable error when `document.yaml` contains Git conflict markers (`<<<<<<<`) — the likeliest broken state after a bad merge of the shared ordering file (2026-06-11; pulled forward from M7, it was a 10-line fix with a test)
 - [ ] Group repo CI: the report builds and the normalsider count is checked on every push, via the packaged CLI from M6 — members who don't run Paperstack still see the PDF and the count on their changes
 - [ ] Recents: drop entries that fail to open (from the backlog)
 - [ ] Editor: preserve undo history across section switches (from the backlog)
@@ -229,9 +229,9 @@ Known-good improvements that don't gate any milestone — pick up when touching 
 - [ ] "Show in folder" button on the export notice (`tauri-plugin-opener`) instead of only printing the relative path
 - [ ] Sidebar inline rename/add: commit on blur instead of silently discarding (Enter is the only commit path today, and nothing says so)
 - [ ] Section-remove confirm copy tells the user the file stays on disk and how to re-add it (the data is safe; the copy doesn't say so)
-- [ ] `toError`: render non-`Error` throws readably (a thrown plain object currently shows `[object Object]` in the banner)
-- [ ] Sweep stale `.typ` files from `output/.build/converted/` when sections are renamed/removed (diagram renders are swept; these never are)
-- [ ] Derive `ENGINE_VERSION` from package.json instead of a hand-maintained constant that will drift
+- [x] `toError`: render non-`Error` throws readably (2026-06-11)
+- [x] Sweep stale `.typ` files from `output/.build/converted/` after a successful export, with the diagram sweep's only-our-naming-scheme rule (2026-06-11)
+- [x] `ENGINE_VERSION`: deleted — hand-maintained, never imported, already drifting (2026-06-11)
 
 (The editor-undo, preview-scroll, and recents items moved into Milestone 7; the reload-triggered undo wipe — the worse half of the editor-undo item — moved into Milestone 4.5.)
 
