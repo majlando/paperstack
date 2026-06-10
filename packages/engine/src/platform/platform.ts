@@ -15,6 +15,8 @@ export interface Platform {
   rename(oldPath: string, newPath: string): Promise<void>;
   /** Delete a file. Fails if it is missing. */
   removeFile(path: string): Promise<void>;
+  /** Copy a file byte-for-byte (used for importing figures). Overwrites the target. */
+  copyFile(sourcePath: string, destPath: string): Promise<void>;
   /**
    * Run a bundled binary (typst, pandoc) and capture its output. `binary` is
    * whatever identifies the executable to this platform: an absolute path in

@@ -132,6 +132,25 @@ export class MarkdownEditor {
     return this.view.state.selection.main.head;
   }
 
+  /**
+   * Insert block-level Markdown at the cursor, kept on its own lines (a
+   * blank line is added when the cursor sits inside existing text).
+   * `cursorAt` places the cursor that many characters into the inserted
+   * text — e.g. just after a code fence so the language can be typed.
+   */
+  insertBlock(text: string, cursorAt?: number): void {
+    const state = this.view.state;
+    const { from, to } = state.selection.main;
+    const line = state.doc.lineAt(from);
+    const prefix = line.text.trim() === "" ? "" : "\n\n";
+    this.view.dispatch({
+      changes: { from, to, insert: `${prefix}${text}\n` },
+      selection: { anchor: from + prefix.length + (cursorAt ?? text.length) },
+      effects: EditorView.scrollIntoView(from, { y: "center" }),
+    });
+    this.view.focus();
+  }
+
   /** Select a range, scroll it into view, and focus the editor. */
   select(from: number, to: number): void {
     const length = this.view.state.doc.length;

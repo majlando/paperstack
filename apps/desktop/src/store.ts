@@ -85,6 +85,11 @@ interface AppState {
   /** Compile the report and write output/report.pdf (or the locked-file fallback). */
   exportPdf(): Promise<void>;
   showPreview(): void;
+  /**
+   * Copies an image into the project's images folder (collision-safe) and
+   * returns its project-relative path, or null on failure.
+   */
+  importFigure(sourcePath: string): Promise<string | null>;
   openMetadata(): Promise<void>;
   closeMetadata(): void;
   /** Returns false when the save failed — the form stays open with the error visible. */
@@ -539,6 +544,36 @@ export const useStore = create<AppState>((set, get) => {
 
   showPreview() {
     set({ pane: "preview" });
+  },
+
+  async importFigure(sourcePath: string) {
+    const { projectDir } = get();
+    if (!projectDir) return null;
+    try {
+      const fileName = baseOf(sourcePath.replaceAll("\\", "/"));
+      // Follow the project's own convention for where images live.
+      let dir = "figures";
+      for (const candidate of ["figures", "images", "assets", "resources"]) {
+        if (await platform.fileExists(`${projectDir}/${candidate}`)) {
+          dir = candidate;
+          break;
+        }
+      }
+      await platform.mkdir(`${projectDir}/${dir}`);
+      // Never overwrite an existing asset — same name gets a numeric suffix.
+      const dot = fileName.lastIndexOf(".");
+      const stem = dot === -1 ? fileName : fileName.slice(0, dot);
+      const ext = dot === -1 ? "" : fileName.slice(dot);
+      let dest = `${dir}/${fileName}`;
+      for (let n = 2; await platform.fileExists(`${projectDir}/${dest}`); n++) {
+        dest = `${dir}/${stem}-${n}${ext}`;
+      }
+      await platform.copyFile(sourcePath, `${projectDir}/${dest}`);
+      return dest;
+    } catch (e) {
+      set({ error: toError(e) });
+      return null;
+    }
   },
 
   async openMetadata() {

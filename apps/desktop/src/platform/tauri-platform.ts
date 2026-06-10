@@ -6,6 +6,7 @@ import {
   mkdir,
   rename,
   remove,
+  copyFile,
 } from "@tauri-apps/plugin-fs";
 import { Command } from "@tauri-apps/plugin-shell";
 import { invoke } from "@tauri-apps/api/core";
@@ -56,6 +57,10 @@ export class TauriPlatform implements Platform {
 
   async removeFile(path: string): Promise<void> {
     await remove(path);
+  }
+
+  async copyFile(sourcePath: string, destPath: string): Promise<void> {
+    await copyFile(sourcePath, destPath);
   }
 
   async runBinary(

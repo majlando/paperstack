@@ -2,6 +2,7 @@ import { useEffect, useRef } from "react";
 import { useStore } from "../store.ts";
 import { MarkdownEditor } from "../editor/markdown-editor.ts";
 import { registerEditor } from "../editor/editor-registry.ts";
+import { InsertControls } from "./InsertControls.tsx";
 
 /**
  * Thin React bridge for the vanilla-TS CodeMirror wrapper: mounts it once
@@ -52,8 +53,9 @@ export function Editor() {
 
   return (
     <div className="relative flex min-w-0 flex-1 flex-col">
-      <div className="border-b border-zinc-800 bg-zinc-900/60 px-4 py-1.5 text-xs text-zinc-500">
-        {activeFile ?? "no section open"}
+      <div className="flex items-center justify-between border-b border-zinc-800 bg-zinc-900/60 px-4 py-1 text-xs text-zinc-500">
+        <span className="truncate py-0.5">{activeFile ?? "no section open"}</span>
+        {activeFile && <InsertControls />}
       </div>
       <div ref={containerRef} className="min-h-0 flex-1 bg-zinc-950" />
       {!activeFile && (

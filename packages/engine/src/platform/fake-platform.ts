@@ -43,6 +43,12 @@ export class FakePlatform implements Platform {
     if (!this.files.delete(path)) throw new Error(`ENOENT: ${path}`);
   }
 
+  async copyFile(sourcePath: string, destPath: string): Promise<void> {
+    const content = this.files.get(sourcePath);
+    if (content === undefined) throw new Error(`ENOENT: ${sourcePath}`);
+    this.files.set(destPath, content);
+  }
+
   async runBinary(): Promise<{ exitCode: number; stdout: string; stderr: string }> {
     throw new Error("not supported in FakePlatform");
   }
