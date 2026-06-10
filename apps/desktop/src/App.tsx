@@ -18,8 +18,10 @@ let devAutoOpened = false;
 export default function App() {
   const project = useStore((s) => s.project);
   const error = useStore((s) => s.error);
+  const notice = useStore((s) => s.notice);
   const conflict = useStore((s) => s.conflict);
   const clearError = useStore((s) => s.clearError);
+  const clearNotice = useStore((s) => s.clearNotice);
   const openProject = useStore((s) => s.openProject);
   const keepMine = useStore((s) => s.resolveConflictKeepMine);
   const useDisk = useStore((s) => s.resolveConflictUseDisk);
@@ -39,6 +41,14 @@ export default function App() {
         <div className="flex items-start justify-between gap-4 border-b border-red-900 bg-red-950 px-4 py-2 text-sm text-red-200">
           <pre className="whitespace-pre-wrap font-sans">{error}</pre>
           <button onClick={clearError} className="shrink-0 text-red-400 hover:text-red-200">
+            dismiss
+          </button>
+        </div>
+      )}
+      {notice && (
+        <div className="flex items-start justify-between gap-4 border-b border-emerald-900 bg-emerald-950 px-4 py-2 text-sm text-emerald-200">
+          <span>{notice}</span>
+          <button onClick={clearNotice} className="shrink-0 text-emerald-400 hover:text-emerald-200">
             dismiss
           </button>
         </div>

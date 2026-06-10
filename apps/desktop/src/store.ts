@@ -5,6 +5,7 @@ import {
   countProject,
   applySectionContent,
   extractMermaidBlocks,
+  buildReport,
   addSectionToYaml,
   removeSectionFromYaml,
   moveSectionInYaml,
@@ -15,7 +16,7 @@ import {
   type Section,
   type SectionRole,
 } from "@paperstack/engine";
-import { platform } from "./platform/tauri-platform.ts";
+import { platform, SIDECARS } from "./platform/tauri-platform.ts";
 import { renderMermaidSvg } from "./preview/mermaid.ts";
 
 interface AppState {
@@ -44,6 +45,14 @@ interface AppState {
   contentVersion: number;
   dirty: boolean;
   error: string | null;
+  /** Success message (e.g. after export) — the friendly counterpart of `error`. */
+  notice: string | null;
+  /** A report compile is running (View Report / Export PDF). */
+  building: boolean;
+  /** Snapshot of the last compiled report, shown in the right pane's Report tab. */
+  report: { pdfPath: string; warnings: string[]; builtAt: number } | null;
+  /** What the right pane shows: the live section preview or the report PDF. */
+  pane: "preview" | "report";
 
   openProject(dir: string): Promise<void>;
   /** Scaffolds a new SEA report in `dir` (or just opens it if it already is one). */
@@ -66,7 +75,13 @@ interface AppState {
   saveActive(force?: boolean): Promise<boolean>;
   resolveConflictKeepMine(): Promise<void>;
   resolveConflictUseDisk(): void;
+  /** Compile the report and show the PDF in the right pane. */
+  viewReport(): Promise<void>;
+  /** Compile the report and write output/report.pdf (or the locked-file fallback). */
+  exportPdf(): Promise<void>;
+  showPreview(): void;
   clearError(): void;
+  clearNotice(): void;
 }
 
 function message(e: unknown): string {
@@ -178,7 +193,31 @@ async function renderDiagramsToDisk(projectDir: string, content: string): Promis
   }
 }
 
-export const useStore = create<AppState>((set, get) => ({
+export const useStore = create<AppState>((set, get) => {
+  /** Shared build path for View Report and Export PDF: save, compile, sync counters. */
+  async function runBuild(): Promise<{ pdfPath: string; warnings: string[] } | null> {
+    const { projectDir } = get();
+    if (!projectDir) return null;
+    // A blocked save (write failure or conflict) keeps its own error visible.
+    if (!(await get().saveActive())) return null;
+    set({ building: true });
+    try {
+      const result = await buildReport(platform, projectDir, {
+        typst: SIDECARS.typst,
+        pandoc: SIDECARS.pandoc,
+      });
+      // The build re-reads every section — its counts are authoritative.
+      set({ counts: result.counts, error: null });
+      return result;
+    } catch (e) {
+      set({ error: message(e) });
+      return null;
+    } finally {
+      set({ building: false });
+    }
+  }
+
+  return {
   projectDir: null,
   project: null,
   counts: null,
@@ -189,6 +228,10 @@ export const useStore = create<AppState>((set, get) => ({
   contentVersion: 0,
   dirty: false,
   error: null,
+  notice: null,
+  building: false,
+  report: null,
+  pane: "preview",
 
   async openProject(dir: string) {
     try {
@@ -205,6 +248,9 @@ export const useStore = create<AppState>((set, get) => ({
         conflict: null,
         dirty: false,
         error: null,
+        notice: null,
+        report: null,
+        pane: "preview",
       });
       rememberProject(normalized);
       const first = project.meta.sections.find((s) => s.role === "body") ?? project.meta.sections[0];
@@ -422,7 +468,34 @@ export const useStore = create<AppState>((set, get) => ({
     });
   },
 
+  async viewReport() {
+    const result = await runBuild();
+    if (!result) return;
+    set({
+      report: { pdfPath: result.pdfPath, warnings: result.warnings, builtAt: Date.now() },
+      pane: "report",
+    });
+  },
+
+  async exportPdf() {
+    const { projectDir } = get();
+    const result = await runBuild();
+    if (!result || !projectDir) return;
+    const relPath = result.pdfPath.replace(`${projectDir}/`, "");
+    const warningText = result.warnings.length > 0 ? ` ${result.warnings.join(" ")}` : "";
+    set({ notice: `Report exported to ${relPath}.${warningText}` });
+  },
+
+  showPreview() {
+    set({ pane: "preview" });
+  },
+
   clearError() {
     set({ error: null });
   },
-}));
+
+  clearNotice() {
+    set({ notice: null });
+  },
+  };
+});
