@@ -11,6 +11,7 @@ export {
   type SectionRole,
 } from "./schema.ts";
 export { loadProject, type Project } from "./project.ts";
+export { createProject, type CreateProjectOptions } from "./create-project.ts";
 export {
   CHARS_PER_NORMALSIDE,
   countAnslag,

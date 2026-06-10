@@ -1,4 +1,5 @@
 export type ErrorCode =
+  | "project-exists"
   | "metadata-missing"
   | "metadata-invalid-yaml"
   | "metadata-invalid"
