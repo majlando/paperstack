@@ -45,10 +45,16 @@ export function Editor() {
   useEffect(() => {
     const editor = editorRef.current;
     if (!editor) return;
-    editor.setDoc(useStore.getState().content);
-    const file = useStore.getState().activeFile;
-    if (file && file !== lastFocusedFile.current) editor.focus();
-    lastFocusedFile.current = file;
+    const { content, activeFile } = useStore.getState();
+    const sameFile = activeFile === lastFocusedFile.current;
+    // Same section, same text: a structure edit (move/rename/add) bumped
+    // contentVersion without touching this section — rebuilding the editor
+    // state would only wipe the undo history. A different section always
+    // rebuilds: undo history must never cross section files, even when two
+    // sections happen to contain identical text.
+    if (!sameFile || editor.getDoc() !== content) editor.setDoc(content);
+    if (activeFile && !sameFile) editor.focus();
+    lastFocusedFile.current = activeFile;
   }, [contentVersion]);
 
   return (
