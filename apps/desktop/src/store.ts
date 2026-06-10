@@ -4,9 +4,15 @@ import {
   countProject,
   applySectionContent,
   extractMermaidBlocks,
+  addSectionToYaml,
+  removeSectionFromYaml,
+  moveSectionInYaml,
+  renameSectionInYaml,
   PaperstackError,
   type Project,
   type ProjectCounts,
+  type Section,
+  type SectionRole,
 } from "@paperstack/engine";
 import { platform } from "./platform/tauri-platform.ts";
 import { renderMermaidSvg } from "./preview/mermaid.ts";
@@ -41,6 +47,13 @@ interface AppState {
   openProject(dir: string): Promise<void>;
   reloadProject(): Promise<void>;
   openSection(file: string): Promise<void>;
+  /** Creates the section file (heading stub) and adds it to document.yaml. */
+  addSection(role: SectionRole, name: string): Promise<void>;
+  /** Takes the section out of the report structure; the file stays on disk. */
+  removeSection(file: string): Promise<void>;
+  moveSection(file: string, direction: "up" | "down"): Promise<void>;
+  /** Renames the file on disk (same folder) and updates document.yaml. */
+  renameSection(file: string, newStem: string): Promise<void>;
   setContent(content: string): void;
   /**
    * Returns false when the content was not written (write failed, or the file
@@ -55,6 +68,52 @@ interface AppState {
 
 function message(e: unknown): string {
   return e instanceof PaperstackError ? e.userMessage : String(e);
+}
+
+/** Filename-safe slug: "Løsning & Design" → "loesning-design". */
+function slugify(name: string): string {
+  const danish: Record<string, string> = { æ: "ae", ø: "oe", å: "aa" };
+  const slug = name
+    .trim()
+    .toLowerCase()
+    .replace(/[æøå]/g, (c) => danish[c]!)
+    .normalize("NFKD")
+    .replace(/[̀-ͯ]/g, "") // strip combining diacritics (é → e)
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "");
+  return slug || "section";
+}
+
+/**
+ * Picks a file path for a new section, following the project's filename
+ * conventions (purely cosmetic — order lives in document.yaml): numbered
+ * prefixes under sections/, letters for appendices/.
+ */
+function newSectionFile(sections: Section[], role: SectionRole, name: string): string {
+  const slug = slugify(name);
+  if (role === "appendix") {
+    const letter = String.fromCharCode(
+      97 + sections.filter((s) => s.role === "appendix").length,
+    );
+    return `appendices/appendix-${letter}-${slug}.md`;
+  }
+  let max = 0;
+  for (const s of sections) {
+    const m = s.file.match(/^sections\/(\d+)/);
+    if (m) max = Math.max(max, Number(m[1]));
+  }
+  return `sections/${String(max + 1).padStart(2, "0")}-${slug}.md`;
+}
+
+/** Read–edit–write document.yaml; skips the write when nothing changed. */
+async function editDocumentYaml(
+  projectDir: string,
+  edit: (yamlText: string) => string,
+): Promise<void> {
+  const path = `${projectDir}/document.yaml`;
+  const text = await platform.readTextFile(path);
+  const next = edit(text);
+  if (next !== text) await platform.writeTextFile(path, next);
 }
 
 /**
@@ -154,6 +213,92 @@ export const useStore = create<AppState>((set, get) => ({
       });
       // Sections edited outside the app may contain never-rendered diagrams.
       void renderDiagramsToDisk(projectDir, content);
+    } catch (e) {
+      set({ error: message(e) });
+    }
+  },
+
+  async addSection(role: SectionRole, name: string) {
+    const { projectDir, project } = get();
+    if (!projectDir || !project) return;
+    try {
+      const file = newSectionFile(project.meta.sections, role, name);
+      const path = `${projectDir}/${file}`;
+      if (!(await platform.fileExists(path))) {
+        await platform.mkdir(`${projectDir}/${file.slice(0, file.lastIndexOf("/"))}`);
+        await platform.writeTextFile(path, `# ${name.trim()}\n`);
+      }
+      await editDocumentYaml(projectDir, (t) => addSectionToYaml(t, file, role));
+      await get().reloadProject();
+      await get().openSection(file);
+    } catch (e) {
+      set({ error: message(e) });
+    }
+  },
+
+  async removeSection(file: string) {
+    const { projectDir, activeFile, saveActive } = get();
+    if (!projectDir) return;
+    // Removal only takes the section out of the report — the file stays on
+    // disk, so flush pending edits to it first.
+    if (file === activeFile && !(await saveActive())) return;
+    try {
+      await editDocumentYaml(projectDir, (t) => removeSectionFromYaml(t, file));
+      if (get().activeFile === file) {
+        set({
+          activeFile: null,
+          content: "",
+          baseline: "",
+          dirty: false,
+          contentVersion: get().contentVersion + 1,
+        });
+      }
+      await get().reloadProject();
+    } catch (e) {
+      set({ error: message(e) });
+    }
+  },
+
+  async moveSection(file: string, direction: "up" | "down") {
+    const { projectDir } = get();
+    if (!projectDir) return;
+    try {
+      await editDocumentYaml(projectDir, (t) => moveSectionInYaml(t, file, direction));
+      await get().reloadProject();
+    } catch (e) {
+      set({ error: message(e) });
+    }
+  },
+
+  async renameSection(file: string, newStem: string) {
+    const { projectDir, activeFile, saveActive } = get();
+    if (!projectDir) return;
+    const dir = file.slice(0, file.lastIndexOf("/") + 1);
+    const newFile = `${dir}${newStem.trim()}.md`;
+    if (newFile === file || !newStem.trim()) return;
+    // Flush pending edits to the old path so nothing is in flight mid-rename.
+    if (file === activeFile && !(await saveActive())) return;
+    try {
+      if (await platform.fileExists(`${projectDir}/${newFile}`)) {
+        set({ error: `A file named "${newFile}" already exists in the project.` });
+        return;
+      }
+      // Validate against document.yaml before touching the file system.
+      const yamlPath = `${projectDir}/document.yaml`;
+      const yamlText = await platform.readTextFile(yamlPath);
+      const nextYaml = renameSectionInYaml(yamlText, file, newFile);
+      await platform.rename(`${projectDir}/${file}`, `${projectDir}/${newFile}`);
+      try {
+        await platform.writeTextFile(yamlPath, nextYaml);
+      } catch (e) {
+        // keep file and structure in sync: undo the rename if yaml failed
+        await platform
+          .rename(`${projectDir}/${newFile}`, `${projectDir}/${file}`)
+          .catch(() => {});
+        throw e;
+      }
+      if (get().activeFile === file) set({ activeFile: newFile });
+      await get().reloadProject();
     } catch (e) {
       set({ error: message(e) });
     }
