@@ -30,12 +30,23 @@ export interface MermaidExtraction {
   blocks: MermaidBlock[];
 }
 
+/**
+ * Matches what the preview's Markdown parser treats as a Mermaid block: a
+ * fence line starting with exactly ```mermaid (an info string like
+ * "mermaid layout" still counts; "mermaid-x" does not), closed by a ``` line.
+ * Anchored to line starts so prose that merely mentions ```mermaid is left
+ * alone, while indented fences (e.g. inside lists) still match.
+ */
+const MERMAID_FENCE = /^[ \t]*```mermaid(?:[ \t][^\n]*)?\r?\n([\s\S]*?)^[ \t]*```[ \t]*\r?$/gm;
+
 export function extractMermaidBlocks(markdown: string): MermaidExtraction {
   const blocks: MermaidBlock[] = [];
   const replaced = markdown.replace(
-    /```mermaid[^\n]*\r?\n([\s\S]*?)```/g,
+    MERMAID_FENCE,
     (_match, code: string) => {
-      const trimmed = code.trim();
+      // Normalize line endings before hashing so CRLF and LF checkouts of the
+      // same diagram map to the same rendered SVG file.
+      const trimmed = code.replace(/\r\n?/g, "\n").trim();
       const hash = hashDiagram(trimmed);
       const renderedPath = `diagrams/rendered/${hash}.svg`;
       blocks.push({ code: trimmed, hash, renderedPath });
