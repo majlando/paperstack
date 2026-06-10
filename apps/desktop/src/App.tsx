@@ -1,13 +1,23 @@
+import { useEffect } from "react";
 import { useStore } from "./store.ts";
 import { Welcome } from "./components/Welcome.tsx";
 import { Sidebar } from "./components/Sidebar.tsx";
 import { Editor } from "./components/Editor.tsx";
 import { StatusBar } from "./components/StatusBar.tsx";
 
+// Dev convenience: VITE_OPEN_PROJECT=<path> auto-opens a project on launch
+// (used by smoke tests; the folder dialog can't be driven from scripts).
+const devProject = import.meta.env.VITE_OPEN_PROJECT as string | undefined;
+
 export default function App() {
   const project = useStore((s) => s.project);
   const error = useStore((s) => s.error);
   const clearError = useStore((s) => s.clearError);
+  const openProject = useStore((s) => s.openProject);
+
+  useEffect(() => {
+    if (devProject && !useStore.getState().project) void openProject(devProject);
+  }, [openProject]);
 
   return (
     <div className="flex h-screen flex-col bg-zinc-950 text-zinc-200">
