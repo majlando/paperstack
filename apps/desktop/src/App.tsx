@@ -11,13 +11,16 @@ import { StatusBar } from "./components/StatusBar.tsx";
 // VITE_OPEN_SECTION=<file> jumps to a section, VITE_SMOKE_EXPORT=1 runs
 // Export PDF right after opening, VITE_SMOKE_VIEW=1 runs View Report
 // (=2 recompiles once more while the PDF pane is showing — exercises the
-// file-locked-by-viewer path). Smoke tests; the folder dialog and buttons
-// can't be driven from scripts.
+// file-locked-by-viewer path). VITE_SMOKE_SCRIPT=1 runs the full scripted
+// scenario instead and writes output/smoke-result.json (`pnpm smoke` drives
+// it end to end). Smoke tests; the folder dialog and buttons can't be
+// driven from scripts.
 const devProject = import.meta.env.VITE_OPEN_PROJECT as string | undefined;
 const devSection = import.meta.env.VITE_OPEN_SECTION as string | undefined;
 const devSmokeExport = import.meta.env.VITE_SMOKE_EXPORT as string | undefined;
 const devSmokeView = import.meta.env.VITE_SMOKE_VIEW as string | undefined;
 const devSmokeMetadata = import.meta.env.VITE_SMOKE_METADATA as string | undefined;
+const devSmokeScript = import.meta.env.VITE_SMOKE_SCRIPT as string | undefined;
 // Module-level guard: StrictMode runs effects twice, and two concurrent
 // openProject calls race — the loser would override the devSection jump.
 let devAutoOpened = false;
@@ -69,6 +72,10 @@ export default function App() {
   useEffect(() => {
     if (devProject && !devAutoOpened) {
       devAutoOpened = true;
+      if (devSmokeScript) {
+        void import("./dev/smoke.ts").then((m) => m.runScriptedSmoke(devProject));
+        return;
+      }
       void openProject(devProject).then(() => {
         if (devSection) void useStore.getState().openSection(devSection);
         if (devSmokeExport) void useStore.getState().exportPdf(true);
