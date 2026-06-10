@@ -131,9 +131,9 @@ Goal: another student can install it and produce a report unaided.
 Goal: nothing in the core loop can lose writing or silently produce a wrong report. A writing app's first job is to never lose writing — these gate the `v0.1.0` tag ahead of every v0.2 feature.
 
 **Data-loss fixes (the review's headline findings):**
-- [ ] `saveActive` race: a keystroke landing during the save's awaited read/write gets its `dirty: true` clobbered by the save's unconditional `set({ dirty: false, baseline: content })` with the stale captured content — newer text then exists only in the editor while the status bar says "saved", and the debounce no-ops on the `!dirty` guard. Fix: clear `dirty`/advance `baseline` only when `get().content` still equals the saved content
-- [ ] Flush on window close: there is no `onCloseRequested`/`beforeunload` handler anywhere — closing the window inside the 800 ms autosave debounce silently drops the last keystrokes. Add a Tauri `onCloseRequested` that awaits `saveActive()` before allowing close
-- [ ] `openMetadata` honors a failed save: it currently discards `saveActive()`'s return value, so a write failure/conflict unmounts the editor and leaves the conflict banner pointing at a section the user can no longer see — bail like `openSection` does
+- [x] `saveActive` race: a keystroke landing during the save's awaited read/write got its `dirty: true` clobbered by the save's unconditional `set({ dirty: false, baseline: content })` with the stale captured content — newer text then existed only in the editor while the status bar said "saved". Fixed (2026-06-11): the save advances the baseline only to what it actually synced and chains a save for anything newer
+- [x] Flush on window close: `onCloseRequested` awaits `saveActive()` before allowing close, and keeps the window open when the save fails or conflicts so the banner can be resolved (2026-06-11; needed `core:window:allow-destroy` — registering a close-requested listener makes the JS wrapper responsible for destroying the window)
+- [x] `openMetadata` honors a failed save: bails like `openSection` instead of unmounting the editor over an unresolved conflict (2026-06-11)
 - [ ] Sidebar actions stop wiping editor undo: `reloadProject` (called by move/rename/add/saveMetadata) bumps `contentVersion`, and `setDoc` rebuilds editor state from scratch — skip the rebuild when the incoming content is string-identical to the buffer
 
 **Silent-wrong-output fixes:**
@@ -207,9 +207,9 @@ Goal: the group report is written in Paperstack while some group members edit th
 
 - [ ] Auto-reload when the window regains focus and project files changed on disk (the conflict guard already protects unsaved edits; the manual Reload button stays)
 - [ ] Per-section changed-on-disk indicators in the sidebar after an external change
-- [ ] **Decide the rendered-diagrams default (before the group report starts):** scaffolded projects git-ignore `diagrams/rendered/`, so a member adding a Mermaid block in VS Code (the explicitly supported scenario) produces a project that *fails to export for everyone* until someone opens that section in Paperstack. The renders are content-hashed and deterministic, so committing them is conflict-free — recommended: flip the scaffolded `.gitignore` to commit them, which also lets the CLI and group CI build fresh diagrams. Self-healing (next item) then becomes convenience, not the fix
+- [x] **Rendered-diagrams default decided (2026-06-11): committed, not ignored.** Scaffolded projects no longer git-ignore `diagrams/rendered/` — the renders are content-hashed and deterministic, so committing them is conflict-free, and group members/CLI/CI can build sections containing diagrams they never opened in Paperstack. Self-healing (next item) is now convenience, not the fix. (Projects scaffolded before this keep their old `.gitignore` — removing the line by hand re-enables committing)
 - [ ] Export self-heals diagrams: render missing Mermaid SVGs in-app before building, instead of telling the user to go open the section — a group member adding a diagram in another editor is exactly this case (the readable error stays for the CLI path, which has no renderer)
-- [ ] Scaffold a `.gitattributes` (`* text=auto`) into new projects alongside the `.gitignore` — mixed Windows/macOS groups hit CRLF diff churn in week one; counters are already CR-insensitive, diffs aren't
+- [x] Scaffold a `.gitattributes` (`* text=auto`) into new projects alongside the `.gitignore` — mixed Windows/macOS groups hit CRLF diff churn in week one; counters are already CR-insensitive, diffs weren't (2026-06-11; never overwrites an existing one)
 - [ ] Readable error when `document.yaml` contains Git conflict markers (`<<<<<<<`) — the likeliest broken state after a bad merge of the shared ordering file, and exactly the audience that needs the message spelled out
 - [ ] Group repo CI: the report builds and the normalsider count is checked on every push, via the packaged CLI from M6 — members who don't run Paperstack still see the PDF and the count on their changes
 - [ ] Recents: drop entries that fail to open (from the backlog)
@@ -225,7 +225,7 @@ Known-good improvements that don't gate any milestone — pick up when touching 
 
 - [x] Scripted smoke test for the app shell: `pnpm smoke` scaffolds a scratch project, launches the real app (`tauri dev` + `VITE_SMOKE_SCRIPT`), drives the store through open → edit → save → TODO confirm → export, and asserts the result the app writes to `output/smoke-result.json`. Local only (needs sidecars, port 1420, and a desktop session)
 - [ ] `vite.config.ts`: replace the `@ts-expect-error` on `process` with `@types/node` in devDependencies
-- [ ] Ctrl+S bound to `saveActive` — autosave makes it redundant, but writers will press it; the binding is pure reassurance
+- [x] Ctrl+S bound to `saveActive` — autosave makes it redundant, but writers will press it; the binding is pure reassurance (2026-06-11)
 - [ ] "Show in folder" button on the export notice (`tauri-plugin-opener`) instead of only printing the relative path
 - [ ] Sidebar inline rename/add: commit on blur instead of silently discarding (Enter is the only commit path today, and nothing says so)
 - [ ] Section-remove confirm copy tells the user the file stays on disk and how to re-add it (the data is safe; the copy doesn't say so)
