@@ -15,6 +15,7 @@ output/
 # The author's actual SEA report (separate private repo, used as a local
 # test fixture only — contains personal exam content, never committed here)
 report/
+report-migrated/
 
 # Editor / OS noise
 .idea/

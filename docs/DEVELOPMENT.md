@@ -48,7 +48,12 @@ Goal: `node scripts/build.ts fixtures/demo-report` produces `output/report.pdf` 
 
 **Acceptance:**
 - [x] Demo fixture builds green in the test run (integration test, auto-skipped where binaries are absent, e.g. CI)
-- [ ] The real SEA report (local) builds and the PDF is judged side-by-side against the original `report.pdf` — typography, ToC, code blocks, figures
+- [x] The real SEA report (local) builds and the PDF is judged side-by-side against the original `report.pdf`. Migrated copy (git-ignored `report-migrated/`): manual heading numbers stripped, LaTeX figure blocks → Markdown images, `\newpage` hints removed. All 23 sections built first try (~37 normalsider); ToC structure matches the original exactly, tables/code/figures/appendix lettering all render. Known gaps logged below.
+
+**Template follow-ups found by the real-report acceptance (not M1 blockers):**
+- [ ] Cover page is plainer than a hand-built LaTeX cover — consider optional `logo` and `cover_image` metadata fields and a details table (post-MVP polish)
+- [ ] Large figures leave a gap and push to the next page (the old report managed this with manual `\newpage`) — consider `set figure(placement: auto)` or smarter spacing in the template
+- [ ] Heading/link colors: the old report used navy headings and teal links; current template is black headings + navy links — decide the default look deliberately in M4 polish
 - [x] Mermaid handling implemented: ```mermaid blocks are content-hashed and replaced with `diagrams/rendered/<hash>.svg` images at build time; a missing render is a readable error (the app renders on save in M2; for M1 a placeholder SVG stands in)
 
 ## Milestone 2 — App shell *(L)*

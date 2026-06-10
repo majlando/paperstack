@@ -24,7 +24,8 @@ export class PandocConverter implements Converter {
       this.pandocPath,
       // implicit_figures: an image alone in a paragraph becomes a numbered
       // figure with the alt text as caption (the Paperstack figure convention)
-      ["-f", "gfm+implicit_figures", "-t", "typst", "--wrap=none"],
+      // attributes: supports ![alt](img.png){width=62%} for figure sizing
+      ["-f", "gfm+implicit_figures+attributes", "-t", "typst", "--wrap=none"],
       { stdin: markdown },
     );
     if (result.exitCode !== 0) {
