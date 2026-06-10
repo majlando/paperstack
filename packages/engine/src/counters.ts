@@ -40,6 +40,22 @@ export interface ProjectCounts {
   todosTotal: number;
 }
 
+/** Recompute the totals for a given set of section counts. */
+function totals(sections: SectionCount[], cap: number): ProjectCounts {
+  const bodyChars = sections
+    .filter((s) => s.role === "body")
+    .reduce((sum, s) => sum + s.chars, 0);
+  const bodyNormalsider = bodyChars / CHARS_PER_NORMALSIDE;
+  return {
+    sections,
+    bodyChars,
+    bodyNormalsider,
+    cap,
+    overCap: bodyNormalsider > cap,
+    todosTotal: sections.reduce((sum, s) => sum + s.todos, 0),
+  };
+}
+
 export async function countProject(
   platform: Platform,
   project: Project,
@@ -56,17 +72,29 @@ export async function countProject(
       todos: countTodos(content),
     });
   }
-  const bodyChars = sections
-    .filter((s) => s.role === "body")
-    .reduce((sum, s) => sum + s.chars, 0);
-  const bodyNormalsider = bodyChars / CHARS_PER_NORMALSIDE;
-  const cap = project.meta.body_cap_normalsider;
-  return {
-    sections,
-    bodyChars,
-    bodyNormalsider,
-    cap,
-    overCap: bodyNormalsider > cap,
-    todosTotal: sections.reduce((sum, s) => sum + s.todos, 0),
-  };
+  return totals(sections, project.meta.body_cap_normalsider);
+}
+
+/**
+ * Pure update of ProjectCounts after one section's content changed (e.g. on
+ * every keystroke in the editor) — keeps live counters in sync without
+ * re-reading the project from disk.
+ */
+export function applySectionContent(
+  counts: ProjectCounts,
+  file: string,
+  content: string,
+): ProjectCounts {
+  const chars = countAnslag(content);
+  const sections = counts.sections.map((s) =>
+    s.file === file
+      ? {
+          ...s,
+          chars,
+          normalsider: chars / CHARS_PER_NORMALSIDE,
+          todos: countTodos(content),
+        }
+      : s,
+  );
+  return totals(sections, counts.cap);
 }

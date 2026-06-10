@@ -1,5 +1,6 @@
+// NOTE: NodePlatform deliberately lives in the "./node" subpath export —
+// the main entry must stay importable from the webview (no node:* imports).
 export type { Platform } from "./platform.ts";
-export { NodePlatform } from "./node-platform.ts";
 export { PaperstackError, type ErrorCode } from "./errors.ts";
 export {
   documentSchema,
@@ -15,6 +16,7 @@ export {
   countAnslag,
   countTodos,
   countProject,
+  applySectionContent,
   type SectionCount,
   type ProjectCounts,
 } from "./counters.ts";

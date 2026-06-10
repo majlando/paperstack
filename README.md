@@ -72,11 +72,14 @@ pnpm tsx scripts/build-report.ts <path-to-project>
 
 # Watch mode while working on the engine
 pnpm --filter @paperstack/engine test:watch
+
+# Run the desktop app (requires the Rust toolchain via https://rustup.rs/)
+pnpm --filter @paperstack/desktop tauri dev
 ```
 
 Set `$env:DEBUG=1` before a build command to see the underlying Pandoc/Typst output when an error message isn't enough.
 
-The desktop app (Milestone 2, `apps/desktop`) doesn't exist yet — once it does, `pnpm tauri dev` will run it, and the Rust toolchain becomes a prerequisite. See [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md) for the full plan and progress.
+See [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md) for the full plan and progress.
 
 ## Documentation
 

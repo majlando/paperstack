@@ -4,6 +4,7 @@ export type ErrorCode =
   | "metadata-invalid"
   | "section-missing"
   | "diagram-not-rendered"
+  | "dependency-missing"
   | "convert-failed"
   | "image-missing"
   | "output-locked"

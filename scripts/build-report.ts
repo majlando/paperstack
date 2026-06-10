@@ -5,7 +5,8 @@
  * Requires bin/typst + bin/pandoc (scripts/fetch-binaries.ps1).
  */
 import { resolve, join } from "node:path";
-import { NodePlatform, buildReport, PaperstackError } from "@paperstack/engine";
+import { buildReport, PaperstackError } from "@paperstack/engine";
+import { NodePlatform } from "@paperstack/engine/node";
 
 const projectDir = resolve(process.argv[2] ?? "fixtures/demo-report").replaceAll("\\", "/");
 const exe = process.platform === "win32" ? ".exe" : "";

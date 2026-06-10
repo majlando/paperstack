@@ -60,12 +60,12 @@ Goal: `node scripts/build.ts fixtures/demo-report` produces `output/report.pdf` 
 
 Goal: open a project, edit sections with autosave, see a live per-section preview.
 
-- [ ] Scaffold `apps/desktop`: Tauri 2 + React + Vite + Tailwind + shadcn/ui
-- [ ] Sidecar config for `typst` + `pandoc`; `TauriPlatform` implementation of the engine's `Platform` interface (fs/shell plugins)
-- [ ] App layout: sidebar | editor | preview panes
+- [x] Scaffold `apps/desktop`: Tauri 2 + React + Vite + Tailwind (shadcn/ui added when the first form/dialog needs it)
+- [x] `TauriPlatform` implementation of the engine's `Platform` interface (fs plugin; `runBinary` via the shell plugin + sidecar config lands with View Report in M3). The engine package gained a `./node` subpath export so `NodePlatform` (node:fs) never enters the webview bundle.
+- [x] App layout: sidebar | editor panes, error banner, status bar (preview pane next)
 - [ ] Create project (from SEA template, including a project `.gitignore` for `output/` and `diagrams/rendered/`) and open project (folder picker); recent-projects list
 - [ ] Reload project action — picks up files changed outside the app (e.g. after a `git pull`); warn instead of silently overwriting if a file changed on disk while open in the editor
-- [ ] Sidebar driven by the engine's `Project` model, grouped by role; add / rename / delete / move up/down (reordering edits the `sections` list in `document.yaml` — the single source of truth for order)
+- [x] Sidebar driven by the engine's `Project` model, grouped by role, with per-section TODO badges (add / rename / delete / move up/down still to come — reordering edits the `sections` list in `document.yaml`, the single source of truth for order)
 - [ ] `EditorView` vanilla-TS class wrapping CodeMirror 6 (markdown mode, highlighting) + the small React mount bridge; autosave on idle
 - [ ] Preview pane: remark → HTML, syntax-highlighted code, images resolved from the project folder, live Mermaid rendering
 - [ ] Mermaid save hook: on save, render diagrams to `diagrams/rendered/*.svg`

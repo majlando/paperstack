@@ -1,8 +1,8 @@
 import { describe, expect, it } from "vitest";
 import { fileURLToPath } from "node:url";
 import { join } from "node:path";
-import type { Platform } from "./platform.ts";
 import { NodePlatform } from "./node-platform.ts";
+import { FakePlatform } from "./test-utils.ts";
 import { loadProject } from "./project.ts";
 import { countProject } from "./counters.ts";
 import { PaperstackError } from "./errors.ts";
@@ -11,29 +11,6 @@ const fixtureDir = join(
   fileURLToPath(new URL(".", import.meta.url)),
   "../../../fixtures/demo-report",
 ).replaceAll("\\", "/");
-
-/** In-memory Platform for error-path tests. */
-class FakePlatform implements Platform {
-  constructor(private readonly files: Map<string, string>) {}
-  async readTextFile(path: string): Promise<string> {
-    const content = this.files.get(path);
-    if (content === undefined) throw new Error(`ENOENT: ${path}`);
-    return content;
-  }
-  async writeTextFile(path: string, content: string): Promise<void> {
-    this.files.set(path, content);
-  }
-  async fileExists(path: string): Promise<boolean> {
-    return this.files.has(path);
-  }
-  async listDir(): Promise<string[]> {
-    return [];
-  }
-  async mkdir(): Promise<void> {}
-  async runBinary(): Promise<{ exitCode: number; stdout: string; stderr: string }> {
-    throw new Error("not supported in FakePlatform");
-  }
-}
 
 describe("loadProject on the demo fixture", () => {
   const platform = new NodePlatform();

@@ -1,0 +1,12 @@
+# Normalize all text files to LF in the repo (silences CRLF warnings on
+# Windows and keeps diffs clean for group members on any OS).
+* text=auto eol=lf
+
+# Windows scripts keep CRLF
+*.ps1 text eol=crlf
+
+# Binary assets
+*.png binary
+*.ico binary
+*.icns binary
+*.pdf binary

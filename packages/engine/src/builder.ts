@@ -29,6 +29,19 @@ export async function buildReport(
   projectDir: string,
   options: BuildOptions,
 ): Promise<BuildResult> {
+  for (const [name, path] of [
+    ["PDF engine (typst)", options.typstPath],
+    ["converter (pandoc)", options.pandocPath],
+  ] as const) {
+    if (!(await platform.fileExists(path))) {
+      throw new PaperstackError(
+        "dependency-missing",
+        `The ${name} could not be found. Reinstall Paperstack — or, in development, run scripts/fetch-binaries.ps1.`,
+        `expected at ${path}`,
+      );
+    }
+  }
+
   const project = await loadProject(platform, projectDir);
   const counts = await countProject(platform, project);
   const warnings: string[] = [];

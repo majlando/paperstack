@@ -42,7 +42,11 @@ export class NodePlatform implements Platform {
         (error, stdout, stderr) => {
           const exitCode =
             error && typeof error.code === "number" ? error.code : error ? 1 : 0;
-          resolve({ exitCode, stdout, stderr });
+          // A spawn failure (e.g. missing executable) produces no stderr of
+          // its own — surface the error message so it isn't silently lost.
+          const detail =
+            error && !stderr ? `${stderr}\n${error.message}`.trim() : stderr;
+          resolve({ exitCode, stdout, stderr: detail });
         },
       );
       if (options?.stdin !== undefined) {
