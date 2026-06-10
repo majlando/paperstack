@@ -20,6 +20,11 @@ describe("countAnslag", () => {
   it("strips carriage returns so CRLF and LF checkouts count the same", () => {
     expect(countAnslag("a\r\nb")).toBe(countAnslag("a\nb"));
   });
+
+  it("counts code points, not UTF-16 units: an emoji is one anslag", () => {
+    expect(countAnslag("🙂")).toBe(1);
+    expect(countAnslag("a🙂b")).toBe(3);
+  });
 });
 
 describe("applySectionContent", () => {

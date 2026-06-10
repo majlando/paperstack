@@ -9,9 +9,18 @@ export const CHARS_PER_NORMALSIDE = 2400;
  * Character count for the length cap. HTML comments are authoring notes and
  * are stripped; carriage returns are stripped so counts are identical across
  * Windows/Unix checkouts.
+ *
+ * The unit is Unicode code points, not UTF-16 units: this number feeds a
+ * hard academic cap printed on the cover, so its definition is pinned —
+ * an emoji or other astral character counts as one anslag, not two.
+ * (Danish text is unaffected either way.)
  */
 export function countAnslag(markdown: string): number {
-  return markdown.replace(/<!--[\s\S]*?-->/g, "").replace(/\r/g, "").length;
+  const stripped = markdown.replace(/<!--[\s\S]*?-->/g, "").replace(/\r/g, "");
+  let count = 0;
+  // for..of iterates code points; a spread would allocate an array per keystroke.
+  for (const _ of stripped) count++;
+  return count;
 }
 
 /**
