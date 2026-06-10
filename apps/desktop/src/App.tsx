@@ -74,9 +74,42 @@ export default function App() {
   // the window closes. A failed or conflicted save keeps the window open so
   // the banner can be resolved — closing then would silently drop writing.
   useEffect(() => {
+    // A write failure (read-only file, dead network share) may not be
+    // resolvable in-app, and the window must never be permanently
+    // unclosable: the first failed close blocks with an explanation, the
+    // next one is allowed to discard. Conflicts always block — their banner
+    // resolves them. Every close attempt still tries the save first.
+    let closeDiscardArmed = false;
     const unlisten = getCurrentWindow().onCloseRequested(async (event) => {
-      const saved = await useStore.getState().saveActive();
-      if (!saved) event.preventDefault();
+      const state = useStore.getState();
+      if (state.metadataOpen && state.metadataDirty) {
+        event.preventDefault();
+        useStore.setState({
+          error: {
+            message:
+              "Report details have unsaved changes — save or cancel the form before closing.",
+          },
+        });
+        return;
+      }
+      const saved = await state.saveActive();
+      if (saved) return;
+      if (useStore.getState().conflict) {
+        event.preventDefault();
+        return;
+      }
+      if (!closeDiscardArmed) {
+        closeDiscardArmed = true;
+        event.preventDefault();
+        const current = useStore.getState().error;
+        useStore.setState({
+          error: {
+            message: `${current?.message ?? "Your last edits could not be saved."} Fix the problem and close again — or close again now to discard the unsaved changes.`,
+            details: current?.details,
+          },
+        });
+      }
+      // armed and still failing: the close proceeds, discarding the edits
     });
     return () => void unlisten.then((fn) => fn());
   }, []);

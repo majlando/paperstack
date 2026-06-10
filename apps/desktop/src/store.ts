@@ -64,6 +64,12 @@ interface AppState {
   pane: "preview" | "report";
   /** The report-details form is open (replaces the editor + preview area). */
   metadataOpen: boolean;
+  /**
+   * The form holds edits not yet saved to document.yaml. Tracked here (the
+   * field values stay local to the form) so the window-close guard can refuse
+   * to silently drop them.
+   */
+  metadataDirty: boolean;
 
   openProject(dir: string): Promise<void>;
   /** Scaffolds a new SEA report in `dir` (or just opens it if it already is one). */
@@ -102,6 +108,7 @@ interface AppState {
   importFigure(sourcePath: string): Promise<string | null>;
   openMetadata(): Promise<void>;
   closeMetadata(): void;
+  setMetadataDirty(dirty: boolean): void;
   /** Returns false when the save failed — the form stays open with the error visible. */
   saveMetadata(edit: MetadataEdit): Promise<boolean>;
   clearError(): void;
@@ -194,6 +201,61 @@ async function renderDiagramsToDisk(projectDir: string, content: string): Promis
 }
 
 export const useStore = create<AppState>((set, get) => {
+  /** The in-flight save chain — concurrent save triggers join it (see saveActive). */
+  let saveInFlight: Promise<boolean> | null = null;
+
+  /**
+   * The actual save. Callers go through saveActive (single-flight); only the
+   * settle chain below calls this directly, while the flight is still open.
+   */
+  async function doSave(force: boolean): Promise<boolean> {
+    const { projectDir, activeFile, content, baseline, dirty } = get();
+    if (!projectDir || !activeFile) return true;
+    // Never write when there is nothing to save: a no-op write would churn
+    // mtimes and could clobber a file refreshed outside the app (git pull).
+    if (!dirty) return true;
+    // Keystrokes can land while this save awaits disk I/O. They set `dirty`
+    // again, and this save must not clear it — the newer text is not on disk.
+    // Advance the baseline to what was just synced and chain a save for the
+    // newer text instead of marking it saved.
+    const settle = (): Promise<boolean> | true => {
+      // The user switched sections while this save was in flight: the
+      // captured file is fully written, and the store now describes a
+      // different section — its state is not this save's to touch.
+      if (get().activeFile !== activeFile) return true;
+      if (get().content !== content) {
+        set({ baseline: content, conflict: null });
+        return doSave(false);
+      }
+      set({ dirty: false, baseline: content, conflict: null });
+      return true;
+    };
+    try {
+      if (!force) {
+        // Conflict guard: the file changed on disk while it had unsaved
+        // edits here — let the user choose instead of silently overwriting.
+        // A read failure means the file is gone; the write below recreates it.
+        const disk = await platform
+          .readTextFile(`${projectDir}/${activeFile}`)
+          .catch(() => null);
+        if (disk === content) {
+          // the disk copy already matches the editor — nothing to write
+          return settle();
+        }
+        if (disk !== null && disk !== baseline) {
+          set({ conflict: { file: activeFile, diskContent: disk } });
+          return false;
+        }
+      }
+      await platform.writeTextFile(`${projectDir}/${activeFile}`, content);
+      void renderDiagramsToDisk(projectDir, content);
+      return settle();
+    } catch (e) {
+      set({ error: toError(e) });
+      return false;
+    }
+  }
+
   /** Shared build path for View Report and Export PDF: save, compile, sync counters. */
   async function runBuild(): Promise<{ pdfPath: string; warnings: string[] } | null> {
     const { projectDir, building } = get();
@@ -240,6 +302,7 @@ export const useStore = create<AppState>((set, get) => {
   confirmExport: null,
   pane: "preview",
   metadataOpen: false,
+  metadataDirty: false,
 
   async openProject(dir: string) {
     try {
@@ -434,51 +497,22 @@ export const useStore = create<AppState>((set, get) => {
   },
 
   async saveActive(force = false) {
-    const { projectDir, activeFile, content, baseline, dirty } = get();
-    if (!projectDir || !activeFile) return true;
-    // Never write when there is nothing to save: a no-op write would churn
-    // mtimes and could clobber a file refreshed outside the app (git pull).
-    if (!dirty) return true;
-    // Keystrokes can land while this save awaits disk I/O. They set `dirty`
-    // again, and this save must not clear it — the newer text is not on disk.
-    // Advance the baseline to what was just synced and chain a save for the
-    // newer text instead of marking it saved.
-    const settle = (): Promise<boolean> | true => {
-      // The user switched sections while this save was in flight: the
-      // captured file is fully written, and the store now describes a
-      // different section — its state is not this save's to touch.
-      if (get().activeFile !== activeFile) return true;
-      if (get().content !== content) {
-        set({ baseline: content, conflict: null });
-        return get().saveActive();
-      }
-      set({ dirty: false, baseline: content, conflict: null });
-      return true;
-    };
-    try {
-      if (!force) {
-        // Conflict guard: the file changed on disk while it had unsaved
-        // edits here — let the user choose instead of silently overwriting.
-        // A read failure means the file is gone; the write below recreates it.
-        const disk = await platform
-          .readTextFile(`${projectDir}/${activeFile}`)
-          .catch(() => null);
-        if (disk === content) {
-          // the disk copy already matches the editor — nothing to write
-          return settle();
-        }
-        if (disk !== null && disk !== baseline) {
-          set({ conflict: { file: activeFile, diskContent: disk } });
-          return false;
-        }
-      }
-      await platform.writeTextFile(`${projectDir}/${activeFile}`, content);
-      void renderDiagramsToDisk(projectDir, content);
-      return settle();
-    } catch (e) {
-      set({ error: toError(e) });
-      return false;
+    // Single-flight: blur, the autosave debounce, Ctrl+S, and the close
+    // handler can all fire around the same moment. Concurrent triggers join
+    // the running save chain (which already covers keystrokes landing
+    // mid-save) instead of racing it with overlapping writes and conflict
+    // reads against the same file.
+    if (saveInFlight) {
+      const ok = await saveInFlight;
+      // A forced save ("keep my version") must still write when the joined
+      // save was blocked — returning the blocked result would drop the force.
+      if (ok || !force) return ok;
     }
+    const run = doSave(force);
+    saveInFlight = run.finally(() => {
+      saveInFlight = null;
+    });
+    return run;
   },
 
   async resolveConflictKeepMine() {
@@ -550,11 +584,15 @@ export const useStore = create<AppState>((set, get) => {
     // A failed or conflicted save keeps the section visible instead of
     // hiding it behind the form while a banner asks about it.
     if (!(await get().saveActive())) return;
-    set({ metadataOpen: true });
+    set({ metadataOpen: true, metadataDirty: false });
   },
 
   closeMetadata() {
-    set({ metadataOpen: false });
+    set({ metadataOpen: false, metadataDirty: false });
+  },
+
+  setMetadataDirty(dirty: boolean) {
+    if (get().metadataDirty !== dirty) set({ metadataDirty: dirty });
   },
 
   async saveMetadata(edit: MetadataEdit) {
@@ -563,7 +601,7 @@ export const useStore = create<AppState>((set, get) => {
     try {
       await editDocumentYaml(projectDir, (t) => editMetadataInYaml(t, edit));
       await get().reloadProject();
-      set({ metadataOpen: false });
+      set({ metadataOpen: false, metadataDirty: false });
       return true;
     } catch (e) {
       set({ error: toError(e) });

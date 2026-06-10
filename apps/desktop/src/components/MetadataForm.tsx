@@ -34,6 +34,9 @@ interface AuthorRow {
 export function MetadataForm() {
   const saveMetadata = useStore((s) => s.saveMetadata);
   const closeMetadata = useStore((s) => s.closeMetadata);
+  // Field values stay local; the store only learns *that* edits are pending,
+  // so the window-close guard can refuse to silently drop them.
+  const setMetadataDirty = useStore((s) => s.setMetadataDirty);
   const [values, setValues] = useState(() => {
     const meta = useStore.getState().project?.meta;
     return {
@@ -60,9 +63,13 @@ export function MetadataForm() {
     return () => window.removeEventListener("keydown", onKey);
   }, [closeMetadata]);
 
-  const update = (patch: Partial<typeof values>) => setValues((v) => ({ ...v, ...patch }));
+  const edit = (mutate: (v: typeof values) => typeof values) => {
+    setMetadataDirty(true);
+    setValues(mutate);
+  };
+  const update = (patch: Partial<typeof values>) => edit((v) => ({ ...v, ...patch }));
   const updateAuthor = (index: number, patch: Partial<AuthorRow>) =>
-    setValues((v) => ({
+    edit((v) => ({
       ...v,
       authors: v.authors.map((a, i) => (i === index ? { ...a, ...patch } : a)),
     }));
@@ -215,7 +222,7 @@ export function MetadataForm() {
                   />
                   <button
                     onClick={() =>
-                      setValues((v) => ({
+                      edit((v) => ({
                         ...v,
                         authors: v.authors.filter((_, j) => j !== i),
                       }))
@@ -230,7 +237,7 @@ export function MetadataForm() {
               {errors.authors && <div className="text-xs text-red-400">{errors.authors}</div>}
               <button
                 onClick={() =>
-                  setValues((v) => ({
+                  edit((v) => ({
                     ...v,
                     authors: [...v.authors, { name: "", student_id: "" }],
                   }))
