@@ -4,7 +4,7 @@ The working plan for getting from empty repo to v1 (see [MVP.md](MVP.md) for sco
 
 **Guiding rule:** engine first, UI second. Milestone 1 had zero UI and proved the only technically risky part — `folder → professional PDF`. Every later milestone is well-understood app work, with one exception left: running the bundled binaries from inside the app (M3 sidecars).
 
-**Status (2026-06-10):** Phase 0 and Milestones 1–3 are complete — the full core loop works in the app: create/open project, structure editing, autosaved editing with live preview and conflict guard, metadata form, counters with TODO jump, View Report (real PDF in-pane via bundled sidecars), Export PDF, readable errors, and a hardened webview (runtime-scoped fs access, real CSP). What remains is Milestone 4: insert helpers, template/first-run polish, and the installer.
+**Status (2026-06-11):** Phase 0 and Milestones 1–4 are complete (M4's clean-machine test is deferred until a clean Windows machine is available — it gates the `v0.1.0` tag, not development). The post-v1 plan is Milestones 5–7 below: writing features (math, tables, citations), cross-platform public releases, and group-report readiness — in that order, except M7 floats to whenever the group report starts.
 
 ---
 
@@ -128,15 +128,63 @@ Goal: another student can install it and produce a report unaided.
 
 ---
 
+# Beyond v0.1.0 — the v0.2 plan (2026-06-11)
+
+Decided priorities: the next real report (a group report) needs math, tables, and citations; the project goes public open-source on all three desktop platforms; group workflow stays "polish what exists". Same guiding rule as v1: the riskiest pipeline work goes first, UI second.
+
+## Milestone 5 — Writing features: math, tables, citations *(M/L)*
+
+Goal: the three writing needs the first real report met by hand stop needing hand-work.
+
+**Citations spike (the unknown — engine only, like M1):**
+- [ ] Prove the pipeline: `references.bib` in the project + `[@key]` in Markdown → numbered citations and a references list in the PDF. Two candidate routes — pandoc `+citations` emitting Typst `#cite`, or handing the `.bib` to Typst's native bibliography — decide while both are still cheap to choose, testing against real references from the migrated SEA report. If this works, the rest of citations is UI
+- [ ] Decide the v1-of-citations scope: numbered style only (SEA reports don't need citation-style choice)
+
+**Math (proven tech, high value):**
+- [ ] Engine: enable `tex_math_dollars` in the pandoc reader; verify the Typst writer emits Typst math for inline `$x$` and display `$$…$$` (fixture section with both; readable error when math is invalid)
+- [ ] Preview: remark-math + KaTeX so the preview accepts the same `$` syntax as the pipeline (KaTeX already ships inside the Mermaid bundle — check whether it can be reused before adding a dependency)
+
+**Tables (small):**
+- [ ] Insert Table helper: rows × columns → GFM table skeleton at the cursor (pipeline and preview already render GFM tables)
+- [ ] "Format table" editor command: re-align the pipes of the table under the cursor — a pure text transform, lives in the engine with unit tests
+
+**Citations UX (after the spike has decided the route):**
+- [ ] Insert Citation helper listing `references.bib` entries; inserted at the cursor
+- [ ] Preview shows citations as readable placeholders (`[1]` / `[key]`) — the PDF stays the truth, same one-rendering-path rule
+
+## Milestone 6 — Every platform, public release *(L)*
+
+Goal: a stranger on Windows, macOS, or Linux installs a release build and trusts the repo.
+
+- [ ] `fetch-binaries` becomes cross-platform (TS port run via tsx; per-target typst/pandoc triples for dev and CI)
+- [ ] PDF pane via pdf.js everywhere (the documented upgrade path): webkitgtk on Linux does not render PDFs in iframes, so this is a prerequisite, not polish — and it fixes the accepted scroll-reset-on-recompile annoyance as a side effect
+- [ ] `pnpm smoke` passes on macOS and Linux (needs a desktop session, so it stays a release-checklist step, not CI)
+- [ ] CI release workflow: tag → matrix build (NSIS/MSI, dmg, AppImage + deb) → GitHub release with artifacts attached
+- [ ] Auto-update: tauri-plugin-updater against GitHub releases (the updater's own signing keys are free; OS code signing stays deferred — document the SmartScreen/Gatekeeper first-run path in the README instead)
+- [ ] Repo as product: README with screenshots and an install section, LICENSE decision, CONTRIBUTING.md, issue templates
+- [ ] The clean-machine walkthrough (docs/CLEAN-MACHINE-TEST.md) runs per platform before each release
+
+## Milestone 7 — Group-report readiness *(S/M — floats; schedule against the group report's start)*
+
+Goal: the group report is written in Paperstack while some group members edit the same project in plain editors over Git.
+
+- [ ] Auto-reload when the window regains focus and project files changed on disk (the conflict guard already protects unsaved edits; the manual Reload button stays)
+- [ ] Per-section changed-on-disk indicators in the sidebar after an external change
+- [ ] Recents: drop entries that fail to open (from the backlog)
+- [ ] Editor: preserve undo history across section switches (from the backlog)
+- [ ] Preview scroll: restore by anchor rather than raw `scrollTop` (from the backlog)
+- [ ] Dogfood gate: the group report is written in Paperstack — the v1 bar from PROJECT.md carries over to v0.2
+
+---
+
 ## Improvement backlog (valuable, never blocking)
 
 Known-good improvements that don't gate any milestone — pick up when touching the area anyway:
 
 - [x] Scripted smoke test for the app shell: `pnpm smoke` scaffolds a scratch project, launches the real app (`tauri dev` + `VITE_SMOKE_SCRIPT`), drives the store through open → edit → save → TODO confirm → export, and asserts the result the app writes to `output/smoke-result.json`. Local only (needs sidecars, port 1420, and a desktop session)
-- [ ] Editor: preserve undo history across section switches (currently each switch resets CodeMirror state — acceptable, but surprising for heavy switchers)
-- [ ] Preview scroll: restore by anchor rather than raw `scrollTop` (image loads shift layout slightly)
-- [ ] Recent-projects list: drop entries that fail to open (currently they just error)
 - [ ] `vite.config.ts`: replace the `@ts-expect-error` on `process` with `@types/node` in devDependencies
+
+(The editor-undo, preview-scroll, and recents items moved into Milestone 7.)
 
 ## Working practices
 
@@ -157,3 +205,5 @@ Known-good improvements that don't gate any milestone — pick up when touching 
 | Mermaid → SVG → Typst rendering quality | Proven in M1 with real diagrams from the SEA report |
 | Webview scope too broad (fs `**`, no CSP) | Resolved (2026-06-10): empty static scopes + per-project runtime grants, CSP set; preview refuses raw HTML by design. Production CSP gets exercised in the M4 clean-machine test |
 | Scope creep | MVP.md cut list is the contract; this plan has no optional tasks on the milestone path |
+| Citation pipeline (pandoc citeproc vs Typst bibliography) fights the template | M5 starts with an engine-only spike against real references from the SEA report — route decided before any UI exists |
+| Linux webview cannot show PDFs in an iframe | Known going in: pdf.js replaces the built-in viewer in M6 *before* the first Linux release; it also fixes the scroll-reset annoyance |
