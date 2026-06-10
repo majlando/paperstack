@@ -54,6 +54,8 @@ interface AppState {
   building: boolean;
   /** Snapshot of the last compiled report, shown in the right pane's Report tab. */
   report: { pdfPath: string; warnings: string[]; builtAt: number } | null;
+  /** Export was requested while [TODO]s remain — waiting for the user's call. */
+  confirmExport: number | null;
   /** What the right pane shows: the live section preview or the report PDF. */
   pane: "preview" | "report";
   /** The report-details form is open (replaces the editor + preview area). */
@@ -82,8 +84,12 @@ interface AppState {
   resolveConflictUseDisk(): void;
   /** Compile the report and show the PDF in the right pane. */
   viewReport(): Promise<void>;
-  /** Compile the report and write output/report.pdf (or the locked-file fallback). */
-  exportPdf(): Promise<void>;
+  /**
+   * Compile the report and write output/report.pdf (or the locked-file
+   * fallback). When [TODO]s remain, asks for confirmation first unless `force`.
+   */
+  exportPdf(force?: boolean): Promise<void>;
+  cancelExport(): void;
   showPreview(): void;
   /**
    * Copies an image into the project's images folder (collision-safe) and
@@ -277,6 +283,7 @@ export const useStore = create<AppState>((set, get) => {
   notice: null,
   building: false,
   report: null,
+  confirmExport: null,
   pane: "preview",
   metadataOpen: false,
 
@@ -533,13 +540,24 @@ export const useStore = create<AppState>((set, get) => {
     });
   },
 
-  async exportPdf() {
+  async exportPdf(force = false) {
+    // The warning moment belongs *before* the hand-in file is written.
+    const todos = get().counts?.todosTotal ?? 0;
+    if (!force && todos > 0) {
+      set({ confirmExport: todos });
+      return;
+    }
+    set({ confirmExport: null });
     const result = await runBuild();
     const { projectDir } = get();
     if (!result || !projectDir) return;
     const relPath = result.pdfPath.replace(`${projectDir}/`, "");
     const warningText = result.warnings.length > 0 ? ` ${result.warnings.join(" ")}` : "";
     set({ notice: `Report exported to ${relPath}.${warningText}` });
+  },
+
+  cancelExport() {
+    set({ confirmExport: null });
   },
 
   showPreview() {

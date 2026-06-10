@@ -33,13 +33,16 @@ export default function App() {
   const openProject = useStore((s) => s.openProject);
   const keepMine = useStore((s) => s.resolveConflictKeepMine);
   const useDisk = useStore((s) => s.resolveConflictUseDisk);
+  const confirmExport = useStore((s) => s.confirmExport);
+  const exportPdf = useStore((s) => s.exportPdf);
+  const cancelExport = useStore((s) => s.cancelExport);
 
   useEffect(() => {
     if (devProject && !devAutoOpened) {
       devAutoOpened = true;
       void openProject(devProject).then(() => {
         if (devSection) void useStore.getState().openSection(devSection);
-        if (devSmokeExport) void useStore.getState().exportPdf();
+        if (devSmokeExport) void useStore.getState().exportPdf(true);
         if (devSmokeMetadata) void useStore.getState().openMetadata();
         if (devSmokeView) {
           void useStore.getState().viewReport().then(() => {
@@ -78,6 +81,28 @@ export default function App() {
           <button onClick={clearNotice} className="shrink-0 text-emerald-400 hover:text-emerald-200">
             dismiss
           </button>
+        </div>
+      )}
+      {confirmExport !== null && (
+        <div className="flex items-center justify-between gap-4 border-b border-amber-900 bg-amber-950 px-4 py-2 text-sm text-amber-200">
+          <span>
+            The report still contains {confirmExport} [TODO] placeholder
+            {confirmExport === 1 ? "" : "s"}. Export it anyway?
+          </span>
+          <span className="flex shrink-0 gap-2">
+            <button
+              onClick={() => void exportPdf(true)}
+              className="rounded border border-amber-700 px-2.5 py-0.5 font-medium hover:bg-amber-900"
+            >
+              Export anyway
+            </button>
+            <button
+              onClick={cancelExport}
+              className="rounded border border-amber-700 px-2.5 py-0.5 hover:bg-amber-900"
+            >
+              Cancel
+            </button>
+          </span>
         </div>
       )}
       {conflict && (
