@@ -1,0 +1,24 @@
+# Dependencies / build output
+node_modules/
+dist/
+target/
+
+# Tauri
+src-tauri/target/
+
+# Test/report output
+output/
+*.pdf
+
+# The author's actual SEA report (separate private repo, used as a local
+# test fixture only — contains personal exam content, never committed here)
+report/
+
+# Editor / OS noise
+.idea/
+.vscode/
+Thumbs.db
+.DS_Store
+
+# Logs
+*.log
