@@ -54,5 +54,3 @@ export {
 export { newSectionFile } from "./project/new-section-file.ts";
 export { importFigure, suggestedCaption, figureMarkdown } from "./project/import-figure.ts";
 export { buildReport, type BuildOptions, type BuildResult } from "./build/builder.ts";
-
-export const ENGINE_VERSION = "0.0.1";
