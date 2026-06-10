@@ -5,6 +5,7 @@ import {
   readDir,
   mkdir,
   rename,
+  remove,
 } from "@tauri-apps/plugin-fs";
 import { Command } from "@tauri-apps/plugin-shell";
 import type { Platform } from "@paperstack/engine";
@@ -41,6 +42,10 @@ export class TauriPlatform implements Platform {
 
   async rename(oldPath: string, newPath: string): Promise<void> {
     await rename(oldPath, newPath);
+  }
+
+  async removeFile(path: string): Promise<void> {
+    await remove(path);
   }
 
   async runBinary(

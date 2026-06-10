@@ -24,6 +24,7 @@ export {
 export {
   hashDiagram,
   extractMermaidBlocks,
+  sweepStaleRenders,
   type MermaidBlock,
   type MermaidExtraction,
 } from "./mermaid.ts";

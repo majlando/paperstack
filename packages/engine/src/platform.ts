@@ -13,6 +13,8 @@ export interface Platform {
   mkdir(path: string): Promise<void>;
   /** Rename/move a file. Fails if the source is missing. */
   rename(oldPath: string, newPath: string): Promise<void>;
+  /** Delete a file. Fails if it is missing. */
+  removeFile(path: string): Promise<void>;
   /**
    * Run a bundled binary (typst, pandoc) and capture its output. `binary` is
    * whatever identifies the executable to this platform: an absolute path in

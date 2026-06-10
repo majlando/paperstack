@@ -1,4 +1,4 @@
-import { readFile, writeFile, readdir, access, mkdir, rename } from "node:fs/promises";
+import { readFile, writeFile, readdir, access, mkdir, rename, rm } from "node:fs/promises";
 import { execFile } from "node:child_process";
 import type { Platform } from "./platform.ts";
 
@@ -31,6 +31,10 @@ export class NodePlatform implements Platform {
 
   async rename(oldPath: string, newPath: string): Promise<void> {
     await rename(oldPath, newPath);
+  }
+
+  async removeFile(path: string): Promise<void> {
+    await rm(path);
   }
 
   runBinary(

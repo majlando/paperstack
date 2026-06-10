@@ -7,6 +7,7 @@
  * FNV-1a is used instead of node:crypto so this module also runs in the
  * Tauri webview.
  */
+import type { Platform } from "./platform.ts";
 
 export function hashDiagram(code: string): string {
   let h = 0x811c9dc5;
@@ -55,4 +56,30 @@ export function extractMermaidBlocks(markdown: string): MermaidExtraction {
     },
   );
   return { markdown: replaced, blocks };
+}
+
+/**
+ * Deletes rendered SVGs that no current diagram references (edited diagrams
+ * change hash and leave their old render behind). Strictly limited to the
+ * 8-hex-digit names this module generates — anything a user put in the
+ * folder is never touched. Best-effort: a failed delete never fails a build.
+ */
+export async function sweepStaleRenders(
+  platform: Platform,
+  projectDir: string,
+  /** Project-relative `renderedPath`s still referenced by some section. */
+  keep: ReadonlySet<string>,
+): Promise<void> {
+  let entries: string[];
+  try {
+    entries = await platform.listDir(`${projectDir}/diagrams/rendered`);
+  } catch {
+    return; // no rendered diagrams yet
+  }
+  for (const name of entries) {
+    if (!/^[0-9a-f]{8}\.svg$/.test(name)) continue;
+    const rel = `diagrams/rendered/${name}`;
+    if (keep.has(rel)) continue;
+    await platform.removeFile(`${projectDir}/${rel}`).catch(() => {});
+  }
 }

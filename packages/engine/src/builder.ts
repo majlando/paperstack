@@ -2,7 +2,7 @@ import type { Platform } from "./platform.ts";
 import { PaperstackError } from "./errors.ts";
 import { loadProject } from "./project.ts";
 import { countProject, type ProjectCounts } from "./counters.ts";
-import { extractMermaidBlocks } from "./mermaid.ts";
+import { extractMermaidBlocks, sweepStaleRenders } from "./mermaid.ts";
 import { PandocConverter, type Converter } from "./converter.ts";
 import { SEA_TEMPLATE } from "./template.ts";
 import {
@@ -70,12 +70,14 @@ export async function buildReport(
     options.converter ?? new PandocConverter(platform, options.pandoc, buildDir);
 
   const converted: ConvertedSection[] = [];
+  const referencedRenders = new Set<string>();
   for (let i = 0; i < project.meta.sections.length; i++) {
     const section = project.meta.sections[i]!;
     const source = await platform.readTextFile(`${projectDir}/${section.file}`);
 
     const { markdown, blocks } = extractMermaidBlocks(source);
     for (const block of blocks) {
+      referencedRenders.add(block.renderedPath);
       if (!(await platform.fileExists(`${projectDir}/${block.renderedPath}`))) {
         throw new PaperstackError(
           "diagram-not-rendered",
@@ -129,6 +131,9 @@ export async function buildReport(
   }
 
   if (result.exitCode !== 0) throw mapTypstError(result.stderr);
+
+  // Only after a successful export: renders for since-edited diagrams are stale.
+  await sweepStaleRenders(platform, projectDir, referencedRenders);
 
   return { pdfPath: `${projectDir}/${pdfRel}`, counts, warnings };
 }

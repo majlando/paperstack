@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { extractMermaidBlocks, hashDiagram } from "./mermaid.ts";
+import { extractMermaidBlocks, hashDiagram, sweepStaleRenders } from "./mermaid.ts";
+import { FakePlatform } from "./test-utils.ts";
 
 describe("extractMermaidBlocks", () => {
   it("replaces mermaid blocks with rendered-SVG image references", () => {
@@ -50,5 +51,29 @@ describe("extractMermaidBlocks", () => {
   it("hashes are stable and content-sensitive", () => {
     expect(hashDiagram("a --> b")).toBe(hashDiagram("a --> b"));
     expect(hashDiagram("a --> b")).not.toBe(hashDiagram("a --> c"));
+  });
+});
+
+describe("sweepStaleRenders", () => {
+  it("deletes only unreferenced hash-named SVGs, never user files", async () => {
+    const platform = new FakePlatform(
+      new Map([
+        ["/p/diagrams/rendered/00000000.svg", "<svg/>"], // stale render
+        ["/p/diagrams/rendered/2e06c61f.svg", "<svg/>"], // still referenced
+        ["/p/diagrams/rendered/hand-made.svg", "<svg/>"], // not ours
+        ["/p/diagrams/rendered/notes.txt", "x"],
+      ]),
+    );
+    await sweepStaleRenders(platform, "/p", new Set(["diagrams/rendered/2e06c61f.svg"]));
+
+    expect(platform.files.has("/p/diagrams/rendered/00000000.svg")).toBe(false);
+    expect(platform.files.has("/p/diagrams/rendered/2e06c61f.svg")).toBe(true);
+    expect(platform.files.has("/p/diagrams/rendered/hand-made.svg")).toBe(true);
+    expect(platform.files.has("/p/diagrams/rendered/notes.txt")).toBe(true);
+  });
+
+  it("is a no-op when nothing has been rendered yet", async () => {
+    const platform = new FakePlatform();
+    await expect(sweepStaleRenders(platform, "/p", new Set())).resolves.toBeUndefined();
   });
 });

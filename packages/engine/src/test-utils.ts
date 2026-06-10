@@ -18,8 +18,16 @@ export class FakePlatform implements Platform {
     return this.files.has(path);
   }
 
-  async listDir(): Promise<string[]> {
-    return [];
+  /** Names of entries directly under `path` (files and subdirectories). */
+  async listDir(path: string): Promise<string[]> {
+    const prefix = path.endsWith("/") ? path : `${path}/`;
+    const names = new Set<string>();
+    for (const file of this.files.keys()) {
+      if (!file.startsWith(prefix)) continue;
+      names.add(file.slice(prefix.length).split("/")[0]!);
+    }
+    if (names.size === 0) throw new Error(`ENOENT: ${path}`);
+    return [...names];
   }
 
   async mkdir(): Promise<void> {}
@@ -29,6 +37,10 @@ export class FakePlatform implements Platform {
     if (content === undefined) throw new Error(`ENOENT: ${oldPath}`);
     this.files.delete(oldPath);
     this.files.set(newPath, content);
+  }
+
+  async removeFile(path: string): Promise<void> {
+    if (!this.files.delete(path)) throw new Error(`ENOENT: ${path}`);
   }
 
   async runBinary(): Promise<{ exitCode: number; stdout: string; stderr: string }> {
