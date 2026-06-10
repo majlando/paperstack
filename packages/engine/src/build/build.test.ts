@@ -1,14 +1,16 @@
-import { beforeAll, describe, expect, it } from "vitest";
+import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { existsSync, statSync } from "node:fs";
-import { readFile, writeFile, mkdir } from "node:fs/promises";
+import { cp, readFile, writeFile, mkdir, mkdtemp, rm } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
 import { join } from "node:path";
+import { tmpdir } from "node:os";
 import { NodePlatform } from "../platform/node-platform.ts";
 import { buildReport } from "./builder.ts";
 import { extractMermaidBlocks } from "./mermaid.ts";
 
 const root = join(fileURLToPath(new URL(".", import.meta.url)), "../../../..");
-const fixtureDir = join(root, "fixtures/demo-report").replaceAll("\\", "/");
+const sourceFixtureDir = join(root, "fixtures/demo-report").replaceAll("\\", "/");
+let fixtureDir = sourceFixtureDir;
 const exe = process.platform === "win32" ? ".exe" : "";
 const typstPath = join(root, "bin", `typst${exe}`);
 const pandocPath = join(root, "bin", `pandoc${exe}`);
@@ -19,6 +21,9 @@ const hasBinaries = existsSync(typstPath) && existsSync(pandocPath);
 
 describe.skipIf(!hasBinaries)("buildReport on the demo fixture", () => {
   beforeAll(async () => {
+    fixtureDir = (await mkdtemp(join(tmpdir(), "paperstack-build-test-"))).replaceAll("\\", "/");
+    await cp(sourceFixtureDir, fixtureDir, { recursive: true });
+
     // Ensure the fixture's mermaid block has a rendered SVG (in the app
     // this happens on save; the placeholder stands in for a real render).
     const section = await readFile(
@@ -38,6 +43,12 @@ describe.skipIf(!hasBinaries)("buildReport on the demo fixture", () => {
           "utf8",
         );
       }
+    }
+  });
+
+  afterAll(async () => {
+    if (fixtureDir !== sourceFixtureDir) {
+      await rm(fixtureDir, { recursive: true, force: true });
     }
   });
 

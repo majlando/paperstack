@@ -101,11 +101,15 @@ export async function buildReport(
     converted.push({ path: `/${outRel}`, role: section.role });
   }
 
-  await platform.writeTextFile(`${buildDir}/sea.typ`, SEA_TEMPLATE);
+  const templateRel = "paperstack-template.typ";
+  if (!(await platform.fileExists(`${projectDir}/${templateRel}`))) {
+    await platform.writeTextFile(`${projectDir}/${templateRel}`, SEA_TEMPLATE);
+  }
   const main = generateMainTypst(
     project.meta,
     converted,
     buildLengthLine(project.meta, counts),
+    `/${templateRel}`,
   );
   await platform.writeTextFile(`${buildDir}/main.typ`, main);
 

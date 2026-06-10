@@ -13,13 +13,6 @@
     "fs:allow-mkdir",
     "fs:allow-rename",
     "fs:allow-remove",
-    "fs:allow-copy-file",
-    {
-      "identifier": "shell:allow-execute",
-      "allow": [
-        { "name": "binaries/typst", "sidecar": true, "args": true },
-        { "name": "binaries/pandoc", "sidecar": true, "args": true }
-      ]
-    }
+    "fs:allow-copy-file"
   ]
 }

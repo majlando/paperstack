@@ -32,7 +32,6 @@ export {
 export {
   PandocConverter,
   rewriteImagePaths,
-  resolveProjectPath,
   type Converter,
 } from "./build/converter.ts";
 export {
@@ -50,6 +49,7 @@ export {
   extOf,
   slugify,
   humanize,
+  resolveProjectPath,
 } from "./project/paths.ts";
 export { newSectionFile } from "./project/new-section-file.ts";
 export { importFigure, suggestedCaption, figureMarkdown } from "./project/import-figure.ts";

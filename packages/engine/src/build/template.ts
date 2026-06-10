@@ -3,9 +3,9 @@
  * time (Typst can only include files under --root, so the template must live
  * inside the project during a build).
  *
- * Fonts fall back left to right: Cambria/Consolas match the look of the
- * original hand-built pipeline on Windows; Libertinus/DejaVu are Typst's
- * bundled fonts so builds also work on machines without them (e.g. CI).
+ * Fonts fall back left to right. Typst-bundled fonts are first so projects
+ * render consistently across machines; Windows report-style fonts remain
+ * fallback options for users who customize the template later.
  */
 export const SEA_TEMPLATE = `// Paperstack SEA report template (written by Paperstack at build time)
 #let report(
@@ -21,8 +21,8 @@ export const SEA_TEMPLATE = `// Paperstack SEA report template (written by Paper
   body,
 ) = {
   set document(title: title)
-  set text(lang: language, size: 11pt, font: ("Cambria", "Libertinus Serif", "New Computer Modern"))
-  show raw: set text(font: ("Consolas", "DejaVu Sans Mono"), size: 9pt)
+  set text(lang: language, size: 11pt, font: ("Libertinus Serif", "New Computer Modern", "Cambria"))
+  show raw: set text(font: ("DejaVu Sans Mono", "Consolas"), size: 9pt)
   let margins = (x: 2.4cm, top: 2.6cm, bottom: 2.6cm)
   set page(paper: "a4", margin: margins)
   set par(justify: true)

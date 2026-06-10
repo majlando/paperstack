@@ -24,6 +24,7 @@ export interface MarkdownPreviewOptions {
 export class MarkdownPreview {
   private readonly processor: Processor;
   private seq = 0;
+  private readonly objectUrls = new Set<string>();
   /** Rendered SVG per diagram content hash — typing pauses re-render the
    * HTML every time, but unchanged diagrams should not re-run mermaid. */
   private readonly svgCache = new Map<string, string>();
@@ -51,6 +52,7 @@ export class MarkdownPreview {
   ): Promise<void> {
     // Keep scroll position while typing; jump to top on section switch.
     const scrollTop = options?.resetScroll ? 0 : this.container.scrollTop;
+    this.revokeObjectUrls();
 
     let html: string;
     try {
@@ -60,12 +62,19 @@ export class MarkdownPreview {
       this.container.appendChild(this.errorBox(`Preview error: ${(e as Error).message}`));
       return;
     }
-    this.container.innerHTML = html;
+    const template = document.createElement("template");
+    template.innerHTML = html;
+    sanitizePreviewFragment(template.content);
+    this.container.replaceChildren(template.content.cloneNode(true));
 
     for (const img of Array.from(this.container.querySelectorAll("img"))) {
       const src = img.getAttribute("src") ?? "";
       if (!/^(https?:|data:|blob:)/.test(src)) {
-        img.src = this.options.resolveImageUrl(src, sectionDir);
+        try {
+          img.src = this.options.resolveImageUrl(src, sectionDir);
+        } catch (e) {
+          img.replaceWith(this.errorBox((e as Error).message));
+        }
       }
     }
 
@@ -85,8 +94,14 @@ export class MarkdownPreview {
           this.svgCache.set(hash, svg);
         }
         const wrapper = document.createElement("div");
-        wrapper.className = "my-4 flex justify-center [&_svg]:max-w-full";
-        wrapper.innerHTML = svg;
+        wrapper.className = "my-4 flex justify-center";
+        const img = document.createElement("img");
+        img.alt = "Mermaid diagram";
+        img.className = "max-w-full";
+        const url = URL.createObjectURL(new Blob([svg], { type: "image/svg+xml" }));
+        this.objectUrls.add(url);
+        img.src = url;
+        wrapper.appendChild(img);
         pre.replaceWith(wrapper);
       } catch (e) {
         pre.replaceWith(this.errorBox(`Diagram error: ${(e as Error).message}`));
@@ -105,6 +120,84 @@ export class MarkdownPreview {
   }
 
   destroy(): void {
-    this.container.innerHTML = "";
+    this.revokeObjectUrls();
+    this.container.replaceChildren();
   }
+
+  private revokeObjectUrls(): void {
+    for (const url of this.objectUrls) URL.revokeObjectURL(url);
+    this.objectUrls.clear();
+  }
+}
+
+const ALLOWED_TAGS = new Map<string, ReadonlySet<string>>([
+  ["a", new Set(["href", "title"])],
+  ["blockquote", new Set()],
+  ["br", new Set()],
+  ["code", new Set(["class"])],
+  ["del", new Set()],
+  ["em", new Set()],
+  ["h1", new Set(["id"])],
+  ["h2", new Set(["id"])],
+  ["h3", new Set(["id"])],
+  ["h4", new Set(["id"])],
+  ["h5", new Set(["id"])],
+  ["h6", new Set(["id"])],
+  ["hr", new Set()],
+  ["img", new Set(["src", "alt", "title"])],
+  ["li", new Set()],
+  ["ol", new Set()],
+  ["p", new Set()],
+  ["pre", new Set()],
+  ["span", new Set(["class"])],
+  ["strong", new Set()],
+  ["table", new Set()],
+  ["tbody", new Set()],
+  ["td", new Set(["align"])],
+  ["th", new Set(["align"])],
+  ["thead", new Set()],
+  ["tr", new Set()],
+  ["ul", new Set()],
+]);
+
+function sanitizePreviewFragment(fragment: DocumentFragment): void {
+  const walker = document.createTreeWalker(fragment, NodeFilter.SHOW_ELEMENT);
+  const elements: Element[] = [];
+  for (let node = walker.nextNode(); node; node = walker.nextNode()) {
+    elements.push(node as Element);
+  }
+  for (const el of elements.reverse()) {
+    const tag = el.tagName.toLowerCase();
+    const allowedAttrs = ALLOWED_TAGS.get(tag);
+    if (!allowedAttrs) {
+      el.replaceWith(...Array.from(el.childNodes));
+      continue;
+    }
+    for (const attr of Array.from(el.attributes)) {
+      const name = attr.name.toLowerCase();
+      if (!allowedAttrs.has(name) || name.startsWith("on")) {
+        el.removeAttribute(attr.name);
+        continue;
+      }
+      if ((name === "href" || name === "src") && !isSafeUrl(attr.value)) {
+        el.removeAttribute(attr.name);
+      }
+    }
+  }
+}
+
+function isSafeUrl(value: string): boolean {
+  const trimmed = value.trim().toLowerCase();
+  return (
+    trimmed === "" ||
+    trimmed.startsWith("/") ||
+    trimmed.startsWith("./") ||
+    trimmed.startsWith("../") ||
+    trimmed.startsWith("#") ||
+    trimmed.startsWith("http://") ||
+    trimmed.startsWith("https://") ||
+    trimmed.startsWith("mailto:") ||
+    trimmed.startsWith("data:image/") ||
+    trimmed.startsWith("blob:")
+  );
 }

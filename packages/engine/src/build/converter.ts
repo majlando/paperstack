@@ -1,5 +1,6 @@
 import type { Platform } from "../platform/platform.ts";
 import { PaperstackError } from "../errors.ts";
+import { resolveProjectPath } from "../project/paths.ts";
 
 /**
  * Markdown → Typst conversion, behind an interface so the Pandoc sidecar can
@@ -53,24 +54,6 @@ export class PandocConverter implements Converter {
 export function rewriteImagePaths(typst: string, sectionDir: string): string {
   return typst.replace(/image\("([^"]+)"/g, (match, path: string) => {
     if (path.startsWith("/")) return match;
-    return `image("${resolveProjectPath(sectionDir, path)}"`;
+    return `image("${resolveProjectPath(sectionDir, path, "image path")}"`;
   });
-}
-
-/**
- * Pure-string posix path resolution (no node:path — must run in the webview).
- * Resolves a path relative to a project-relative base dir into a
- * root-absolute project path: ("sections", "../figures/x.png") → "/figures/x.png".
- * Also used by the app's preview to resolve image paths.
- */
-export function resolveProjectPath(baseDir: string, relative: string): string {
-  const parts = [...baseDir.split("/"), ...relative.split("/")].filter(
-    (p) => p !== "" && p !== ".",
-  );
-  const out: string[] = [];
-  for (const part of parts) {
-    if (part === "..") out.pop();
-    else out.push(part);
-  }
-  return "/" + out.join("/");
 }

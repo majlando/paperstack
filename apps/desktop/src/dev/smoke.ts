@@ -6,7 +6,7 @@
  * is loaded dynamically so it never reaches a release bundle.
  */
 import { useStore } from "../store.ts";
-import { platform, allowProjectScope } from "../platform/tauri-platform.ts";
+import { platform, allowExistingProjectScope } from "../platform/tauri-platform.ts";
 
 interface Step {
   name: string;
@@ -26,7 +26,7 @@ export async function runScriptedSmoke(projectDir: string): Promise<void> {
   try {
     // Grant the scope up front so the result file below is writable even
     // when the open itself is what fails.
-    await allowProjectScope(dir);
+    await allowExistingProjectScope(dir);
 
     await state().openProject(dir);
     check(

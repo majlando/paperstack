@@ -1,5 +1,6 @@
 import type { Platform } from "../platform/platform.ts";
 import { PaperstackError } from "../errors.ts";
+import { SEA_TEMPLATE } from "../build/template.ts";
 
 export interface CreateProjectOptions {
   title: string;
@@ -53,6 +54,7 @@ export async function createProject(
   await platform.mkdir(`${dir}/figures`);
   await platform.mkdir(`${dir}/diagrams`);
   await platform.writeTextFile(`${dir}/document.yaml`, documentYaml);
+  await writeIfAbsent(platform, `${dir}/paperstack-template.typ`, SEA_TEMPLATE);
   // The chosen folder may not be empty (e.g. an existing group repo):
   // never overwrite files that are already there.
   await writeIfAbsent(platform, `${dir}/sections/01-introduction.md`, introduction);

@@ -3,6 +3,7 @@
  * use forward slashes regardless of OS — OS paths (e.g. from a file dialog)
  * are normalized at the boundary with `normalizeSlashes`.
  */
+import { PaperstackError } from "../errors.ts";
 
 export function normalizeSlashes(path: string): string {
   return path.replaceAll("\\", "/");
@@ -48,4 +49,44 @@ export function slugify(name: string, fallback = "section"): string {
 export function humanize(stem: string): string {
   const words = stem.replace(/[-_]+/g, " ").trim();
   return words ? words.charAt(0).toUpperCase() + words.slice(1) : "";
+}
+
+/**
+ * Resolves a Markdown/project asset path to a root-absolute project path.
+ * Throws when the input is absolute outside the project, Windows-absolute,
+ * uses backslashes, or tries to climb above the project root.
+ */
+export function resolveProjectPath(baseDir: string, assetPath: string, what = "asset path"): string {
+  if (assetPath.trim() === "") {
+    throw new PaperstackError("metadata-invalid", `${what} must not be empty.`);
+  }
+  if (assetPath.includes("\\")) {
+    throw new PaperstackError("metadata-invalid", `Use forward slashes (/) in ${what}s.`);
+  }
+  if (/^[A-Za-z]:/.test(assetPath) || assetPath.startsWith("//")) {
+    throw new PaperstackError(
+      "metadata-invalid",
+      `${what}s must be relative to the project folder.`,
+    );
+  }
+
+  const parts = [
+    ...(assetPath.startsWith("/") ? [] : baseDir.split("/")),
+    ...assetPath.replace(/^\/+/, "").split("/"),
+  ].filter((p) => p !== "" && p !== ".");
+  const out: string[] = [];
+  for (const part of parts) {
+    if (part === "..") {
+      if (out.length === 0) {
+        throw new PaperstackError(
+          "metadata-invalid",
+          `${what}s must stay inside the project folder.`,
+        );
+      }
+      out.pop();
+    } else {
+      out.push(part);
+    }
+  }
+  return "/" + out.join("/");
 }

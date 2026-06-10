@@ -22,7 +22,12 @@ import {
   type ProjectCounts,
   type SectionRole,
 } from "@paperstack/engine";
-import { platform, SIDECARS, allowProjectScope } from "./platform/tauri-platform.ts";
+import {
+  platform,
+  SIDECARS,
+  allowExistingProjectScope,
+  allowNewProjectScope,
+} from "./platform/tauri-platform.ts";
 import { renderMermaidSvg } from "./preview/mermaid.ts";
 
 interface AppState {
@@ -238,8 +243,7 @@ export const useStore = create<AppState>((set, get) => {
 
   async openProject(dir: string) {
     try {
-      const normalized = dir.replaceAll("\\", "/");
-      await allowProjectScope(normalized);
+      const normalized = await allowExistingProjectScope(dir);
       const project = await loadProject(platform, normalized);
       const counts = await countProject(platform, project);
       set({
@@ -268,10 +272,8 @@ export const useStore = create<AppState>((set, get) => {
   },
 
   async createProject(dir: string) {
-    const normalized = dir.replaceAll("\\", "/").replace(/\/+$/, "");
     try {
-      await allowProjectScope(normalized);
-      // Picking a folder that already is a report just opens it.
+      const normalized = await allowNewProjectScope(dir);
       if (!(await platform.fileExists(`${normalized}/document.yaml`))) {
         const now = new Date();
         const pad = (n: number) => String(n).padStart(2, "0");
