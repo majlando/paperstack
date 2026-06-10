@@ -72,7 +72,7 @@ export async function buildReport(
       if (!(await platform.fileExists(`${projectDir}/${block.renderedPath}`))) {
         throw new PaperstackError(
           "diagram-not-rendered",
-          `A diagram in "${section.file}" has not been rendered yet. Open the section in Paperstack and save it to render the diagram.`,
+          `A diagram in "${section.file}" has not been rendered yet. Open that section in Paperstack to render it, then try again.`,
           `expected ${block.renderedPath}`,
         );
       }
@@ -110,7 +110,10 @@ export async function buildReport(
 
   // Most common Windows export failure: report.pdf is open in a viewer.
   if (result.exitCode !== 0 && /os error 32|permission denied|failed to (write|create)/i.test(result.stderr)) {
-    const stamp = new Date().toISOString().slice(0, 19).replace(/[:T]/g, "-");
+    // Local time, not UTC — the fallback filename should match the user's clock.
+    const now = new Date();
+    const pad = (n: number) => String(n).padStart(2, "0");
+    const stamp = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}-${pad(now.getHours())}-${pad(now.getMinutes())}-${pad(now.getSeconds())}`;
     pdfRel = `output/report-${stamp}.pdf`;
     warnings.push(
       `report.pdf is locked — it is probably open in a PDF viewer. The report was saved as ${pdfRel} instead.`,
