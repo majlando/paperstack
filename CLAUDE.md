@@ -2,6 +2,12 @@
 
 Paperstack is a Tauri 2 desktop app for writing structured technical reports in Markdown and exporting professional PDFs via bundled Typst. Read `docs/MVP.md` for scope, `docs/STACK.md` for the stack, `docs/DEVELOPMENT.md` for the plan.
 
+## Commands
+
+- `pnpm test` and `pnpm typecheck` — run both before every commit; CI runs exactly these. The PDF integration test needs `bin/` (populate via `pwsh ./scripts/fetch-binaries.ps1`) and auto-skips without it.
+- `pnpm build:demo` — build `fixtures/demo-report` to PDF from the terminal; `pnpm tsx scripts/build-report.ts <dir>` for any project. `$env:DEBUG=1` reveals raw Pandoc/Typst output.
+- `pnpm --filter @paperstack/desktop tauri dev` — run the app (never plain Vite; the UI needs Tauri APIs). Requires sidecars in `src-tauri/binaries/` (same fetch script). Smoke-test hooks: `VITE_OPEN_PROJECT=<dir>`, `VITE_OPEN_SECTION=<file>`, `VITE_SMOKE_EXPORT=1` (auto-open / jump to section / export PDF on launch).
+
 ## Architecture rules
 
 Deliberate defaults, not dogma — deviate when something is clearly better, and update this file when you do.

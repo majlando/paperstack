@@ -55,29 +55,68 @@ Tauri 2 · TypeScript · React + Vite · CodeMirror 6 · Mermaid · Pandoc → T
 
 ## Development
 
-Prerequisites: [Node.js](https://nodejs.org/) 22+, [pnpm](https://pnpm.io/), and PowerShell 7 (`pwsh`).
+Prerequisites:
+
+- [Node.js](https://nodejs.org/) 22+ and [pnpm](https://pnpm.io/) (the repo pins the exact version via the `packageManager` field — `corepack enable` is enough)
+- PowerShell 7 (`pwsh`) for the binary-fetch script
+- Only for the desktop app: the [Rust toolchain](https://rustup.rs/) (Tauri 2). Engine work needs no Rust.
+
+### Setup (once)
 
 ```powershell
-# Setup (once)
 pnpm install                          # install workspace dependencies
-pwsh ./scripts/fetch-binaries.ps1     # download pinned typst + pandoc into bin/ (git-ignored)
+pwsh ./scripts/fetch-binaries.ps1     # download pinned typst + pandoc
+```
 
-# Daily commands
-pnpm test          # engine tests (the PDF integration test auto-skips if bin/ is empty)
+The fetch script places the binaries twice, both locations git-ignored: `bin/` (used by tests and the terminal build) and `apps/desktop/src-tauri/binaries/` (the Tauri sidecars the app runs). These same pinned versions ship inside the installer in releases.
+
+### Test and typecheck
+
+```powershell
+pnpm test          # all engine tests (the PDF integration test auto-skips if bin/ is empty)
 pnpm typecheck     # strict TypeScript check across the workspace
-pnpm build:demo    # build fixtures/demo-report to a PDF and print the length table
 
-# Build any report project folder
-pnpm tsx scripts/build-report.ts <path-to-project>
+pnpm --filter @paperstack/engine test:watch   # watch mode while working on the engine
+```
 
-# Watch mode while working on the engine
-pnpm --filter @paperstack/engine test:watch
+Run both before committing — CI (`.github/workflows/ci.yml`) runs exactly these on every push. CI has no binaries, so the PDF integration test only runs locally; populate `bin/` and run `pnpm test` yourself before pushing pipeline changes.
 
-# Run the desktop app (requires the Rust toolchain via https://rustup.rs/)
-pnpm --filter @paperstack/desktop tauri dev
+### Build reports from the terminal (engine only, no app)
+
+```powershell
+pnpm build:demo                                  # fixtures/demo-report → output/report.pdf + length table
+pnpm tsx scripts/build-report.ts <project-dir>   # build any report project folder
 ```
 
 Set `$env:DEBUG=1` before a build command to see the underlying Pandoc/Typst output when an error message isn't enough.
+
+### Run the desktop app
+
+```powershell
+pnpm --filter @paperstack/desktop tauri dev
+```
+
+The first run compiles the Rust shell and takes a few minutes; afterwards the web side hot-reloads. Two things to know:
+
+- The sidecar binaries must be in place first (the fetch script above) — the app runs typst/pandoc as bundled sidecars.
+- Always launch through `tauri dev`. Running the Vite dev server alone (`pnpm --filter @paperstack/desktop dev`) serves the UI without Tauri's APIs, so opening a project fails immediately.
+
+Dev hooks for scripted smoke tests (the folder dialog and buttons can't be driven from scripts):
+
+```powershell
+$env:VITE_OPEN_PROJECT = "E:/path/to/report-project"    # auto-open a project at launch
+$env:VITE_OPEN_SECTION = "sections/01-introduction.md"  # then jump to a section
+$env:VITE_SMOKE_EXPORT = "1"                            # then run Export PDF immediately
+pnpm --filter @paperstack/desktop tauri dev
+```
+
+### Build the installer
+
+```powershell
+pnpm --filter @paperstack/desktop tauri build   # release build + NSIS installer, sidecars bundled
+```
+
+Packaging is Milestone 4 work — the command is wired up but not yet part of the verified release flow.
 
 See [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md) for the full plan and progress.
 
