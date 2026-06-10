@@ -113,30 +113,46 @@ function slugify(name: string): string {
   return slug || "section";
 }
 
+function dirOf(file: string): string {
+  return file.slice(0, Math.max(0, file.lastIndexOf("/")));
+}
+
+function baseOf(file: string): string {
+  return file.slice(file.lastIndexOf("/") + 1);
+}
+
 /**
- * Picks a file path for a new section, following the project's filename
- * conventions (purely cosmetic — order lives in document.yaml): numbered
- * prefixes under sections/, letters for appendices/.
+ * Picks a file path for a new section, following the project's own filename
+ * conventions (purely cosmetic — order lives in document.yaml). New files go
+ * where existing sections of the same role live: migrated reports may keep
+ * everything at the project root, so never hardcode sections//appendices/.
  */
 function newSectionFile(sections: Section[], role: SectionRole, name: string): string {
   const slug = slugify(name);
+  const sameRole = sections.filter((s) => s.role === role);
+  const fallbackDir = role === "appendix" ? "appendices" : "sections";
+  const dir = sameRole.length > 0 ? dirOf(sameRole[sameRole.length - 1]!.file) : fallbackDir;
+  const prefix = dir === "" ? "" : `${dir}/`;
+
   if (role === "appendix") {
     // Next letter after the highest in use — counting would repeat letters
     // after a removal (remove appendix-a, add → "a" again beside appendix-b).
     let used = 0;
     for (const s of sections) {
-      const m = s.file.match(/^appendices\/appendix-([a-z])[-_.]/);
+      const m = baseOf(s.file).match(/^appendix-([a-z])[-_.]/);
       if (m) used = Math.max(used, m[1]!.charCodeAt(0) - 96);
     }
     const letter = String.fromCharCode(97 + Math.min(used, 25));
-    return `appendices/appendix-${letter}-${slug}.md`;
+    return `${prefix}appendix-${letter}-${slug}.md`;
   }
+  // Numbered prefixes share one sequence per folder, whatever the role.
   let max = 0;
   for (const s of sections) {
-    const m = s.file.match(/^sections\/(\d+)/);
+    if (dirOf(s.file) !== dir) continue;
+    const m = baseOf(s.file).match(/^(\d+)/);
     if (m) max = Math.max(max, Number(m[1]));
   }
-  return `sections/${String(max + 1).padStart(2, "0")}-${slug}.md`;
+  return `${prefix}${String(max + 1).padStart(2, "0")}-${slug}.md`;
 }
 
 /**
@@ -281,6 +297,7 @@ export const useStore = create<AppState>((set, get) => {
         metadataOpen: false,
       });
       rememberProject(normalized);
+      document.title = `${project.meta.title} — Paperstack`;
       const first = project.meta.sections.find((s) => s.role === "body") ?? project.meta.sections[0];
       if (first) await get().openSection(first.file);
     } catch (e) {
@@ -314,6 +331,7 @@ export const useStore = create<AppState>((set, get) => {
       const project = await loadProject(platform, projectDir);
       const counts = await countProject(platform, project);
       set({ project, counts, error: null });
+      document.title = `${project.meta.title} — Paperstack`;
       // re-read the open section unless the user has unsaved changes
       if (activeFile && !dirty && project.meta.sections.some((s) => s.file === activeFile)) {
         const content = await platform.readTextFile(`${projectDir}/${activeFile}`);
@@ -355,7 +373,9 @@ export const useStore = create<AppState>((set, get) => {
       const file = newSectionFile(project.meta.sections, role, name);
       const path = `${projectDir}/${file}`;
       if (!(await platform.fileExists(path))) {
-        await platform.mkdir(`${projectDir}/${file.slice(0, file.lastIndexOf("/"))}`);
+        // Flat-layout projects put sections at the root — nothing to create.
+        const dir = dirOf(file);
+        if (dir) await platform.mkdir(`${projectDir}/${dir}`);
         await platform.writeTextFile(path, `# ${name.trim()}\n`);
       }
       await editDocumentYaml(projectDir, (t) => addSectionToYaml(t, file, role));

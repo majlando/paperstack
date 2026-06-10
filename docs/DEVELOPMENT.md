@@ -105,8 +105,10 @@ Goal: the full core loop — edit → save → **View Report** → **Export PDF*
 
 Goal: another student can install it and produce a report unaided.
 
+**Real-report dogfood (2026-06-10):** the migrated SEA report (23 sections, ~37 normalsider, 80+ images, flat layout with assets under `resources/`) opens, edits, and builds in the app — full compile ≈ 2 s, 6.2 MB PDF renders in the pane, counters match the old toolchain. It exposed that the section-add path hardcoded the scaffold layout (fixed: new files follow where same-role sections already live, numbering and appendix letters scan the project's actual files). Remaining lesson lives in the Insert Figure item below.
+
 **Insert helpers:**
-- [ ] Insert Figure: file dialog → copy into `figures/` (needs `Platform.copyFile`) → prompt for the caption → insert `![caption](/figures/...)` at the cursor (alt text becomes the numbered caption; `MarkdownEditor` gains an insert-at-cursor API)
+- [ ] Insert Figure: file dialog → copy into the project's images folder (needs `Platform.copyFile`) → prompt for the caption → insert the image Markdown at the cursor (alt text becomes the numbered caption; `MarkdownEditor` gains an insert-at-cursor API). **Don't hardcode `figures/`** — the real report keeps assets under `resources/`; default to where the project already keeps images, falling back to `figures/`
 - [ ] Insert Code Block and Insert Diagram (Mermaid stub) — snippet insertion via the same editor API
 
 **Template polish (the M1 acceptance gaps, decided deliberately rather than patched ad hoc):**
