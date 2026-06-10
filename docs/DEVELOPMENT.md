@@ -18,7 +18,7 @@ The working plan for getting from empty repo to v1 (see [MVP.md](MVP.md) for sco
   ├─ docs/
   └─ scripts/                # dev-binary download, etc.
   ```
-- [x] `packages/engine`: strict `tsconfig`, Vitest, no runtime dependencies beyond `yaml`, `zod`, `unified/remark`
+- [x] `packages/engine`: strict `tsconfig`, Vitest, no runtime dependencies beyond `yaml` and `zod` (unified/remark moved to the app, where the preview lives — they return to the engine if the remark-based Typst emitter ever happens)
 - [x] `scripts/fetch-binaries.ps1` — downloads pinned versions of `typst` (0.13.1) and `pandoc` (3.6.3) into a git-ignored `bin/` for development (these ship as Tauri sidecars later; never committed)
 - [x] GitHub Actions workflow: install + run engine tests on every push (cheap, and keeps the public repo trustworthy from day one)
 - [x] Two fixtures: `fixtures/demo-report/` (small, synthetic, committed — used by tests) and the real SEA report in `report/` (local only, git-ignored — used to judge output quality)
@@ -67,9 +67,9 @@ Goal: open a project, edit sections with autosave, see a live per-section previe
 - [x] Reload project button in the sidebar — picks up files changed outside the app (e.g. after a `git pull`); skips re-reading the open section while it has unsaved edits
 - [x] Sidebar driven by the engine's `Project` model, grouped by role, with per-section TODO badges
 - [x] Engine hardening from review: section paths validated (relative, forward slashes, no `..` — a shared document.yaml can never read outside the project folder)
-- [ ] Create project from the SEA template (including a project `.gitignore` for `output/` and `diagrams/rendered/`); recent-projects list
-- [ ] Section actions in the sidebar: add / rename / delete / move up/down (all edit the `sections` list in `document.yaml`, the single source of truth for order)
-- [ ] Conflict guard: warn instead of silently overwriting when a file changed on disk while open with unsaved edits
+- [x] Create project from the SEA template (including a project `.gitignore` for `output/` and `diagrams/rendered/` — appended, never overwritten, when the folder already has one); recent-projects list (localStorage — app-private state stays out of the project folder)
+- [x] Section actions in the sidebar: add / rename / remove / move up/down (all edit the `sections` list in `document.yaml`, the single source of truth for order, via the comment-preserving yaml Document API; remove takes the section out of the report but keeps the file on disk; move swaps within the role group)
+- [x] Conflict guard: saves compare the file on disk against the last-synced baseline and a banner offers "keep my version" / "use the disk version" instead of silently overwriting external edits (e.g. after a `git pull`); a failed or blocked save also keeps the section open and dirty instead of dropping the edits
 - [x] `MarkdownEditor` vanilla-TS class wrapping CodeMirror 6 (markdown mode + fenced-code highlighting via language-data, zinc theme, list-continuation keymap) + the small React mount bridge (`contentVersion` distinguishes external content changes from keystrokes); autosave 800 ms after the last keystroke and on blur
 - [x] Preview pane: vanilla-TS `MarkdownPreview` (remark/rehype + rehype-highlight, Tailwind typography) + thin React bridge; images resolved via the Tauri asset protocol; live Mermaid rendering with inline error boxes; 300 ms debounce
 - [x] Mermaid save hook: on save, render not-yet-rendered ```mermaid blocks to `diagrams/rendered/<hash>.svg` (the files PDF export embeds); invalid diagrams skipped (visible in preview, readable error at export)
