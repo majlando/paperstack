@@ -15,6 +15,8 @@ export interface BuildOptions {
   /** Binary identifier for Platform.runBinary: a path in Node, a sidecar name in the app. */
   typst: string;
   pandoc: string;
+  /** Skip the binary startup probe — for callers that already built successfully this session. */
+  skipPreflight?: boolean;
   /** Override the converter (tests, future remark emitter). */
   converter?: Converter;
 }
@@ -33,10 +35,12 @@ export async function buildReport(
   // Preflight by actually running each binary: an existence check can't work
   // uniformly (sidecars are names, not paths) and a binary that exists but
   // can't start would fail later with a worse message anyway.
-  for (const [name, binary] of [
-    ["PDF engine (typst)", options.typst],
-    ["converter (pandoc)", options.pandoc],
-  ] as const) {
+  for (const [name, binary] of options.skipPreflight
+    ? []
+    : ([
+        ["PDF engine (typst)", options.typst],
+        ["converter (pandoc)", options.pandoc],
+      ] as const)) {
     const probe = await platform
       .runBinary(binary, ["--version"])
       .catch((e) => ({ exitCode: -1, stdout: "", stderr: String(e) }));

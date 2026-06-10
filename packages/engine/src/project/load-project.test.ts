@@ -86,6 +86,20 @@ describe("loadProject error messages", () => {
     expect(error.userMessage).toContain("forward slashes");
   });
 
+  it("rejects the same file listed twice", async () => {
+    const platform = new FakePlatform(
+      new Map([
+        [
+          "/proj/document.yaml",
+          "title: T\nsections:\n  - { file: a.md, role: body }\n  - { file: a.md, role: appendix }\n",
+        ],
+      ]),
+    );
+    const error = await loadProject(platform, "/proj").catch((e) => e);
+    expect(error.code).toBe("metadata-invalid");
+    expect(error.userMessage).toContain("more than once");
+  });
+
   it("lists missing section files by name", async () => {
     const platform = new FakePlatform(
       new Map([

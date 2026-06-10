@@ -110,9 +110,14 @@ function slugify(name: string): string {
 function newSectionFile(sections: Section[], role: SectionRole, name: string): string {
   const slug = slugify(name);
   if (role === "appendix") {
-    const letter = String.fromCharCode(
-      97 + sections.filter((s) => s.role === "appendix").length,
-    );
+    // Next letter after the highest in use — counting would repeat letters
+    // after a removal (remove appendix-a, add → "a" again beside appendix-b).
+    let used = 0;
+    for (const s of sections) {
+      const m = s.file.match(/^appendices\/appendix-([a-z])[-_.]/);
+      if (m) used = Math.max(used, m[1]!.charCodeAt(0) - 96);
+    }
+    const letter = String.fromCharCode(97 + Math.min(used, 25));
     return `appendices/appendix-${letter}-${slug}.md`;
   }
   let max = 0;
@@ -128,6 +133,9 @@ function newSectionFile(sections: Section[], role: SectionRole, name: string): s
  * localStorage — app-private state never goes into the project folder.
  */
 const RECENTS_KEY = "paperstack.recentProjects";
+
+/** Set after the first successful build this session — recompiles skip the binary probe. */
+let binariesVerified = false;
 
 export function getRecentProjects(): string[] {
   try {
@@ -196,8 +204,10 @@ async function renderDiagramsToDisk(projectDir: string, content: string): Promis
 export const useStore = create<AppState>((set, get) => {
   /** Shared build path for View Report and Export PDF: save, compile, sync counters. */
   async function runBuild(): Promise<{ pdfPath: string; warnings: string[] } | null> {
-    const { projectDir } = get();
-    if (!projectDir) return null;
+    const { projectDir, building } = get();
+    // Re-entrancy guard — two compiles would race in the same output/.build.
+    // (The UI also disables its buttons, but the store must not rely on that.)
+    if (!projectDir || building) return null;
     // A blocked save (write failure or conflict) keeps its own error visible.
     if (!(await get().saveActive())) return null;
     set({ building: true });
@@ -205,7 +215,11 @@ export const useStore = create<AppState>((set, get) => {
       const result = await buildReport(platform, projectDir, {
         typst: SIDECARS.typst,
         pandoc: SIDECARS.pandoc,
+        // After one successful build the binaries are known-good; skip the
+        // startup probe on recompiles (it costs two process spawns).
+        skipPreflight: binariesVerified,
       });
+      binariesVerified = true;
       // The build re-reads every section — its counts are authoritative.
       set({ counts: result.counts, error: null });
       return result;
@@ -374,9 +388,11 @@ export const useStore = create<AppState>((set, get) => {
   async renameSection(file: string, newStem: string) {
     const { projectDir, activeFile, saveActive } = get();
     if (!projectDir) return;
+    // Tolerate a typed ".md" — the input shows stems, but users type filenames.
+    const stem = newStem.trim().replace(/\.md$/i, "");
     const dir = file.slice(0, file.lastIndexOf("/") + 1);
-    const newFile = `${dir}${newStem.trim()}.md`;
-    if (newFile === file || !newStem.trim()) return;
+    const newFile = `${dir}${stem}.md`;
+    if (newFile === file || !stem) return;
     // Flush pending edits to the old path so nothing is in flight mid-rename.
     if (file === activeFile && !(await saveActive())) return;
     try {
@@ -478,8 +494,8 @@ export const useStore = create<AppState>((set, get) => {
   },
 
   async exportPdf() {
-    const { projectDir } = get();
     const result = await runBuild();
+    const { projectDir } = get();
     if (!result || !projectDir) return;
     const relPath = result.pdfPath.replace(`${projectDir}/`, "");
     const warningText = result.warnings.length > 0 ? ` ${result.warnings.join(" ")}` : "";

@@ -50,7 +50,13 @@ export const documentSchema = z.object({
   date: z.string().optional(),
   language: z.enum(["en", "da"]).default("en"),
   body_cap_normalsider: z.number().positive().default(40),
-  sections: z.array(sectionSchema).min(1, "the report needs at least one section"),
+  sections: z
+    .array(sectionSchema)
+    .min(1, "the report needs at least one section")
+    .refine(
+      (sections) => new Set(sections.map((s) => s.file)).size === sections.length,
+      "the same section file is listed more than once",
+    ),
 });
 
 export type DocumentMeta = z.infer<typeof documentSchema>;
