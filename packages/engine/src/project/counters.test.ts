@@ -71,6 +71,14 @@ describe("countTodos", () => {
     expect(countTodos("we sweep `[TODO]` markers before hand-in")).toBe(0);
   });
 
+  it("ignores fenced-code mentions like `[TODO]`", () => {
+    expect(countTodos("```md\n[TODO: not real]\n```\n\n[TODO: real]")).toBe(1);
+  });
+
+  it("ignores HTML-comment mentions like `[TODO]`", () => {
+    expect(countTodos("<!-- [TODO: hidden] -->\n[TODO: visible]")).toBe(1);
+  });
+
   it("returns 0 for clean text", () => {
     expect(countTodos("nothing to do here")).toBe(0);
   });

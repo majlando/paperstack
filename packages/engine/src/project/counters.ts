@@ -14,15 +14,113 @@ export function countAnslag(markdown: string): number {
   return markdown.replace(/<!--[\s\S]*?-->/g, "").replace(/\r/g, "").length;
 }
 
-/**
- * Genuine `[TODO` placeholders. A backtick directly before (inline code like
- * `` `[TODO]` ``) means the text *discusses* a TODO and is not one.
- */
-const TODO_MARKER = /(?<!`)\[TODO/g;
+/** Genuine `[TODO` placeholders in prose (not comments/code). */
+const TODO_MARKER = /\[TODO/g;
+
+interface Range {
+  start: number;
+  end: number;
+}
+
+function maskRanges(text: string, ranges: Range[]): string {
+  if (ranges.length === 0) return text;
+  const chars = [...text];
+  for (const { start, end } of ranges) {
+    for (let i = Math.max(0, start); i < Math.min(chars.length, end); i += 1) chars[i] = " ";
+  }
+  return chars.join("");
+}
+
+function findCommentRanges(markdown: string): Range[] {
+  return [...markdown.matchAll(/<!--[\s\S]*?-->/g)].map((m) => ({
+    start: m.index ?? 0,
+    end: (m.index ?? 0) + m[0].length,
+  }));
+}
+
+function findFenceRanges(markdown: string): Range[] {
+  const ranges: Range[] = [];
+  let fenceStart: number | null = null;
+  let fenceChar: "`" | "~" | null = null;
+  let fenceLen = 0;
+  let lineStart = 0;
+
+  while (lineStart < markdown.length) {
+    const lineEnd = markdown.indexOf("\n", lineStart);
+    const lineStop = lineEnd === -1 ? markdown.length : lineEnd + 1;
+    const line = markdown.slice(lineStart, lineEnd === -1 ? markdown.length : lineEnd);
+    const match = line.match(/^ {0,3}([`~]{3,})/);
+
+    if (!fenceChar && match) {
+      const marker = match[1]!;
+      fenceChar = marker[0] as "`" | "~";
+      fenceLen = marker.length;
+      fenceStart = lineStart;
+    } else if (fenceChar) {
+      const close = line.match(/^ {0,3}([`~]{3,})/);
+      if (close) {
+        const marker = close[1]!;
+        if (marker[0] === fenceChar && marker.length >= fenceLen) {
+          ranges.push({ start: fenceStart ?? lineStart, end: lineStop });
+          fenceStart = null;
+          fenceChar = null;
+          fenceLen = 0;
+        }
+      }
+    }
+
+    lineStart = lineStop;
+  }
+
+  if (fenceChar && fenceStart !== null) ranges.push({ start: fenceStart, end: markdown.length });
+  return ranges;
+}
+
+function findInlineCodeRanges(markdown: string): Range[] {
+  const ranges: Range[] = [];
+  let i = 0;
+  while (i < markdown.length) {
+    if (markdown[i] !== "`") {
+      i += 1;
+      continue;
+    }
+
+    let openLen = 1;
+    while (markdown[i + openLen] === "`") openLen += 1;
+    let cursor = i + openLen;
+    let closed = false;
+    while (cursor < markdown.length) {
+      if (markdown[cursor] !== "`") {
+        cursor += 1;
+        continue;
+      }
+      let closeLen = 1;
+      while (markdown[cursor + closeLen] === "`") closeLen += 1;
+      if (closeLen === openLen) {
+        ranges.push({ start: i, end: cursor + closeLen });
+        i = cursor + closeLen;
+        closed = true;
+        break;
+      }
+      cursor += closeLen;
+    }
+    if (!closed) i += openLen;
+  }
+  return ranges;
+}
+
+function stripTodoIgnoredContent(markdown: string): string {
+  const withoutCommentsAndFences = maskRanges(markdown, [
+    ...findCommentRanges(markdown),
+    ...findFenceRanges(markdown),
+  ]);
+  return maskRanges(withoutCommentsAndFences, findInlineCodeRanges(withoutCommentsAndFences));
+}
 
 /** Character offsets of every `[TODO` marker — drives the editor's click-to-jump. */
 export function findTodoOffsets(markdown: string): number[] {
-  return [...markdown.matchAll(TODO_MARKER)].map((m) => m.index ?? 0);
+  const searchable = stripTodoIgnoredContent(markdown);
+  return [...searchable.matchAll(TODO_MARKER)].map((m) => m.index ?? 0);
 }
 
 export function countTodos(markdown: string): number {
