@@ -40,6 +40,7 @@ export {
   moveSectionInYaml,
   renameSectionInYaml,
 } from "./project/section-edit.ts";
+export { editMetadataInYaml, type MetadataEdit } from "./project/metadata-edit.ts";
 export { buildReport, type BuildOptions, type BuildResult } from "./build/builder.ts";
 
 export const ENGINE_VERSION = "0.0.1";

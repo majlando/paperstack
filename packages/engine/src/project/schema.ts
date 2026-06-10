@@ -49,7 +49,10 @@ export const documentSchema = z.object({
   authors: z.array(authorSchema).default([]),
   date: z.string().optional(),
   language: z.enum(["en", "da"]).default("en"),
-  body_cap_normalsider: z.number().positive().default(40),
+  body_cap_normalsider: z
+    .number({ invalid_type_error: "the body cap must be a number" })
+    .positive("the body cap must be a positive number")
+    .default(40),
   sections: z
     .array(sectionSchema)
     .min(1, "the report needs at least one section")
