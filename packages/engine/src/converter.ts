@@ -14,19 +14,25 @@ export interface Converter {
 }
 
 export class PandocConverter implements Converter {
+  /**
+   * @param scratchDir absolute build directory for the temp input file —
+   *   input travels via file, not stdin (see Platform.runBinary).
+   */
   constructor(
     private readonly platform: Platform,
-    private readonly pandocPath: string,
+    private readonly pandoc: string,
+    private readonly scratchDir: string,
   ) {}
 
   async toTypst(markdown: string, sectionDir: string): Promise<string> {
+    const inputPath = `${this.scratchDir}/pandoc-input.md`;
+    await this.platform.writeTextFile(inputPath, markdown);
     const result = await this.platform.runBinary(
-      this.pandocPath,
+      this.pandoc,
       // implicit_figures: an image alone in a paragraph becomes a numbered
       // figure with the alt text as caption (the Paperstack figure convention)
       // attributes: supports ![alt](img.png){width=62%} for figure sizing
-      ["-f", "gfm+implicit_figures+attributes", "-t", "typst", "--wrap=none"],
-      { stdin: markdown },
+      ["-f", "gfm+implicit_figures+attributes", "-t", "typst", "--wrap=none", inputPath],
     );
     if (result.exitCode !== 0) {
       throw new PaperstackError(

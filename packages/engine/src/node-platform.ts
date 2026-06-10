@@ -36,10 +36,9 @@ export class NodePlatform implements Platform {
   runBinary(
     binary: string,
     args: string[],
-    options?: { stdin?: string },
   ): Promise<{ exitCode: number; stdout: string; stderr: string }> {
     return new Promise((resolve) => {
-      const child = execFile(
+      execFile(
         binary,
         args,
         { encoding: "utf8", maxBuffer: 64 * 1024 * 1024 },
@@ -53,10 +52,6 @@ export class NodePlatform implements Platform {
           resolve({ exitCode, stdout, stderr: detail });
         },
       );
-      if (options?.stdin !== undefined) {
-        child.stdin?.write(options.stdin);
-      }
-      child.stdin?.end();
     });
   }
 }

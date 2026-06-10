@@ -14,8 +14,8 @@ const binDir = resolve("bin");
 
 try {
   const result = await buildReport(new NodePlatform(), projectDir, {
-    typstPath: join(binDir, `typst${exe}`),
-    pandocPath: join(binDir, `pandoc${exe}`),
+    typst: join(binDir, `typst${exe}`),
+    pandoc: join(binDir, `pandoc${exe}`),
   });
 
   console.log("\nSection lengths:");

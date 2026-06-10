@@ -12,8 +12,8 @@ describe("buildReport preflight", () => {
       ]),
     );
     const error = await buildReport(platform, "/proj", {
-      typstPath: "/bin/typst.exe",
-      pandocPath: "/bin/pandoc.exe",
+      typst: "/bin/typst.exe",
+      pandoc: "/bin/pandoc.exe",
     }).catch((e) => e);
 
     expect(error).toBeInstanceOf(PaperstackError);

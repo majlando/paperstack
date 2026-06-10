@@ -44,8 +44,8 @@ describe.skipIf(!hasBinaries)("buildReport on the demo fixture", () => {
   it("produces a PDF and sensible warnings", async () => {
     const platform = new NodePlatform();
     const result = await buildReport(platform, fixtureDir, {
-      typstPath,
-      pandocPath,
+      typst: typstPath,
+      pandoc: pandocPath,
     });
 
     expect(existsSync(result.pdfPath)).toBe(true);

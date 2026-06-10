@@ -13,10 +13,14 @@ export interface Platform {
   mkdir(path: string): Promise<void>;
   /** Rename/move a file. Fails if the source is missing. */
   rename(oldPath: string, newPath: string): Promise<void>;
-  /** Run a bundled binary (typst, pandoc) and capture its output. */
+  /**
+   * Run a bundled binary (typst, pandoc) and capture its output. `binary` is
+   * whatever identifies the executable to this platform: an absolute path in
+   * Node, a sidecar name in the Tauri app. No stdin — Tauri's shell plugin
+   * cannot close a child's stdin, so input always travels via files.
+   */
   runBinary(
     binary: string,
     args: string[],
-    options?: { stdin?: string },
   ): Promise<{ exitCode: number; stdout: string; stderr: string }>;
 }

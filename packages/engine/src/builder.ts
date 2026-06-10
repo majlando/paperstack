@@ -12,8 +12,9 @@ import {
 } from "./assembler.ts";
 
 export interface BuildOptions {
-  typstPath: string;
-  pandocPath: string;
+  /** Binary identifier for Platform.runBinary: a path in Node, a sidecar name in the app. */
+  typst: string;
+  pandoc: string;
   /** Override the converter (tests, future remark emitter). */
   converter?: Converter;
 }
@@ -29,15 +30,21 @@ export async function buildReport(
   projectDir: string,
   options: BuildOptions,
 ): Promise<BuildResult> {
-  for (const [name, path] of [
-    ["PDF engine (typst)", options.typstPath],
-    ["converter (pandoc)", options.pandocPath],
+  // Preflight by actually running each binary: an existence check can't work
+  // uniformly (sidecars are names, not paths) and a binary that exists but
+  // can't start would fail later with a worse message anyway.
+  for (const [name, binary] of [
+    ["PDF engine (typst)", options.typst],
+    ["converter (pandoc)", options.pandoc],
   ] as const) {
-    if (!(await platform.fileExists(path))) {
+    const probe = await platform
+      .runBinary(binary, ["--version"])
+      .catch((e) => ({ exitCode: -1, stdout: "", stderr: String(e) }));
+    if (probe.exitCode !== 0) {
       throw new PaperstackError(
         "dependency-missing",
-        `The ${name} could not be found. Reinstall Paperstack — or, in development, run scripts/fetch-binaries.ps1.`,
-        `expected at ${path}`,
+        `The ${name} could not be started. Reinstall Paperstack — or, in development, run scripts/fetch-binaries.ps1.`,
+        `probe failed for ${binary}: ${probe.stderr}`,
       );
     }
   }
@@ -60,7 +67,7 @@ export async function buildReport(
   const buildDir = `${projectDir}/output/.build`;
   await platform.mkdir(`${buildDir}/converted`);
   const converter =
-    options.converter ?? new PandocConverter(platform, options.pandocPath);
+    options.converter ?? new PandocConverter(platform, options.pandoc, buildDir);
 
   const converted: ConvertedSection[] = [];
   for (let i = 0; i < project.meta.sections.length; i++) {
@@ -97,7 +104,7 @@ export async function buildReport(
   await platform.writeTextFile(`${buildDir}/main.typ`, main);
 
   const compile = (outputRel: string) =>
-    platform.runBinary(options.typstPath, [
+    platform.runBinary(options.typst, [
       "compile",
       "--root",
       projectDir,
