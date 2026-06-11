@@ -29,14 +29,16 @@ export class MarkdownPreview {
    * HTML every time, but unchanged diagrams should not re-run mermaid. */
   private readonly svgCache = new Map<string, string>();
 
+  // The preview is a viewer, not a browser — swallow link navigation.
+  private readonly onClick = (e: Event) => {
+    if ((e.target as HTMLElement).closest("a")) e.preventDefault();
+  };
+
   constructor(
     private readonly container: HTMLElement,
     private readonly options: MarkdownPreviewOptions,
   ) {
-    // The preview is a viewer, not a browser — swallow link navigation.
-    container.addEventListener("click", (e) => {
-      if ((e.target as HTMLElement).closest("a")) e.preventDefault();
-    });
+    container.addEventListener("click", this.onClick);
     this.processor = unified()
       .use(remarkParse)
       .use(remarkGfm)
@@ -120,6 +122,7 @@ export class MarkdownPreview {
   }
 
   destroy(): void {
+    this.container.removeEventListener("click", this.onClick);
     this.revokeObjectUrls();
     this.container.replaceChildren();
   }

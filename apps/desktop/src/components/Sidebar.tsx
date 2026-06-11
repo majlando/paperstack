@@ -34,13 +34,26 @@ function ActionButton(props: { title: string; onClick: () => void; children: Rea
   );
 }
 
-/** Uncontrolled one-line input: Enter commits, Escape or leaving cancels. */
+/**
+ * Uncontrolled one-line input: Enter or leaving the field commits (clicking
+ * elsewhere must not silently discard what was typed), Escape cancels.
+ */
 function InlineInput(props: {
   placeholder?: string;
   defaultValue?: string;
   onCommit: (value: string) => void;
   onClose: () => void;
 }) {
+  // Enter/Escape close the input, which fires a blur on unmount — `settled`
+  // keeps that trailing blur from committing (or double-committing).
+  const settled = useRef(false);
+  const finish = (commit: boolean, value: string) => {
+    if (settled.current) return;
+    settled.current = true;
+    const trimmed = value.trim();
+    if (commit && trimmed) props.onCommit(trimmed);
+    props.onClose();
+  };
   return (
     <div className="px-4 py-1">
       <input
@@ -48,15 +61,10 @@ function InlineInput(props: {
         defaultValue={props.defaultValue}
         placeholder={props.placeholder}
         onKeyDown={(e) => {
-          if (e.key === "Enter") {
-            const value = e.currentTarget.value.trim();
-            if (value) props.onCommit(value);
-            props.onClose();
-          } else if (e.key === "Escape") {
-            props.onClose();
-          }
+          if (e.key === "Enter") finish(true, e.currentTarget.value);
+          else if (e.key === "Escape") finish(false, "");
         }}
-        onBlur={props.onClose}
+        onBlur={(e) => finish(true, e.currentTarget.value)}
         className="w-full rounded border border-zinc-600 bg-zinc-800 px-2 py-1 text-sm text-zinc-100 outline-none placeholder:text-zinc-600"
       />
     </div>

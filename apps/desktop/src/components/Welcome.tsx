@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { open } from "@tauri-apps/plugin-dialog";
 import { baseOf } from "@paperstack/engine";
 import { useStore, getRecentProjects } from "../store.ts";
@@ -5,8 +6,14 @@ import { useStore, getRecentProjects } from "../store.ts";
 export function Welcome() {
   const openProject = useStore((s) => s.openProject);
   const createProject = useStore((s) => s.createProject);
-  // Read once per mount: the list only changes by opening a project, which unmounts this screen.
-  const recents = getRecentProjects();
+  // A successful open unmounts this screen; a failed open of a stale entry
+  // drops it from the list (store), so re-read after every attempt.
+  const [recents, setRecents] = useState(getRecentProjects);
+
+  async function openRecent(dir: string) {
+    await openProject(dir);
+    setRecents(getRecentProjects());
+  }
 
   async function pickExisting() {
     const dir = await open({ directory: true, title: "Open a Paperstack report project" });
@@ -49,7 +56,7 @@ export function Welcome() {
           {recents.map((dir) => (
             <button
               key={dir}
-              onClick={() => void openProject(dir)}
+              onClick={() => void openRecent(dir)}
               title={dir}
               className="block w-full truncate rounded px-2 py-1 text-left text-sm hover:bg-zinc-900"
             >

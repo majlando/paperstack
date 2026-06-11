@@ -7,12 +7,17 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { GatedPlatform } from "./test/gated-platform.ts";
 
+// Swappable so a test can make the scope grant fail (folder gone / not a project).
+const mocks = vi.hoisted(() => ({
+  allowExisting: async (dir: string) => dir,
+}));
+
 vi.mock("./platform/tauri-platform.ts", async () => {
   const { GatedPlatform } = await import("./test/gated-platform.ts");
   return {
     platform: new GatedPlatform(),
     SIDECARS: { typst: "binaries/typst", pandoc: "binaries/pandoc" },
-    allowExistingProjectScope: async (dir: string) => dir,
+    allowExistingProjectScope: (dir: string) => mocks.allowExisting(dir),
     allowNewProjectScope: async (dir: string) => dir,
   };
 });
@@ -22,10 +27,17 @@ vi.mock("./preview/mermaid.ts", () => ({
 
 import { hashDiagram } from "@paperstack/engine";
 import { platform } from "./platform/tauri-platform.ts";
-import { useStore } from "./store.ts";
+import { getRecentProjects, useStore } from "./store.ts";
 
 // The store touches document.title on project load; tests run in plain Node.
 (globalThis as { document?: { title: string } }).document ??= { title: "" };
+
+// Recents live in localStorage; tests run in plain Node, so stand one in.
+const localStore = new Map<string, string>();
+(globalThis as { localStorage?: unknown }).localStorage ??= {
+  getItem: (k: string) => localStore.get(k) ?? null,
+  setItem: (k: string, v: string) => void localStore.set(k, v),
+};
 
 const fake = platform as unknown as GatedPlatform;
 
@@ -60,6 +72,8 @@ function writesTo(path: string): number {
 beforeEach(() => {
   fake.reset(projectFiles());
   useStore.setState(useStore.getInitialState(), true);
+  mocks.allowExisting = async (dir: string) => dir;
+  localStore.clear();
 });
 
 describe("opening", () => {
@@ -72,6 +86,26 @@ describe("opening", () => {
     expect(s.content).toBe("# A\n\nalpha\n");
     expect(s.baseline).toBe(s.content);
     expect(s.dirty).toBe(false);
+  });
+
+  it("drops a recents entry whose folder can no longer open; keeps fixable ones", async () => {
+    await openProject();
+    expect(getRecentProjects()).toContain("/p");
+
+    // A fixable load failure (e.g. a bad merge in document.yaml) keeps the entry.
+    useStore.setState(useStore.getInitialState(), true);
+    fake.files.set("/p/document.yaml", "<<<<<<< HEAD\ntitle: x\n");
+    await useStore.getState().openProject("/p");
+    expect(useStore.getState().error).not.toBeNull();
+    expect(getRecentProjects()).toContain("/p");
+
+    // The folder being gone (scope grant rejects) drops it.
+    mocks.allowExisting = async () => {
+      throw new Error("No document.yaml was found in the selected folder.");
+    };
+    await useStore.getState().openProject("/p");
+    expect(useStore.getState().error).not.toBeNull();
+    expect(getRecentProjects()).not.toContain("/p");
   });
 });
 

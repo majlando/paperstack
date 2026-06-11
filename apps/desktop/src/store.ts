@@ -191,6 +191,16 @@ function rememberProject(dir: string): void {
   }
 }
 
+/** Drops a recents entry that can no longer open (folder deleted or moved). */
+export function forgetProject(dir: string): void {
+  try {
+    const list = getRecentProjects().filter((p) => p !== dir);
+    localStorage.setItem(RECENTS_KEY, JSON.stringify(list));
+  } catch {
+    // same convenience rule as rememberProject
+  }
+}
+
 /** "C:/repos/smart-home-hub" → "Smart home hub". */
 function titleFromDir(dir: string): string {
   return humanize(baseOf(dir)) || "Report";
@@ -367,8 +377,19 @@ export const useStore = create<AppState>((set, get) => {
   pendingFigure: null,
 
   async openProject(dir: string) {
+    let normalized: string;
     try {
-      const normalized = await allowExistingProjectScope(dir);
+      normalized = await allowExistingProjectScope(dir);
+    } catch (e) {
+      // The folder is gone or is no longer a report project — a recents
+      // entry pointing here can never open again, so stop offering it.
+      // (Fixable failures, e.g. a bad merge in document.yaml, happen in
+      // loadProject below and keep their entry.)
+      forgetProject(dir);
+      set({ error: toError(e) });
+      return;
+    }
+    try {
       const project = await loadProject(platform, normalized);
       const counts = await countProject(platform, project);
       set({
