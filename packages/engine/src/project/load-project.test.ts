@@ -97,6 +97,19 @@ describe("loadProject error messages", () => {
     expect(error.userMessage).toContain("forward slashes");
   });
 
+  it("rejects section paths that alias other entries via ./ or //", async () => {
+    // "./a.md" and "a.md" are the same file — letting both through would
+    // defeat the duplicate guard and count the section twice toward the cap.
+    const yaml = (file: string) =>
+      `title: T\nsections:\n  - { file: a.md, role: body }\n  - { file: '${file}', role: body }\n`;
+    for (const alias of ["./a.md", "sections//a.md", "sections/./a.md"]) {
+      const platform = new FakePlatform(new Map([["/proj/document.yaml", yaml(alias)]]));
+      const error = await loadProject(platform, "/proj").catch((e) => e);
+      expect(error.code).toBe("metadata-invalid");
+      expect(error.userMessage).toContain("plain relative paths");
+    }
+  });
+
   it("rejects the same file listed twice", async () => {
     const platform = new FakePlatform(
       new Map([
@@ -122,6 +135,7 @@ describe("loadProject error messages", () => {
         "/proj",
       );
     expect((await load("logo: /resources/logo.png")).meta.logo).toBe("resources/logo.png");
+    expect((await load("logo: ./logo.png")).meta.logo).toBe("logo.png");
     expect((await load("logo:")).meta.logo).toBeUndefined();
     expect((await load("logo: ''")).meta.logo).toBeUndefined();
     // genuinely unusable values still fail with the field named

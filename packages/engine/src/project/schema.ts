@@ -35,6 +35,12 @@ function projectRelativePath(what: string) {
     .refine(
       (f) => !f.split("/").includes(".."),
       `${what}s must stay inside the project folder`,
+    )
+    // "./a", "a//b", "a/./b" alias other entries: they would defeat the
+    // duplicate-section guard and count the same file twice toward the cap.
+    .refine(
+      (f) => f.split("/").every((segment) => segment !== "" && segment !== "."),
+      `write ${what}s as plain relative paths (no "./" or "//")`,
     );
 }
 
@@ -62,7 +68,12 @@ export const documentSchema = z.object({
     .optional()
     .transform((v) => {
       if (v == null) return undefined;
-      const cleaned = v.trim().replaceAll("\\", "/").replace(/^\/+/, "");
+      const cleaned = v
+        .trim()
+        .replaceAll("\\", "/")
+        .split("/")
+        .filter((segment) => segment !== "" && segment !== ".")
+        .join("/");
       return cleaned === "" ? undefined : cleaned;
     })
     .pipe(projectRelativePath("logo path").optional()),
