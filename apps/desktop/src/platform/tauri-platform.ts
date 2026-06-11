@@ -66,8 +66,12 @@ export class TauriPlatform implements Platform {
     }
   }
 
-  fileExists(path: string): Promise<boolean> {
-    return exists(path);
+  async fileExists(path: string): Promise<boolean> {
+    // exists() alone is true for directories too; without fs:allow-stat the
+    // readDir probe is the cheapest way to keep the files-only contract
+    // NodePlatform has (a directory must never count as a section file).
+    if (!(await exists(path))) return false;
+    return !(await this.dirExists(path));
   }
 
   async dirExists(path: string): Promise<boolean> {

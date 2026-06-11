@@ -2,7 +2,6 @@ import {
   readFile,
   writeFile,
   readdir,
-  access,
   mkdir,
   rename,
   rm,
@@ -45,9 +44,11 @@ export class NodePlatform implements Platform {
   }
 
   async fileExists(path: string): Promise<boolean> {
+    // isFile(), not access(): a directory at the path must not count — a
+    // section entry naming a folder would otherwise pass the loader's
+    // existence check and surface a raw EISDIR when read.
     try {
-      await access(path);
-      return true;
+      return (await stat(path)).isFile();
     } catch {
       return false;
     }

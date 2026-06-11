@@ -27,6 +27,12 @@ describe("NodePlatform against the demo fixture", () => {
     const exists = await platform.fileExists(join(fixtureDir, "nope.md"));
     expect(exists).toBe(false);
   });
+
+  it("fileExists is false for directories (files-only contract)", async () => {
+    expect(await platform.fileExists(join(fixtureDir, "sections"))).toBe(false);
+    expect(await platform.dirExists(join(fixtureDir, "sections"))).toBe(true);
+    expect(await platform.fileExists(join(fixtureDir, "document.yaml"))).toBe(true);
+  });
 });
 
 describe("NodePlatform.writeTextFile", () => {
