@@ -120,5 +120,7 @@ export function editMetadataInYaml(yamlText: string, edit: MetadataEdit): string
     );
   }
 
-  return doc.toString();
+  // lineWidth: 0 disables re-wrapping, so hand-written long lines survive a
+  // form save byte-for-byte — the file is shared over Git and must not churn.
+  return doc.toString({ lineWidth: 0 });
 }

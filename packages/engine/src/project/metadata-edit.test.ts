@@ -89,4 +89,18 @@ describe("editMetadataInYaml", () => {
   it("is a no-op when nothing is edited", () => {
     expect(editMetadataInYaml(YAML, {})).toBe(YAML);
   });
+
+  it("never rewraps hand-written long lines (Git no-churn rule)", () => {
+    const long = [
+      "title: Demo",
+      `subtitle: ${"A hand-written subtitle that runs well past eighty columns ".repeat(2).trim()}`,
+      "sections:",
+      "  - { file: sections/a-section-with-a-rather-long-descriptive-filename.md, role: body }",
+      "",
+    ].join("\n");
+    expect(editMetadataInYaml(long, {})).toBe(long);
+    const edited = editMetadataInYaml(long, { course: "SEA" });
+    expect(edited).toContain(long.split("\n")[1]); // subtitle line intact
+    expect(edited).toContain(long.split("\n")[3]); // flow entry intact
+  });
 });

@@ -52,6 +52,14 @@ describe("addSectionToYaml", () => {
       "stay inside the project folder",
     );
   });
+
+  it("never rewraps long entries other groups wrote by hand (Git no-churn rule)", () => {
+    const longEntry =
+      "  - { file: sections/a-section-with-a-rather-long-descriptive-filename-by-hand.md, role: back-matter }";
+    const yaml = `title: T\nsections:\n  - { file: a.md, role: body }\n${longEntry}\n`;
+    const out = addSectionToYaml(yaml, "b.md", "body");
+    expect(out).toContain(longEntry);
+  });
 });
 
 describe("removeSectionFromYaml", () => {
