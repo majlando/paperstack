@@ -277,20 +277,24 @@ async function projectTemplateOutdated(projectDir: string): Promise<boolean> {
  * the second write would silently drop the first edit.
  */
 let yamlEditChain: Promise<unknown> = Promise.resolve();
+/** Queues work touching document.yaml — EVERY writer must go through here. */
+function chainDocumentEdit<T>(work: () => Promise<T>): Promise<T> {
+  const run = yamlEditChain
+    .catch(() => {}) // a failed edit must not jam the chain
+    .then(work);
+  yamlEditChain = run;
+  return run;
+}
 function editDocumentYaml(
   projectDir: string,
   edit: (yamlText: string) => string,
 ): Promise<void> {
-  const run = yamlEditChain
-    .catch(() => {}) // a failed edit must not jam the chain
-    .then(async () => {
-      const path = `${projectDir}/document.yaml`;
-      const text = await platform.readTextFile(path);
-      const next = edit(text);
-      if (next !== text) await platform.writeTextFile(path, next);
-    });
-  yamlEditChain = run;
-  return run;
+  return chainDocumentEdit(async () => {
+    const path = `${projectDir}/document.yaml`;
+    const text = await platform.readTextFile(path);
+    const next = edit(text);
+    if (next !== text) await platform.writeTextFile(path, next);
+  });
 }
 
 /**
@@ -525,7 +529,11 @@ export const useStore = create<AppState>((set, get) => {
         project,
         counts,
         changedOnDisk,
-        error: null,
+        // A successful reload clears a stale load error — but never an
+        // unresolved save/conflict explanation while edits are unsaved:
+        // the focus handler reloads on every alt-tab back, and that must
+        // not dismiss a banner the user still has to act on.
+        error: get().dirty || get().conflict ? get().error : null,
         // references.bib entries may have arrived or left with the external change
         hasReferences: await projectHasReferences(projectDir),
         // a git pull may have brought an older group member's stock template
@@ -648,20 +656,26 @@ export const useStore = create<AppState>((set, get) => {
         set({ error: { message: `A file named "${newFile}" already exists in the project.` } });
         return;
       }
-      // Validate against document.yaml before touching the file system.
-      const yamlPath = `${projectDir}/document.yaml`;
-      const yamlText = await platform.readTextFile(yamlPath);
-      const nextYaml = renameSectionInYaml(yamlText, file, newFile);
-      await platform.rename(`${projectDir}/${file}`, `${projectDir}/${newFile}`);
-      try {
-        await platform.writeTextFile(yamlPath, nextYaml);
-      } catch (e) {
-        // keep file and structure in sync: undo the rename if yaml failed
-        await platform
-          .rename(`${projectDir}/${newFile}`, `${projectDir}/${file}`)
-          .catch(() => {});
-        throw e;
-      }
+      // The yaml read–validate–write joins the serialized chain like every
+      // other structure edit: the rename input commits on blur, and the very
+      // click that causes the blur can fire another structure edit in the
+      // same instant — racing them silently drops one edit.
+      await chainDocumentEdit(async () => {
+        const yamlPath = `${projectDir}/document.yaml`;
+        const yamlText = await platform.readTextFile(yamlPath);
+        // Validate against document.yaml before touching the file system.
+        const nextYaml = renameSectionInYaml(yamlText, file, newFile);
+        await platform.rename(`${projectDir}/${file}`, `${projectDir}/${newFile}`);
+        try {
+          await platform.writeTextFile(yamlPath, nextYaml);
+        } catch (e) {
+          // keep file and structure in sync: undo the rename if yaml failed
+          await platform
+            .rename(`${projectDir}/${newFile}`, `${projectDir}/${file}`)
+            .catch(() => {});
+          throw e;
+        }
+      });
       if (get().activeFile === file) set({ activeFile: newFile });
       await get().reloadProject();
     } catch (e) {
@@ -739,7 +753,15 @@ export const useStore = create<AppState>((set, get) => {
     if (!result || !projectDir) return;
     const relPath = result.pdfPath.replace(`${projectDir}/`, "");
     const warningText = result.warnings.length > 0 ? ` ${result.warnings.join(" ")}` : "";
-    set({ notice: `Report exported to ${relPath}.${warningText}` });
+    set({
+      notice: `Report exported to ${relPath}.${warningText}`,
+      // A previously compiled Report pane must show what was just exported
+      // (the path may also be the locked-file fallback), not the old PDF
+      // next to a notice claiming the export happened.
+      report: get().report
+        ? { pdfPath: result.pdfPath, warnings: result.warnings, builtAt: Date.now() }
+        : null,
+    });
   },
 
   cancelExport() {
@@ -859,6 +881,10 @@ export const useStore = create<AppState>((set, get) => {
   async openMetadata() {
     const { projectDir } = get();
     if (!projectDir) return;
+    // Already open: a second ⚙ click must not reset metadataDirty or adopt
+    // a freshly pulled document.yaml as the baseline — that would disarm
+    // both the close guard and the form's conflict guard.
+    if (get().metadataOpen) return;
     // Flush pending section edits first — the editor unmounts while the
     // form is open, so nothing should be left waiting on an autosave timer.
     // A failed or conflicted save keeps the section visible instead of

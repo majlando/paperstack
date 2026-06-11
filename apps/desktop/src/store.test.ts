@@ -126,6 +126,26 @@ describe("metadata form", () => {
     expect(fake.files.get("/p/document.yaml")).toBe(pulled); // pull never overwritten
   });
 
+  it("a second ⚙ click while the form is open never disarms its guards", async () => {
+    await openProject();
+    await useStore.getState().openMetadata();
+    useStore.getState().setMetadataDirty(true);
+
+    // a git pull lands while the form is open …
+    const pulled = DOC_YAML.replace("Test Report", "Pulled Title");
+    fake.files.set("/p/document.yaml", pulled);
+
+    // … then the user clicks ⚙ again. Nothing visible changes, so it must
+    // not reset metadataDirty (close guard) or rebase onto the pulled file
+    // (conflict guard).
+    await useStore.getState().openMetadata();
+    expect(useStore.getState().metadataDirty).toBe(true);
+
+    const ok = await useStore.getState().saveMetadata({ title: "Stale Form Title" });
+    expect(ok).toBe(false);
+    expect(fake.files.get("/p/document.yaml")).toBe(pulled); // pull never overwritten
+  });
+
   it("saves normally when nothing changed underneath the form", async () => {
     await openProject();
     await useStore.getState().openMetadata();
@@ -360,6 +380,23 @@ describe("navigation during trouble", () => {
     expect(s.error).not.toBeNull();
   });
 
+  it("a reload (focus regain) never dismisses an unresolved save error", async () => {
+    await openProject();
+    fake.failWrites = (p) => p === A;
+    useStore.getState().setContent("precious");
+    expect(await useStore.getState().saveActive()).toBe(false);
+    expect(useStore.getState().error).not.toBeNull();
+    fake.failWrites = null;
+
+    // Alt-tab away and back triggers reloadProject; the banner explaining
+    // the failed save must survive while the edits are still unsaved.
+    await useStore.getState().reloadProject();
+    const s = useStore.getState();
+    expect(s.error).not.toBeNull();
+    expect(s.dirty).toBe(true);
+    expect(s.content).toBe("precious");
+  });
+
   it("reload never clobbers keystrokes typed while the reload runs", async () => {
     await openProject();
     const gate = fake.gateNextRead((p) => p === "/p/document.yaml");
@@ -417,6 +454,35 @@ describe("structure edits", () => {
     const before = writesTo("/p/document.yaml");
     await useStore.getState().moveSection("sections/a.md", "up"); // already first
     expect(writesTo("/p/document.yaml")).toBe(before);
+  });
+
+  it("a rename overlapping another structure edit loses neither (yaml chain)", async () => {
+    await openProject();
+    // The rename input commits on blur, and the click that causes the blur
+    // can fire "Move up" in the same instant. Hold the rename's yaml write
+    // open while the move runs — serialized they compose; racing, one edit
+    // silently vanishes (or yaml desyncs from the on-disk rename).
+    const gate = fake.gateNextWrite((p) => p === "/p/document.yaml");
+
+    const rename = useStore.getState().renameSection("sections/c.md", "03-results");
+    await gate.reached;
+    const move = useStore.getState().moveSection("sections/b.md", "up");
+    // Let the move run as far as the serialization allows while the rename's
+    // write is still open: chained, it parks; racing, it completes against
+    // the pre-rename yaml and the rename's write then clobbers it.
+    for (let i = 0; i < 3; i++) await new Promise((r) => setTimeout(r, 0));
+    gate.release();
+    await rename;
+    await move;
+
+    expect(useStore.getState().error).toBeNull();
+    expect(useStore.getState().project?.meta.sections.map((x) => x.file)).toEqual([
+      "sections/b.md",
+      "sections/a.md",
+      "sections/03-results.md",
+    ]);
+    expect(fake.files.has("/p/sections/03-results.md")).toBe(true);
+    expect(fake.files.has("/p/sections/c.md")).toBe(false);
   });
 });
 
