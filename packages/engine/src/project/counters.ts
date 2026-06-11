@@ -38,12 +38,30 @@ export function countTodos(markdown: string): number {
   return findTodoOffsets(markdown).length;
 }
 
+/**
+ * FNV-1a over the content with carriage returns stripped — EOL-insensitive so
+ * a CRLF-rewriting checkout doesn't read as "every section changed". Same
+ * algorithm as the diagram hashing in build/mermaid.ts; duplicated rather
+ * than imported so project/ stays independent of build/.
+ */
+export function hashContent(content: string): string {
+  const stripped = content.replace(/\r/g, "");
+  let h = 0x811c9dc5;
+  for (let i = 0; i < stripped.length; i++) {
+    h ^= stripped.charCodeAt(i);
+    h = Math.imul(h, 0x01000193) >>> 0;
+  }
+  return h.toString(16).padStart(8, "0");
+}
+
 export interface SectionCount {
   file: string;
   role: SectionRole;
   chars: number;
   normalsider: number;
   todos: number;
+  /** Content hash as last read/applied — drives the changed-on-disk indicators. */
+  hash: string;
 }
 
 export interface ProjectCounts {
@@ -86,6 +104,7 @@ export async function countProject(
       chars,
       normalsider: chars / CHARS_PER_NORMALSIDE,
       todos: countTodos(content),
+      hash: hashContent(content),
     });
   }
   return totals(sections, project.meta.body_cap_normalsider);
@@ -109,6 +128,7 @@ export function applySectionContent(
           chars,
           normalsider: chars / CHARS_PER_NORMALSIDE,
           todos: countTodos(content),
+          hash: hashContent(content),
         }
       : s,
   );

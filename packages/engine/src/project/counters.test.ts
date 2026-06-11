@@ -4,6 +4,7 @@ import {
   countAnslag,
   countTodos,
   findTodoOffsets,
+  hashContent,
   type ProjectCounts,
 } from "./counters.ts";
 
@@ -30,9 +31,9 @@ describe("countAnslag", () => {
 describe("applySectionContent", () => {
   const base: ProjectCounts = {
     sections: [
-      { file: "sections/01-a.md", role: "body", chars: 2400, normalsider: 1, todos: 0 },
-      { file: "sections/02-b.md", role: "body", chars: 4800, normalsider: 2, todos: 1 },
-      { file: "appendices/a.md", role: "appendix", chars: 100, normalsider: 100 / 2400, todos: 0 },
+      { file: "sections/01-a.md", role: "body", chars: 2400, normalsider: 1, todos: 0, hash: "0" },
+      { file: "sections/02-b.md", role: "body", chars: 4800, normalsider: 2, todos: 1, hash: "0" },
+      { file: "appendices/a.md", role: "appendix", chars: 100, normalsider: 100 / 2400, todos: 0, hash: "0" },
     ],
     bodyChars: 7200,
     bodyNormalsider: 3,
@@ -59,6 +60,21 @@ describe("applySectionContent", () => {
     const next = applySectionContent(base, "appendices/a.md", "x".repeat(50_000));
     expect(next.bodyChars).toBe(7200);
     expect(next.overCap).toBe(false);
+  });
+
+  it("tracks the content hash of applied edits", () => {
+    const next = applySectionContent(base, "sections/01-a.md", "new text");
+    expect(next.sections[0]?.hash).toBe(hashContent("new text"));
+    expect(next.sections[1]?.hash).toBe("0"); // untouched sections keep theirs
+  });
+});
+
+describe("hashContent", () => {
+  it("is stable, content-sensitive, and EOL-insensitive", () => {
+    expect(hashContent("abc")).toBe(hashContent("abc"));
+    expect(hashContent("abc")).not.toBe(hashContent("abd"));
+    // a CRLF-rewriting git checkout must not read as "section changed"
+    expect(hashContent("a\r\nb")).toBe(hashContent("a\nb"));
   });
 });
 
