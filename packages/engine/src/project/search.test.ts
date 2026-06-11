@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { searchContent } from "./search.ts";
+import { replaceContent, searchContent } from "./search.ts";
 
 describe("searchContent", () => {
   it("finds case-insensitive matches with line, offset, and column", () => {
@@ -32,5 +32,27 @@ describe("searchContent", () => {
 
   it("matches never span lines", () => {
     expect(searchContent("end\nstart", "end\nstart")).toEqual([]);
+  });
+});
+
+describe("replaceContent", () => {
+  it("replaces every case-insensitive occurrence and reports the count", () => {
+    expect(replaceContent("The Cache layer.\ncache again", "cache", "store")).toEqual({
+      text: "The store layer.\nstore again",
+      count: 2,
+    });
+  });
+
+  it("leaves the text untouched when nothing matches", () => {
+    const r = replaceContent("nothing here", "cache", "store");
+    expect(r).toEqual({ text: "nothing here", count: 0 });
+  });
+
+  it("handles a replacement containing the query without looping", () => {
+    expect(replaceContent("a a", "a", "aa")).toEqual({ text: "aa aa", count: 2 });
+  });
+
+  it("preserves CRLF line endings around replacements", () => {
+    expect(replaceContent("one\r\ntwo\r\n", "two", "2").text).toBe("one\r\n2\r\n");
   });
 });

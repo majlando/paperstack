@@ -39,3 +39,25 @@ export function searchContent(content: string, query: string): SearchMatch[] {
   }
   return matches;
 }
+
+/**
+ * Replaces every occurrence found by searchContent's rules (case-insensitive
+ * substring, never spanning lines) with `replacement`, written verbatim.
+ * Returns the new text and how many occurrences were replaced.
+ */
+export function replaceContent(
+  content: string,
+  query: string,
+  replacement: string,
+): { text: string; count: number } {
+  const occurrences = searchContent(content, query);
+  if (occurrences.length === 0) return { text: content, count: 0 };
+  let out = "";
+  let last = 0;
+  for (const m of occurrences) {
+    out += content.slice(last, m.offset) + replacement;
+    last = m.offset + query.length;
+  }
+  out += content.slice(last);
+  return { text: out, count: occurrences.length };
+}
