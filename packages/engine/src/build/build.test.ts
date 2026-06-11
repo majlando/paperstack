@@ -24,6 +24,11 @@ describe.skipIf(!hasBinaries)("buildReport on the demo fixture", () => {
     fixtureDir = (await mkdtemp(join(tmpdir(), "paperstack-build-test-"))).replaceAll("\\", "/");
     await cp(sourceFixtureDir, fixtureDir, { recursive: true });
 
+    // A local build may have vendored the then-current template into the
+    // fixture (git-ignored). Drop the copy so this test always exercises
+    // SEA_TEMPLATE as it stands now, like it does in CI.
+    await rm(join(fixtureDir, "paperstack-template.typ"), { force: true });
+
     // Ensure the fixture's mermaid block has a rendered SVG (in the app
     // this happens on save; the placeholder stands in for a real render).
     const section = await readFile(
@@ -64,5 +69,33 @@ describe.skipIf(!hasBinaries)("buildReport on the demo fixture", () => {
     // The fixture deliberately contains 2 TODOs.
     expect(result.warnings.some((w) => w.includes("2 [TODO]"))).toBe(true);
     expect(result.counts.bodyNormalsider).toBeLessThan(result.counts.cap);
+  }, 60_000);
+
+  it("builds the same project as a Danish report with localized labels", async () => {
+    const daDir = (await mkdtemp(join(tmpdir(), "paperstack-build-da-"))).replaceAll("\\", "/");
+    try {
+      // Reuse the prepared fixture copy (diagram render included).
+      await cp(fixtureDir, daDir, { recursive: true });
+      const yamlPath = join(daDir, "document.yaml");
+      const yaml = await readFile(yamlPath, "utf8");
+      await writeFile(yamlPath, yaml.replace(/^language: en$/m, "language: da"), "utf8");
+
+      const platform = new NodePlatform();
+      const result = await buildReport(platform, daDir, {
+        typst: typstPath,
+        pandoc: pandocPath,
+      });
+
+      expect(existsSync(result.pdfPath)).toBe(true);
+      expect(statSync(result.pdfPath).size).toBeGreaterThan(10_000);
+      // The cover length line is engine-localized; Typst localizes the rest
+      // (Indholdsfortegnelse, Figur) via text(lang:) from the same setting.
+      const main = await readFile(join(daDir, "output/.build/main.typ"), "utf8");
+      expect(main).toContain('language: "da"');
+      expect(main).toContain("normalsider");
+      expect(main).toContain("Anslag");
+    } finally {
+      await rm(daDir, { recursive: true, force: true });
+    }
   }, 60_000);
 });

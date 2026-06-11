@@ -60,6 +60,14 @@ export const SEA_TEMPLATE = `// Paperstack SEA report template (written by Paper
     radius: 3pt,
     it,
   )
+  // Booktabs-style tables (the M5 look decision): horizontal rules only —
+  // a sturdier rule above and below the table, a light rule under the header
+  // row (the hline the converter emits), no vertical lines, padded cells,
+  // bold header. Replaces Typst's full-grid default.
+  set table(stroke: none, inset: (x: 0.8em, y: 0.5em))
+  set table.hline(stroke: 0.5pt)
+  show table: it => block(stroke: (top: 0.8pt, bottom: 0.8pt), it)
+  show table.cell.where(y: 0): strong
 
   // ----- Cover page (unnumbered) -----
   if logo != none {
