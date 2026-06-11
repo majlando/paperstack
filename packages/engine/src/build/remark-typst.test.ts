@@ -332,6 +332,14 @@ describe("math", () => {
     expect(t("$xy + 2ab$")).toBe("$x y + 2 a b$");
   });
 
+  it("scripts and arguments take one digit, like TeX (what the KaTeX preview shows)", () => {
+    expect(t("$2^10 = 1024$")).toBe("$2^1 0 = 1024$"); // 2¹0, not 2¹⁰
+    expect(t("$2^{10} = 1024$")).toBe("$2^10 = 1024$"); // braced run stays a run
+    expect(t("$\\frac12$")).toBe("$(1)/(2)$");
+    expect(t("$\\sqrt25$")).toBe("$sqrt(2) 5$");
+    expect(t("$x_12$")).toBe("$x_1 2$");
+  });
+
   it("translates $$-fenced display math as a Typst block equation", () => {
     expect(t("$$\n\\frac{n+1}{2}\n$$")).toBe("$ (n + 1)/(2) $");
     expect(t("before\n\n$$\ne = mc^2\n$$\n\nafter")).toBe("before\n\n$ e = m c^2 $\n\nafter");

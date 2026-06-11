@@ -126,7 +126,7 @@ class Translator {
       } else if (c === "^" || c === "_") {
         this.pos++;
         this.skipWhitespace();
-        const arg = this.primary();
+        const arg = this.primary("single-token");
         base += `${c}${/^[A-Za-z0-9.']+$/.test(arg) ? arg : `(${arg})`}`;
       } else {
         return base;
@@ -134,7 +134,7 @@ class Translator {
     }
   }
 
-  private primary(): string {
+  private primary(mode: "atom" | "single-token" = "atom"): string {
     const c = this.peek();
     if (c === "\\") return this.command();
     if (c === "{") {
@@ -147,6 +147,13 @@ class Translator {
     if (c === "&") this.fail("alignment with \"&\" (matrices, aligned environments) is not supported yet");
     if (c === "^" || c === "_") this.fail(`a "${c}" has nothing to attach to`);
     if (/[0-9]/.test(c)) {
+      // In script/argument position TeX takes ONE token — a single digit
+      // unless braced. $2^10$ is 2¹0 (what the KaTeX preview shows), and
+      // \frac12 is ½; consuming the whole run would render 2¹⁰ in the PDF.
+      if (mode === "single-token") {
+        this.pos++;
+        return c;
+      }
       const m = /^[0-9]+(?:\.[0-9]+)?/.exec(this.src.slice(this.pos))!;
       this.pos += m[0].length;
       return m[0];
@@ -266,7 +273,7 @@ class Translator {
   private argument(command: string): string {
     this.skipWhitespace();
     if (this.pos >= this.src.length) this.fail(`\\${command} is missing its argument`);
-    return this.primary();
+    return this.primary("single-token");
   }
 
   /** A required `{…}` argument taken verbatim (for \text{…}). */
