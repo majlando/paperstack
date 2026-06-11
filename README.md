@@ -79,7 +79,7 @@ pnpm typecheck     # strict TypeScript check across the workspace
 pnpm --filter @paperstack/engine test:watch   # watch mode while working on the engine
 ```
 
-Run both before committing — CI (`.github/workflows/ci.yml`) runs exactly these on every push. CI has no binaries, so the PDF integration test only runs locally; populate `bin/` and run `pnpm test` yourself before pushing pipeline changes.
+Run both before committing — CI (`.github/workflows/ci.yml`) runs these plus `pnpm --filter @paperstack/desktop build` on every push. CI has no binaries, so the PDF integration test only runs locally; populate `bin/` and run `pnpm test` yourself before pushing pipeline changes.
 
 ### Build reports from the terminal (engine only, no app)
 

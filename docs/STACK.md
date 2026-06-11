@@ -10,7 +10,7 @@ Decided stack and the reasoning behind it. Optimized for a solo developer buildi
 | Language | TypeScript | Everywhere. Rust stays at config + official Tauri plugins (fs, dialog, shell) |
 | Build | Vite | Tauri default, instant HMR |
 | UI framework | React, **used thin** (see below) | Runner-up: Svelte 5 |
-| Components/styling | Tailwind + shadcn/ui | shadcn components are vendored source in-repo — owned code, not a dependency |
+| Components/styling | Tailwind + shadcn/ui | shadcn components get vendored as source in-repo when first needed (owned code, not a dependency); none vendored yet |
 | Editor | CodeMirror 6 | Vanilla TS class, hand-written React bridge (no wrapper packages) |
 | Markdown parsing (preview) | unified/remark | AST is reusable for a future Typst emitter |
 | Diagrams | Mermaid | Rendered live in preview; pre-rendered to SVG on save for export |

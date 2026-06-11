@@ -81,7 +81,7 @@ Goal: the full core loop — edit → save → **View Report** → **Export PDF*
 
 **Sidecars (the risk — done, and proven):**
 - [x] Bundle `typst` + `pandoc` as Tauri sidecars (`bundle.externalBin`, target-triple-named binaries; `fetch-binaries.ps1` places dev copies under `src-tauri/binaries/`, git-ignored)
-- [x] Shell-plugin capability scoped to exactly the two sidecars (no general process execution)
+- [x] Shell-plugin capability scoped to exactly the two sidecars (no general process execution) — since replaced by the stricter Rust `run_sidecar` command: no shell permissions in the capability at all, and a per-invocation argument allowlist in `lib.rs`
 - [x] `TauriPlatform.runBinary` via the shell plugin. Pandoc input travels by temp file, not stdin — the shell plugin cannot close a child's stdin, and pandoc reads stdin until EOF
 - [x] Engine preflight runs each binary with `--version` instead of checking paths — works identically for Node paths and sidecar names, and catches exists-but-broken binaries too
 - [x] Smoke test: `VITE_SMOKE_EXPORT=1` dev hook exports the demo fixture from inside the running app — verified, 98 KB PDF written by the sidecars
@@ -99,7 +99,7 @@ Goal: the full core loop — edit → save → **View Report** → **Export PDF*
 **Finish the workflow:**
 - [x] Status bar TODO counter click-to-jump: cycles through `[TODO` markers in the active section, selecting and scrolling to each (engine `findTodoOffsets` shares the counter's regex — one definition of "a TODO"); when the active section is clean it opens the first section that still has one
 - [x] Error surfacing polish: the banner headline stays human-readable; raw tool output (`PaperstackError.details`) is reachable behind a "Technical details" disclosure, never the headline
-- [x] Webview hardening: real CSP (strict in production, Vite-compatible in dev) and **empty static fs/asset scopes** — project folders are granted at runtime by the `allow_project_scope` command when the user opens them, so the webview can only touch folders the user chose. Verified end to end: open → build → View Report all work under the hardened config (the production CSP gets its real exercise in the M4 clean-machine test)
+- [x] Webview hardening: real CSP (strict in production, Vite-compatible in dev) and **empty static fs/asset scopes** — project folders are granted at runtime by the `allow_existing_project_scope` / `allow_new_project_scope` commands when the user opens them, so the webview can only touch folders the user chose. Verified end to end: open → build → View Report all work under the hardened config (the production CSP gets its real exercise in the M4 clean-machine test)
 
 ## Milestone 4 — Helpers, polish, packaging *(M)*
 
@@ -153,6 +153,16 @@ Goal: nothing in the core loop can lose writing or silently produce a wrong repo
 - [x] Export warns when body sections come after an appendix (shared heading counter → duplicate numbers; verified against real Typst) and when a section contains Git merge conflict markers (they would land in the hand-in PDF)
 - [x] fetch-binaries version probe anchored — pin `0.13.1` no longer matches a stray `0.13.10`
 
+**Third review round (2026-06-11, full-project fan-out):** three parallel reviews over engine, app, and infra confirmed the architecture rules hold and found one high-severity export bug plus a set of hardening gaps; everything actionable was fixed the same day.
+- [x] Code listings survive export untouched: `rewriteImagePaths` skips Typst raw segments — an `image("...")` inside a code sample was rewritten (or, with `../` in it, failed the whole export); Mermaid extraction is now fence-aware too, so a ```` ```mermaid ```` example *shown* inside another code block is no longer extracted
+- [x] YAML re-emission no longer rewraps hand-written >80-column lines (`lineWidth: 0` everywhere) — even a no-op form save used to churn other people's lines in the shared document.yaml
+- [x] `reloadProject` re-checks `dirty` before applying the disk copy (keystrokes typed mid-reload were silently reverted); the close guard's "close again to discard" escape disarms after any successful save instead of staying armed for the whole session
+- [x] Atomic writes in both platforms (sibling temp file + rename) — a crash mid-write can no longer truncate document.yaml or a section file
+- [x] `document.yaml` read–edit–writes serialized in the store — two rapid sidebar actions could both read the same base text and silently drop one edit
+- [x] Desktop store test harness (see the backlog item below) — every race above is pinned by a test that was shown to fail without its fix
+- [x] New-project scope guard pulled forward from M6: drive roots and the user-profile/Desktop/Documents/Downloads folders are rejected as report destinations
+- [x] Bare CRLF conflict-marker lines detected; CI hygiene (`permissions`, `concurrency`, docs matched to what CI actually runs)
+
 **The gate:**
 - [ ] Run the clean-machine test (docs/CLEAN-MACHINE-TEST.md) in Windows Sandbox, then tag `v0.1.0` per the M4 items above
 
@@ -205,7 +215,7 @@ Goal: a stranger on Windows, macOS, or Linux installs a release build and trusts
 - [ ] Auto-update: tauri-plugin-updater against GitHub releases (the updater's own signing keys are free; OS code signing stays deferred — document the SmartScreen/Gatekeeper first-run path in the README instead)
 - [ ] CLI packaging: `paperstack build <dir>` as an installable artifact — the engine + NodePlatform + `scripts/build-report.ts` already *are* the CLI; this is packaging, not a feature. Enables report builds in a group repo's CI (see M7)
 - [ ] CI: add a `tauri build` job so packaging breakage is caught on push, not at release time (engine tests already run on every push)
-- [ ] Webview privilege hardening (before strangers run release builds): `allow_project_scope` currently grants recursive read/write fs + asset scope to *any* path the webview asks for — reject filesystem roots and the home directory itself, require the directory to exist; and narrow the sidecar permissions from `args: true` toward an argument allowlist. Today one successful script injection converts to whole-disk access plus arbitrary pandoc/typst invocation; the CSP is the only gate
+- [ ] Webview privilege hardening (before strangers run release builds): the sidecar argument allowlist is done (`run_sidecar` in `lib.rs`; no shell permissions in the capability) and `allow_new_project_scope` now rejects drive roots and the user-profile/Desktop/Documents/Downloads folders (2026-06-11) — what's left is revoking grants when a project is closed (`ProjectRoots` only grows today)
 - [ ] Repo as product: README with screenshots and an install section, LICENSE decision, CONTRIBUTING.md, issue templates
 - [ ] The clean-machine walkthrough (docs/CLEAN-MACHINE-TEST.md) runs per platform before each release
 
@@ -233,7 +243,7 @@ Known-good improvements that don't gate any milestone — pick up when touching 
 
 - [x] Scripted smoke test for the app shell: `pnpm smoke` scaffolds a scratch project, launches the real app (`tauri dev` + `VITE_SMOKE_SCRIPT`), drives the store through open → edit → save → TODO confirm → export, and asserts the result the app writes to `output/smoke-result.json`. Local only (needs sidecars, port 1420, and a desktop session)
 - [ ] `vite.config.ts`: replace the `@ts-expect-error` on `process` with `@types/node` in devDependencies
-- [ ] Store unit tests: every real data-loss bug found in review (both rounds) lived in `store.ts`, not the engine — vitest for `apps/desktop` with a mocked platform (the Tauri imports need stubbing) would have caught them before review did. The save path especially deserves a delayed-write fake-platform test
+- [x] Store unit tests: every real data-loss bug found in review (both rounds) lived in `store.ts`, not the engine — vitest for `apps/desktop` with a mocked platform (the Tauri imports need stubbing) would have caught them before review did. The save path especially deserves a delayed-write fake-platform test (2026-06-11: `store.test.ts` + `GatedPlatform`, 17 tests pinning every reviewed race; runs in CI via `pnpm -r test`)
 - [x] Ctrl+S bound to `saveActive` — autosave makes it redundant, but writers will press it; the binding is pure reassurance (2026-06-11)
 - [ ] "Show in folder" button on the export notice (`tauri-plugin-opener`) instead of only printing the relative path
 - [ ] Sidebar inline rename/add: commit on blur instead of silently discarding (Enter is the only commit path today, and nothing says so)
