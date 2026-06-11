@@ -16,7 +16,19 @@ describe("createProject", () => {
     expect(project.meta.title).toBe('Smart "Home" \\ Hub');
     expect(project.meta.language).toBe("en");
     expect(project.meta.body_cap_normalsider).toBe(40);
-    expect(project.meta.sections.map((s) => s.role)).toEqual(["body", "back-matter"]);
+    expect(project.meta.sections.map((s) => s.role)).toEqual(["body"]);
+  });
+
+  it("scaffolds an inert references.bib that documents the citation workflow", async () => {
+    const platform = new FakePlatform();
+    await createProject(platform, "/proj", { title: "T" });
+
+    const bib = platform.files.get("/proj/references.bib")!;
+    expect(bib).toContain("[@key]");
+    // Commented examples only — no real entries, so no empty References
+    // section is generated and [@...] stays prose until the first entry.
+    const { parseBibliography } = await import("../build/bibliography.ts");
+    expect(parseBibliography(bib)).toEqual([]);
   });
 
   it("writes a project .gitignore covering build output, with trailing newlines", async () => {
@@ -72,7 +84,7 @@ describe("createProject", () => {
     await createProject(platform, "/proj", { title: "T", language: "da" });
 
     expect(platform.files.get("/proj/sections/01-introduction.md")).toContain("# Indledning");
-    expect(platform.files.get("/proj/sections/02-references.md")).toContain("# Referencer");
+    expect(platform.files.get("/proj/references.bib")).toContain("Referencer til rapporten");
     expect(platform.files.get("/proj/document.yaml")).toContain("language: da");
   });
 

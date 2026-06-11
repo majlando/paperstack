@@ -81,8 +81,12 @@ export async function buildReport(
   await platform.mkdir(`${buildDir}/converted`);
   // A references.bib at the project root switches citations on: `[@key]`
   // spans become Typst #cite calls and the bibliography section is generated.
+  // Only real entries count — the scaffolded file ships commented-out
+  // examples, and an empty bibliography must not render an empty References
+  // heading in every new report.
   const bibText = await platform
     .readTextFile(`${projectDir}/references.bib`)
+    .then((t) => (bibliographyKeys(t).size > 0 ? t : null))
     .catch(() => null);
   // The in-house remark→Typst emitter is the default since the M5 cutover
   // (byte-identical with pandoc on the demo fixture and the migrated real

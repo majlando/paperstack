@@ -43,13 +43,47 @@ export async function createProject(
     `language: ${lang}\n` +
     `body_cap_normalsider: 40\n` +
     `sections:\n` +
-    `  - { file: sections/01-introduction.md, role: body }\n` +
-    `  - { file: sections/02-references.md, role: back-matter }\n`;
+    `  - { file: sections/01-introduction.md, role: body }\n`;
 
   const introduction = da
     ? `# Indledning\n\n[TODO: Beskriv projektet.]\n`
     : `# Introduction\n\n[TODO: Introduce the project.]\n`;
-  const references = da ? `# Referencer\n` : `# References\n`;
+  // The References section is generated from references.bib at export —
+  // the scaffolded file documents the workflow with commented-out examples
+  // and stays inert (no empty References heading) until a real entry exists.
+  const references = da
+    ? `% Referencer til rapporten (BibTeX). Citér i en sektion med [@nøgle],\n` +
+      `% fx [@knuth84] eller [@knuth84, s. 12]. Referencelisten genereres\n` +
+      `% automatisk i PDF'en, før eventuelle bilag. Indtil en rigtig post\n` +
+      `% findes herunder, forbliver [@...] almindelig tekst.\n` +
+      `%\n` +
+      `% @book{knuth84,\n` +
+      `%   title     = {The {TeX}book},\n` +
+      `%   author    = {Donald E. Knuth},\n` +
+      `%   year      = {1984},\n` +
+      `%   publisher = {Addison-Wesley}\n` +
+      `% }\n` +
+      `% @online{typst-docs,\n` +
+      `%   title   = {Typst Documentation},\n` +
+      `%   url     = {https://typst.app/docs/},\n` +
+      `%   urldate = {2026-06-11}\n` +
+      `% }\n`
+    : `% References for this report (BibTeX). Cite in any section with [@key],\n` +
+      `% e.g. [@knuth84] or [@knuth84, p. 12]. The reference list is generated\n` +
+      `% in the PDF automatically, before any appendix. Until a real entry\n` +
+      `% exists below, [@...] stays plain text.\n` +
+      `%\n` +
+      `% @book{knuth84,\n` +
+      `%   title     = {The {TeX}book},\n` +
+      `%   author    = {Donald E. Knuth},\n` +
+      `%   year      = {1984},\n` +
+      `%   publisher = {Addison-Wesley}\n` +
+      `% }\n` +
+      `% @online{typst-docs,\n` +
+      `%   title   = {Typst Documentation},\n` +
+      `%   url     = {https://typst.app/docs/},\n` +
+      `%   urldate = {2026-06-11}\n` +
+      `% }\n`;
 
   await platform.mkdir(`${dir}/sections`);
   await platform.mkdir(`${dir}/figures`);
@@ -59,7 +93,7 @@ export async function createProject(
   // The chosen folder may not be empty (e.g. an existing group repo):
   // never overwrite files that are already there.
   await writeIfAbsent(platform, `${dir}/sections/01-introduction.md`, introduction);
-  await writeIfAbsent(platform, `${dir}/sections/02-references.md`, references);
+  await writeIfAbsent(platform, `${dir}/references.bib`, references);
   await ensureGitignore(platform, dir);
   // Mixed Windows/macOS groups hit CRLF diff churn in week one without this.
   await writeIfAbsent(platform, `${dir}/.gitattributes`, `* text=auto\n`);

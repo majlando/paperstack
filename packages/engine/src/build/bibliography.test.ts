@@ -47,6 +47,14 @@ describe("parseBibliography", () => {
     expect(nested.title).toBe("Braces keep their Content");
   });
 
+  it("ignores %-commented example entries (the scaffolded references.bib)", () => {
+    const scaffold = "% how to cite:\n% @book{example,\n%   title = {Example}\n% }\n";
+    expect(parseBibliography(scaffold)).toEqual([]);
+    expect(parseBibliography(`${scaffold}@book{real, year = 2026}\n`).map((e) => e.key)).toEqual([
+      "real",
+    ]);
+  });
+
   it("tolerates malformed input without throwing", () => {
     expect(parseBibliography("@book{broken")).toEqual([]);
     expect(parseBibliography("just prose, no entries")).toEqual([]);

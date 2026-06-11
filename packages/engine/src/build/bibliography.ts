@@ -21,12 +21,18 @@ export interface BibEntry {
  * errors with line numbers when it compiles the bibliography.
  */
 export function parseBibliography(text: string): BibEntry[] {
+  // %-prefixed lines are BibTeX comments — the scaffolded references.bib
+  // ships example entries commented out, and they must not count as real.
+  const source = text
+    .split(/\r?\n/)
+    .filter((line) => !/^\s*%/.test(line))
+    .join("\n");
   const entries: BibEntry[] = [];
   const opener = /@([A-Za-z]+)\s*\{\s*([^,\s{}]+)\s*,/g;
-  for (const m of text.matchAll(opener)) {
+  for (const m of source.matchAll(opener)) {
     const type = m[1]!.toLowerCase();
     if (type === "comment" || type === "preamble" || type === "string") continue;
-    const body = balancedBody(text, m.index + m[0].indexOf("{"));
+    const body = balancedBody(source, m.index + m[0].indexOf("{"));
     if (body === null) continue;
     const entry: BibEntry = { key: m[2]!, type };
     entry.title = field(body, "title");
