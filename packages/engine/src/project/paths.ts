@@ -36,6 +36,10 @@ export function slugify(name: string, fallback = "section"): string {
   const danish: Record<string, string> = { æ: "ae", ø: "oe", å: "aa" };
   const slug = name
     .trim()
+    // macOS hands over NFD filenames (å as a + combining ring); compose
+    // first so the Danish map sees them — the same file dragged in on
+    // Windows and macOS must produce the same slug in the shared repo.
+    .normalize("NFC")
     .toLowerCase()
     .replace(/[æøå]/g, (c) => danish[c]!)
     .normalize("NFKD")
