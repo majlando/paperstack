@@ -157,13 +157,28 @@ fn validate_typst_args(
     if args == ["--version"] {
         return Ok(());
     }
-    if args.len() == 5 && args[0] == "compile" && args[1] == "--root" {
-        let root = canonical_allowed_dir(&args[2], roots)?;
-        require_inside(&args[3], &root, true)?;
-        require_inside(&args[4], &root, false)?;
-        return Ok(());
+    // Exactly the builder's invocation: compile --root <project>
+    // --ignore-system-fonts [--font-path <project>/fonts] <input> <output>
+    if args.len() < 6
+        || args[0] != "compile"
+        || args[1] != "--root"
+        || args[3] != "--ignore-system-fonts"
+    {
+        return Err("Unsupported Typst invocation.".into());
     }
-    Err("Unsupported Typst invocation.".into())
+    let root = canonical_allowed_dir(&args[2], roots)?;
+    let rest = match args.len() {
+        6 => &args[4..],
+        8 if args[4] == "--font-path" => {
+            // a fonts/ folder committed into the project — must exist there
+            require_inside(&args[5], &root, true)?;
+            &args[6..]
+        }
+        _ => return Err("Unsupported Typst invocation.".into()),
+    };
+    require_inside(&rest[0], &root, true)?;
+    require_inside(&rest[1], &root, false)?;
+    Ok(())
 }
 
 fn validate_pandoc_args(
