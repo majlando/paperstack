@@ -32,6 +32,18 @@ export class NodePlatform implements Platform {
     }
   }
 
+  async writeBinaryFile(path: string, bytes: Uint8Array): Promise<void> {
+    // Same crash-safe temp-then-rename as writeTextFile.
+    const tmp = `${path}.paperstack-tmp`;
+    await writeFile(tmp, bytes);
+    try {
+      await rename(tmp, path);
+    } catch (e) {
+      await rm(tmp, { force: true }).catch(() => {});
+      throw e;
+    }
+  }
+
   async fileExists(path: string): Promise<boolean> {
     try {
       await access(path);

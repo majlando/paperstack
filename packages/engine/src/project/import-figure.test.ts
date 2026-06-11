@@ -1,6 +1,11 @@
 import { describe, expect, it } from "vitest";
 import { FakePlatform } from "../platform/fake-platform.ts";
-import { figureMarkdown, importFigure, suggestedCaption } from "./import-figure.ts";
+import {
+  figureMarkdown,
+  importFigure,
+  importFigureBytes,
+  suggestedCaption,
+} from "./import-figure.ts";
 
 const PROJECT = "/proj";
 
@@ -53,6 +58,23 @@ describe("importFigure", () => {
     const platform = platformWith({ "/pics/ø.png": "img" });
     expect(await importFigure(platform, PROJECT, "/pics/ø.png")).toBe(
       "figures/oe.png",
+    );
+  });
+});
+
+describe("importFigureBytes (pasted images)", () => {
+  it("writes the bytes under the same naming and collision rules", async () => {
+    const platform = platformWith({ [`${PROJECT}/figures/image.png`]: "committed" });
+    const dest = await importFigureBytes(platform, PROJECT, "image.png", new Uint8Array(3));
+    expect(dest).toBe("figures/image-2.png");
+    expect(platform.files.has(`${PROJECT}/figures/image-2.png`)).toBe(true);
+    expect(platform.files.get(`${PROJECT}/figures/image.png`)).toBe("committed");
+  });
+
+  it("defaults to .png when the clipboard offers no extension", async () => {
+    const platform = platformWith({});
+    expect(await importFigureBytes(platform, PROJECT, "pasted", new Uint8Array(1))).toBe(
+      "figures/pasted.png",
     );
   });
 });

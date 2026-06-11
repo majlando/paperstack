@@ -7,6 +7,8 @@
 export interface Platform {
   readTextFile(path: string): Promise<string>;
   writeTextFile(path: string, content: string): Promise<void>;
+  /** Write raw bytes (used for importing pasted images). Overwrites the target. */
+  writeBinaryFile(path: string, bytes: Uint8Array): Promise<void>;
   /** True when a file exists at the path. For directories use `dirExists`. */
   fileExists(path: string): Promise<boolean>;
   /** True when the path exists and is a directory. */

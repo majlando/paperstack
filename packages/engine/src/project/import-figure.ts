@@ -16,9 +16,36 @@ export async function importFigure(
   projectDir: string,
   sourcePath: string,
 ): Promise<string> {
-  const sourceName = baseOf(normalizeSlashes(sourcePath));
+  const dest = await figureDestination(platform, projectDir, baseOf(normalizeSlashes(sourcePath)));
+  await platform.copyFile(sourcePath, `${projectDir}/${dest}`);
+  return dest;
+}
+
+/**
+ * Same import for in-memory image data — e.g. a screenshot pasted from the
+ * clipboard, which has no source file to copy. `suggestedName` is whatever
+ * the clipboard offered (often just "image.png"); naming and collision
+ * handling follow the same rules as importFigure.
+ */
+export async function importFigureBytes(
+  platform: Platform,
+  projectDir: string,
+  suggestedName: string,
+  bytes: Uint8Array,
+): Promise<string> {
+  const dest = await figureDestination(platform, projectDir, baseOf(normalizeSlashes(suggestedName)));
+  await platform.writeBinaryFile(`${projectDir}/${dest}`, bytes);
+  return dest;
+}
+
+/** Slugified, collision-safe destination inside the project's images folder. */
+async function figureDestination(
+  platform: Platform,
+  projectDir: string,
+  sourceName: string,
+): Promise<string> {
   const stem = slugify(stemOf(sourceName), "figure");
-  const ext = extOf(sourceName).toLowerCase();
+  const ext = extOf(sourceName).toLowerCase() || ".png";
 
   // Follow the project's own convention for where images live.
   let dir: string | undefined;
@@ -37,7 +64,6 @@ export async function importFigure(
   for (let n = 2; await platform.fileExists(`${projectDir}/${dest}`); n++) {
     dest = `${dir}/${stem}-${n}${ext}`;
   }
-  await platform.copyFile(sourcePath, `${projectDir}/${dest}`);
   return dest;
 }
 

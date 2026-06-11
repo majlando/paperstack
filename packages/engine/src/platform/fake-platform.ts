@@ -14,6 +14,11 @@ export class FakePlatform implements Platform {
     this.files.set(path, content);
   }
 
+  /** Binary content is stored as a marker string — tests check presence, not bytes. */
+  async writeBinaryFile(path: string, bytes: Uint8Array): Promise<void> {
+    this.files.set(path, `[binary ${bytes.length} bytes]`);
+  }
+
   async fileExists(path: string): Promise<boolean> {
     return this.files.has(path);
   }
