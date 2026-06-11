@@ -338,9 +338,8 @@ export const useStore = create<AppState>((set, get) => {
       }
       const result = await buildReport(platform, projectDir, {
         typst: SIDECARS.typst,
-        pandoc: SIDECARS.pandoc,
-        // After one successful build the binaries are known-good; skip the
-        // startup probe on recompiles (it costs two process spawns).
+        // After one successful build the binary is known-good; skip the
+        // startup probe on recompiles (it costs a process spawn).
         skipPreflight: binariesVerified,
       });
       binariesVerified = true;

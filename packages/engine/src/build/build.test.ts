@@ -13,11 +13,11 @@ const sourceFixtureDir = join(root, "fixtures/demo-report").replaceAll("\\", "/"
 let fixtureDir = sourceFixtureDir;
 const exe = process.platform === "win32" ? ".exe" : "";
 const typstPath = join(root, "bin", `typst${exe}`);
-const pandocPath = join(root, "bin", `pandoc${exe}`);
 
-// Integration test: needs the dev binaries (pnpm fetch-binaries). Skipped
-// where they are absent — CI fetches them, so this runs on every push.
-const hasBinaries = existsSync(typstPath) && existsSync(pandocPath);
+// Integration test: needs the dev typst (pnpm fetch-binaries) — conversion
+// is in-process since the M5 cutover. Skipped where the binary is absent;
+// CI fetches it, so this runs on every push.
+const hasBinaries = existsSync(typstPath);
 
 describe.skipIf(!hasBinaries)("buildReport on the demo fixture", () => {
   beforeAll(async () => {
@@ -59,10 +59,7 @@ describe.skipIf(!hasBinaries)("buildReport on the demo fixture", () => {
 
   it("produces a PDF and sensible warnings", async () => {
     const platform = new NodePlatform();
-    const result = await buildReport(platform, fixtureDir, {
-      typst: typstPath,
-      pandoc: pandocPath,
-    });
+    const result = await buildReport(platform, fixtureDir, { typst: typstPath });
 
     expect(existsSync(result.pdfPath)).toBe(true);
     expect(statSync(result.pdfPath).size).toBeGreaterThan(10_000);
@@ -81,10 +78,7 @@ describe.skipIf(!hasBinaries)("buildReport on the demo fixture", () => {
       await writeFile(yamlPath, yaml.replace(/^language: en$/m, "language: da"), "utf8");
 
       const platform = new NodePlatform();
-      const result = await buildReport(platform, daDir, {
-        typst: typstPath,
-        pandoc: pandocPath,
-      });
+      const result = await buildReport(platform, daDir, { typst: typstPath });
 
       expect(existsSync(result.pdfPath)).toBe(true);
       expect(statSync(result.pdfPath).size).toBeGreaterThan(10_000);

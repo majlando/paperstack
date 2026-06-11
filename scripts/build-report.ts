@@ -2,13 +2,13 @@
  * Dev runner for the report engine: builds a Paperstack project folder to PDF.
  * Usage: pnpm build:demo            (builds fixtures/demo-report)
  *        pnpm tsx scripts/build-report.ts <project-dir>
- * Requires bin/typst + bin/pandoc (pnpm fetch-binaries).
- * Set PAPERSTACK_CONVERTER=remark (or pass --converter=remark) to build with
- * the in-house remark→Typst emitter instead of pandoc (Milestone 5; pandoc
- * stays the default).
+ * Requires bin/typst (pnpm fetch-binaries).
+ * The in-house remark→Typst emitter is the default converter (M5 cutover).
+ * Set PAPERSTACK_CONVERTER=pandoc (or pass --converter=pandoc) to build with
+ * the pandoc fallback instead — needs bin/pandoc.
  */
 import { resolve, join } from "node:path";
-import { buildReport, PaperstackError, RemarkConverter } from "@paperstack/engine";
+import { buildReport, PandocConverter, PaperstackError } from "@paperstack/engine";
 import { NodePlatform } from "@paperstack/engine/node";
 
 const args = process.argv.slice(2).filter((a) => !a.startsWith("--"));
@@ -16,15 +16,25 @@ const flags = process.argv.slice(2).filter((a) => a.startsWith("--"));
 const projectDir = resolve(args[0] ?? "fixtures/demo-report").replaceAll("\\", "/");
 const exe = process.platform === "win32" ? ".exe" : "";
 const binDir = resolve("bin");
-const useRemark =
-  process.env.PAPERSTACK_CONVERTER === "remark" || flags.includes("--converter=remark");
-if (useRemark) console.log("Converter: remark emitter");
+const usePandoc =
+  process.env.PAPERSTACK_CONVERTER === "pandoc" || flags.includes("--converter=pandoc");
+if (usePandoc) console.log("Converter: pandoc (fallback)");
 
+const platform = new NodePlatform();
 try {
-  const result = await buildReport(new NodePlatform(), projectDir, {
+  const result = await buildReport(platform, projectDir, {
     typst: join(binDir, `typst${exe}`),
-    pandoc: join(binDir, `pandoc${exe}`),
-    ...(useRemark ? { converter: new RemarkConverter() } : {}),
+    ...(usePandoc
+      ? {
+          // The builder creates output/.build before converting — pandoc's
+          // temp input file lives there, same as before the cutover.
+          converter: new PandocConverter(
+            platform,
+            join(binDir, `pandoc${exe}`),
+            `${projectDir}/output/.build`,
+          ),
+        }
+      : {}),
   });
 
   console.log("\nSection lengths:");

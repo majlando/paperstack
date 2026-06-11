@@ -51,7 +51,7 @@ The app automates the workflow; it never owns your document. Everything stays po
 
 ## Tech
 
-Tauri 2 · TypeScript · React + Vite · CodeMirror 6 · Mermaid · Pandoc → Typst (bundled, no system dependencies). Details and rationale in [docs/STACK.md](docs/STACK.md).
+Tauri 2 · TypeScript · React + Vite · CodeMirror 6 · Mermaid · own Markdown→Typst emitter · Typst (bundled, no system dependencies). Details and rationale in [docs/STACK.md](docs/STACK.md).
 
 ## Development
 

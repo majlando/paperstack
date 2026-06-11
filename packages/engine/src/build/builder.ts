@@ -3,7 +3,8 @@ import { PaperstackError } from "../errors.ts";
 import { loadProject } from "../project/load-project.ts";
 import { countProject, type ProjectCounts } from "../project/counters.ts";
 import { extractMermaidBlocks, sweepStaleRenders } from "./mermaid.ts";
-import { PandocConverter, type Converter } from "./converter.ts";
+import type { Converter } from "./converter.ts";
+import { RemarkConverter } from "./remark-typst.ts";
 import { SEA_TEMPLATE } from "./template.ts";
 import {
   buildLengthLine,
@@ -14,10 +15,9 @@ import {
 export interface BuildOptions {
   /** Binary identifier for Platform.runBinary: a path in Node, a sidecar name in the app. */
   typst: string;
-  pandoc: string;
   /** Skip the binary startup probe — for callers that already built successfully this session. */
   skipPreflight?: boolean;
-  /** Override the converter (tests, future remark emitter). */
+  /** Override the converter (tests, the pandoc fallback in scripts/build-report.ts). */
   converter?: Converter;
 }
 
@@ -32,23 +32,19 @@ export async function buildReport(
   projectDir: string,
   options: BuildOptions,
 ): Promise<BuildResult> {
-  // Preflight by actually running each binary: an existence check can't work
+  // Preflight by actually running the binary: an existence check can't work
   // uniformly (sidecars are names, not paths) and a binary that exists but
-  // can't start would fail later with a worse message anyway.
-  for (const [name, binary] of options.skipPreflight
-    ? []
-    : ([
-        ["PDF engine (typst)", options.typst],
-        ["converter (pandoc)", options.pandoc],
-      ] as const)) {
+  // can't start would fail later with a worse message anyway. Only typst is
+  // probed — conversion is an in-process function since the M5 cutover.
+  if (!options.skipPreflight) {
     const probe = await platform
-      .runBinary(binary, ["--version"])
+      .runBinary(options.typst, ["--version"])
       .catch((e) => ({ exitCode: -1, stdout: "", stderr: String(e) }));
     if (probe.exitCode !== 0) {
       throw new PaperstackError(
         "dependency-missing",
-        `The ${name} could not be started. Reinstall Paperstack — or, in development, run pnpm fetch-binaries.`,
-        `probe failed for ${binary}: ${probe.stderr}`,
+        "The PDF engine (typst) could not be started. Reinstall Paperstack — or, in development, run pnpm fetch-binaries.",
+        `probe failed for ${options.typst}: ${probe.stderr}`,
       );
     }
   }
@@ -82,8 +78,10 @@ export async function buildReport(
 
   const buildDir = `${projectDir}/output/.build`;
   await platform.mkdir(`${buildDir}/converted`);
-  const converter =
-    options.converter ?? new PandocConverter(platform, options.pandoc, buildDir);
+  // The in-house remark→Typst emitter is the default since the M5 cutover
+  // (byte-identical with pandoc on the demo fixture and the migrated real
+  // report — fixtures/golden-typst/ and scripts/converter-parity.ts).
+  const converter = options.converter ?? new RemarkConverter();
 
   const converted: ConvertedSection[] = [];
   const referencedRenders = new Set<string>();

@@ -4,6 +4,14 @@ Status as of 2026-06-11, measured against pandoc 3.6.3
 (`-f gfm+implicit_figures+attributes -t typst --wrap=none` + the image-path
 rewrite — exactly what `PandocConverter` runs).
 
+**The emitter is the default converter everywhere** (M5 cutover, 2026-06-11):
+byte-identical with pandoc on every section of the demo fixture *and* all 23
+sections of the migrated real report (`pnpm tsx scripts/converter-parity.ts
+<project-dir>` re-runs that comparison on any local project). Pandoc remains
+available as the fallback via `--converter=pandoc` / `PAPERSTACK_CONVERTER=pandoc`
+in `scripts/build-report.ts`, and the committed goldens still pin pandoc's
+output so upgrades stay visible.
+
 ## What matches
 
 **Byte-identical output on every section of `fixtures/demo-report`** — the
@@ -36,9 +44,10 @@ resolution identical to `rewriteImagePaths`.
 - **`1)` paren-delimited ordered lists**: mdast does not record the
   delimiter, so these render as plain `+` items; pandoc preserves
   `numbering: "1)"`.
-- **Formatting inside image alt text**: mdast stores alt as plain text, so
-  `![*Emph* cap](x.png)` loses the emphasis in the caption (pandoc keeps it).
-  Plain-text captions — what Insert Figure writes — are identical.
+- ~~**Formatting inside image alt text**~~ fixed 2026-06-11: the real report
+  uses code spans in figure captions, so this was not rare after all. The raw
+  description is recovered from the source via the node's position and
+  re-parsed as inlines — captions now render their markup exactly like pandoc.
 - **Paragraph-leading `-`/`+`**: pandoc only escapes leading `=` and `/`;
   the emitter also escapes `-` and `+` (only reachable via markdown-escaped
   literals; strictly safer in Typst).
@@ -52,19 +61,18 @@ resolution identical to `rewriteImagePaths`.
 - Remote image URLs are mangled by project-path resolution on both paths
   (Typst cannot load remote images anyway).
 
-## Still missing for the real-report cutover
+## Cutover record (2026-06-11)
 
-- **Goldens for the migrated real report**: `report/` is git-ignored, so the
-  committed goldens only cover the demo fixture. Before switching the
-  default converter, run both converters over the real report and diff
-  (extend `scripts/update-golden-typst.ts` locally or run it on a copy).
-- **Math, citations, booktabs tables** are the next M5 tasks and land *in*
-  the emitter. Note `$x$` is currently plain text on both paths (gfm has no
-  math), so there is no parity gap today — and the booktabs table style will
-  deliberately break golden parity for tables when it lands.
+- **Real-report parity verified**: `scripts/converter-parity.ts` diffs both
+  converters over any local project. The migrated real report diverged in
+  exactly one place (code spans in figure captions — fixed, see above); all
+  23 sections are now byte-identical, and the default converter is the
+  emitter everywhere (builder, app, CLI).
+- **Booktabs tables** landed in the *template*, not the emitter, so golden
+  parity for tables is intact.
+- **Math and citations** are the next M5 tasks and land *in* the emitter.
+  `$x$` is currently plain text (gfm has no math) — adding it is a feature,
+  not a parity break, since the pandoc path never supported it either.
 - Non-GFM constructs pandoc supports but remark-gfm has no syntax for
-  (definition lists, superscript, …) are out of scope: authors cannot write
+  (definition lists, superscript, …) stay out of scope: authors cannot write
   them in Paperstack's GFM anyway.
-- Pandoc stays the default converter everywhere. The emitter is opt-in via
-  `PAPERSTACK_CONVERTER=remark` (or `--converter=remark`) in
-  `scripts/build-report.ts`; the app does not use it yet.

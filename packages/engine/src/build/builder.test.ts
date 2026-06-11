@@ -36,7 +36,7 @@ const projectFiles = () =>
   ]);
 
 describe("buildReport preflight", () => {
-  it("reports missing typst/pandoc binaries in plain language", async () => {
+  it("reports a missing typst binary in plain language", async () => {
     const platform = new FakePlatform(
       new Map([
         ["/proj/document.yaml", "title: T\nsections:\n  - { file: a.md, role: body }\n"],
@@ -45,7 +45,6 @@ describe("buildReport preflight", () => {
     );
     const error = await buildReport(platform, "/proj", {
       typst: "/bin/typst.exe",
-      pandoc: "/bin/pandoc.exe",
     }).catch((e) => e);
 
     expect(error).toBeInstanceOf(PaperstackError);
@@ -63,7 +62,6 @@ describe("buildReport preflight", () => {
     );
     const error = await buildReport(platform, "/proj", {
       typst: "/bin/typst.exe",
-      pandoc: "/bin/pandoc.exe",
       skipPreflight: true,
     }).catch((e) => e);
 
@@ -79,7 +77,6 @@ describe("buildReport orchestration (stub converter, fake compile)", () => {
     const platform = new RunnablePlatform(projectFiles());
     const result = await buildReport(platform, "/proj", {
       typst: "typst",
-      pandoc: "pandoc",
       converter: stubConverter,
     });
 
@@ -100,7 +97,6 @@ describe("buildReport orchestration (stub converter, fake compile)", () => {
     const platform = new RunnablePlatform(files);
     await buildReport(platform, "/proj", {
       typst: "typst",
-      pandoc: "pandoc",
       converter: stubConverter,
     });
 
@@ -118,7 +114,6 @@ describe("buildReport orchestration (stub converter, fake compile)", () => {
     const platform = new RunnablePlatform(files);
     const result = await buildReport(platform, "/proj", {
       typst: "typst",
-      pandoc: "pandoc",
       converter: stubConverter,
     });
 
@@ -131,7 +126,6 @@ describe("buildReport orchestration (stub converter, fake compile)", () => {
     const platform = new RunnablePlatform(files);
     const result = await buildReport(platform, "/proj", {
       typst: "typst",
-      pandoc: "pandoc",
       converter: stubConverter,
     });
 
@@ -147,7 +141,6 @@ describe("buildReport orchestration (stub converter, fake compile)", () => {
     );
     const result = await buildReport(platform, "/proj", {
       typst: "typst",
-      pandoc: "pandoc",
       converter: stubConverter,
     });
 
