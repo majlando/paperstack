@@ -207,6 +207,17 @@ export class MarkdownEditor {
     this.view.focus();
   }
 
+  /** Insert inline text at the cursor (replacing any selection) and focus. */
+  insertInline(text: string): void {
+    const { from, to } = this.view.state.selection.main;
+    this.view.dispatch({
+      changes: { from, to, insert: text },
+      selection: { anchor: from + text.length },
+      effects: EditorView.scrollIntoView(from, { y: "center" }),
+    });
+    this.view.focus();
+  }
+
   /** Select a range, scroll it into view, and focus the editor. */
   select(from: number, to: number): void {
     const length = this.view.state.doc.length;

@@ -62,6 +62,7 @@ export function Preview() {
     };
   }, []);
 
+  const hasReferences = useStore((s) => s.hasReferences);
   useEffect(() => {
     const timer = setTimeout(() => {
       const preview = previewRef.current;
@@ -69,10 +70,10 @@ export function Preview() {
       const sectionDir = dirOf(activeFile);
       const resetScroll = lastFileRef.current !== activeFile;
       lastFileRef.current = activeFile;
-      void preview.render(content, sectionDir, { resetScroll });
+      void preview.render(content, sectionDir, { resetScroll, citations: hasReferences });
     }, 300);
     return () => clearTimeout(timer);
-  }, [content, activeFile]);
+  }, [content, activeFile, hasReferences]);
 
   return (
     <div className="flex min-w-0 flex-1 flex-col border-l border-zinc-800">

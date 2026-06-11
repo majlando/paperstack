@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { open } from "@tauri-apps/plugin-dialog";
-import { figureMarkdown } from "@paperstack/engine";
+import { figureMarkdown, type BibEntry } from "@paperstack/engine";
 import { useStore } from "../store.ts";
 import { activeEditor } from "../editor/editor-registry.ts";
 
@@ -20,7 +20,18 @@ export function InsertControls() {
   const pendingFigure = useStore((s) => s.pendingFigure);
   const requestFigure = useStore((s) => s.requestFigure);
   const cancelFigure = useStore((s) => s.cancelFigure);
+  const hasReferences = useStore((s) => s.hasReferences);
   const [caption, setCaption] = useState("");
+  const [references, setReferences] = useState<BibEntry[] | null>(null);
+
+  async function openCitations() {
+    setReferences(await useStore.getState().listReferences());
+  }
+
+  function insertCitation(key: string) {
+    setReferences(null);
+    activeEditor()?.insertInline(`[@${key}]`);
+  }
 
   // A new pending figure (picked or pasted) starts from its suggested caption.
   useEffect(() => {
@@ -63,6 +74,67 @@ export function InsertControls() {
       >
         Diagram
       </button>
+      {/* Only offered when the project has a references.bib — without one,
+          [@key] would print literally in the report. */}
+      {hasReferences && (
+        <button
+          title="Insert Citation — a numbered reference from references.bib"
+          className={buttonCls}
+          onClick={() => void openCitations()}
+        >
+          Cite
+        </button>
+      )}
+
+      {references !== null && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/60"
+          onClick={() => setReferences(null)}
+          onKeyDown={(e) => {
+            if (e.key === "Escape") setReferences(null);
+          }}
+        >
+          <div
+            className="w-full max-w-lg rounded-lg border border-zinc-700 bg-zinc-900 p-4 shadow-xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="pb-1 text-sm font-semibold text-zinc-100">Insert Citation</div>
+            <div className="pb-3 text-xs text-zinc-500">
+              From references.bib — inserted as [@key], numbered in the report.
+            </div>
+            {references.length === 0 ? (
+              <div className="py-2 text-sm text-zinc-500">
+                No entries found in references.bib.
+              </div>
+            ) : (
+              <div className="max-h-72 overflow-y-auto">
+                {references.map((r) => (
+                  <button
+                    key={r.key}
+                    autoFocus={r === references[0]}
+                    onClick={() => insertCitation(r.key)}
+                    className="block w-full rounded px-2 py-1.5 text-left hover:bg-zinc-800"
+                  >
+                    <span className="text-sm text-sky-300">[{r.key}]</span>
+                    <span className="ml-2 text-sm text-zinc-300">
+                      {r.title ?? "(no title)"}
+                      {r.year && <span className="text-zinc-500"> ({r.year})</span>}
+                    </span>
+                  </button>
+                ))}
+              </div>
+            )}
+            <div className="flex justify-end pt-3">
+              <button
+                onClick={() => setReferences(null)}
+                className="rounded border border-zinc-700 px-3 py-1 text-sm text-zinc-300 hover:bg-zinc-800"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {pendingFigure !== null && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60">

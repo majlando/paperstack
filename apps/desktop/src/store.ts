@@ -16,10 +16,12 @@ import {
   importFigureBytes,
   suggestedCaption,
   searchContent,
+  parseBibliography,
   dirOf,
   baseOf,
   humanize,
   PaperstackError,
+  type BibEntry,
   type MetadataEdit,
   type Project,
   type ProjectCounts,
@@ -80,6 +82,12 @@ interface AppState {
   notice: string | null;
   /** A report compile is running (View Report / Export PDF). */
   building: boolean;
+  /**
+   * The project has a references.bib at its root — citations are active:
+   * [@key] spans become numbered references in the PDF, the preview shows
+   * placeholders, and the editor offers Insert Citation.
+   */
+  hasReferences: boolean;
   /** Snapshot of the last compiled report, shown in the right pane's Report tab. */
   report: { pdfPath: string; warnings: string[]; builtAt: number } | null;
   /** Export was requested while [TODO]s remain — waiting for the user's call. */
@@ -144,6 +152,8 @@ interface AppState {
    * read from disk. Capped at 500 matches.
    */
   searchProject(query: string): Promise<ProjectSearchMatch[]>;
+  /** Entries of references.bib for the Insert Citation list ([] without one). */
+  listReferences(): Promise<BibEntry[]>;
   openMetadata(): Promise<void>;
   closeMetadata(): void;
   setMetadataDirty(dirty: boolean): void;
@@ -368,6 +378,7 @@ export const useStore = create<AppState>((set, get) => {
   error: null,
   notice: null,
   building: false,
+  hasReferences: false,
   report: null,
   confirmExport: null,
   pane: "preview",
@@ -407,6 +418,7 @@ export const useStore = create<AppState>((set, get) => {
         confirmExport: null,
         pane: "preview",
         metadataOpen: false,
+        hasReferences: await platform.fileExists(`${normalized}/references.bib`),
       });
       rememberProject(normalized);
       setWindowTitle(project.meta.title);
@@ -454,7 +466,14 @@ export const useStore = create<AppState>((set, get) => {
             .map((s) => s.file),
         ]),
       ];
-      set({ project, counts, changedOnDisk, error: null });
+      set({
+        project,
+        counts,
+        changedOnDisk,
+        error: null,
+        // a references.bib may have arrived or left with the external change
+        hasReferences: await platform.fileExists(`${projectDir}/references.bib`),
+      });
       setWindowTitle(project.meta.title);
       // re-read the open section unless the user has unsaved changes
       if (activeFile && !dirty && project.meta.sections.some((s) => s.file === activeFile)) {
@@ -716,6 +735,16 @@ export const useStore = create<AppState>((set, get) => {
       }
     }
     return out;
+  },
+
+  async listReferences() {
+    const { projectDir } = get();
+    if (!projectDir) return [];
+    try {
+      return parseBibliography(await platform.readTextFile(`${projectDir}/references.bib`));
+    } catch {
+      return []; // no file or unreadable — the Cite button simply lists nothing
+    }
   },
 
   async openMetadata() {

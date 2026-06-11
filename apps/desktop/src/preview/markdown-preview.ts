@@ -54,7 +54,7 @@ export class MarkdownPreview {
   async render(
     markdown: string,
     sectionDir: string,
-    options?: { resetScroll?: boolean },
+    options?: { resetScroll?: boolean; citations?: boolean },
   ): Promise<void> {
     // Keep scroll position while typing; jump to top on section switch.
     const scrollTop = options?.resetScroll ? 0 : this.container.scrollTop;
@@ -83,6 +83,12 @@ export class MarkdownPreview {
         }
       }
     }
+
+    // Citations become readable [key] placeholders — the numbered form only
+    // exists in the compiled report, the same one-rendering-path rule as
+    // everything else. Only active for projects with a references.bib, so
+    // the preview never suggests a citation the PDF would print literally.
+    if (options?.citations) renderCitationPlaceholders(this.container);
 
     // Math is rendered after sanitization, like Mermaid below: KaTeX builds
     // its DOM from the math source text directly, so nothing it produces
@@ -153,6 +159,38 @@ export class MarkdownPreview {
   private revokeObjectUrls(): void {
     for (const url of this.objectUrls) URL.revokeObjectURL(url);
     this.objectUrls.clear();
+  }
+}
+
+/** `[@key]` / `[@a; @b, p. 12]` spans in prose → styled [key] chips. */
+function renderCitationPlaceholders(root: HTMLElement): void {
+  const ITEM = /^@([A-Za-z0-9_][A-Za-z0-9_.:-]*)(?:\s*,\s*(.+))?$/;
+  const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
+  const texts: Text[] = [];
+  for (let n = walker.nextNode(); n; n = walker.nextNode()) texts.push(n as Text);
+  for (const text of texts) {
+    // citations live in prose — never rewrite code samples
+    if (text.parentElement?.closest("pre, code")) continue;
+    const value = text.nodeValue ?? "";
+    let fragment: DocumentFragment | null = null;
+    let last = 0;
+    for (const m of value.matchAll(/\[@[^\]]*\]/g)) {
+      const items = m[0].slice(1, -1).split(";").map((s) => ITEM.exec(s.trim()));
+      if (items.some((i) => i === null)) continue; // not citation syntax
+      fragment ??= document.createDocumentFragment();
+      if (m.index > last) fragment.append(value.slice(last, m.index));
+      const chip = document.createElement("span");
+      chip.className = "rounded bg-sky-500/15 px-1 text-[0.85em] text-sky-300";
+      chip.title = "Citation — appears as a numbered reference in the report";
+      chip.textContent = `[${items
+        .map((i) => (i![2] === undefined ? i![1]! : `${i![1]}, ${i![2]}`))
+        .join("; ")}]`;
+      fragment.append(chip);
+      last = m.index + m[0].length;
+    }
+    if (fragment === null) continue;
+    if (last < value.length) fragment.append(value.slice(last));
+    text.replaceWith(fragment);
   }
 }
 
