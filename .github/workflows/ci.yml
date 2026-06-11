@@ -15,9 +15,10 @@ jobs:
   test:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: pnpm/action-setup@v4
-      - uses: actions/setup-node@v4
+      # Node 24 runner majors — GitHub removes Node 20 action support 2026-06-16.
+      - uses: actions/checkout@v6
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v6
         with:
           node-version: 22
           cache: pnpm
@@ -25,7 +26,7 @@ jobs:
       # Pinned typst + pandoc so the PDF integration test runs the real
       # pipeline on every push. Cache keyed on the fetch script — a version
       # or hash bump invalidates it automatically.
-      - uses: actions/cache@v4
+      - uses: actions/cache@v5
         with:
           path: bin
           key: binaries-${{ runner.os }}-${{ hashFiles('scripts/fetch-binaries.ts') }}
