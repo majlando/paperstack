@@ -35,3 +35,4 @@ Deliberate defaults, not dogma — deviate when something is clearly better, and
 - **Sections** — the report's top-level divisions (academic-report terminology; not "chapters"). Use "section" in code, docs, and UI wording.
 - **Section roles** — `front-matter | body | back-matter | appendix`; only `body` counts toward the cap.
 - **SEA report** — the target report format for v1 (Danish academy CS exam report).
+- **Citations** — a `references.bib` at the project root activates them (convention, no document.yaml field): `[@key]` → Typst `#cite`, bibliography generated before the appendices. No references.bib → `[@key]` stays prose.

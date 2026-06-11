@@ -201,8 +201,8 @@ Goal: the three writing needs the first real report met by hand (tables, math, c
 - [ ] "Format table" editor command: re-align the pipes of the table under the cursor — a pure text transform, lives in the engine with unit tests
 
 **Citations:**
-- [ ] Engine spike: `references.bib` handed to Typst's native bibliography, `[@key]` emitted as `#cite` — tested against real references from the migrated report. (The emitter makes Typst-native the only sensible route; the pandoc-citeproc alternative dies with the converter.) Numbered style only — SEA reports don't need citation-style choice
-- [ ] Insert Citation helper listing `references.bib` entries; preview shows readable placeholders (`[key]`) — the PDF stays the truth, same one-rendering-path rule
+- [x] Engine: `references.bib` handed to Typst's native bibliography, `[@key]` emitted as `#cite` (2026-06-11: a references.bib at the project root switches citations on — `[@key]`, `[@a; @b]`, and `[@key, p. 12]` locators; the bibliography lands before the first appendix, numbered IEEE style, localized title. A key missing from the file fails the export naming the section and the key — a typo'd citation must never print literally in a hand-in. Verified against book/online reference shapes from the real report; conversion errors now name their section, which math messages inherit too)
+- [x] Insert Citation helper listing `references.bib` entries; preview shows readable placeholders (2026-06-11: Cite button appears only when the project has a references.bib; the preview renders `[@key]` spans as `[key]` chips — prose only, never inside code — while the numbered form stays PDF-only, same one-rendering-path rule)
 
 ## Milestone 6 — Every platform, public release *(L)*
 
