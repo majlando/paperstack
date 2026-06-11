@@ -93,7 +93,7 @@ export async function buildReport(
 
     // Unlike document.yaml (where markers break the load), markers in a
     // section build fine — straight into the hand-in PDF. Warn loudly.
-    if (/^<{7}( |$)/m.test(source)) {
+    if (/^<{7}( |\r?$)/m.test(source)) {
       warnings.push(
         `"${section.file}" contains unresolved Git merge conflict markers (<<<<<<<), which will show up in the PDF.`,
       );

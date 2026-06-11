@@ -22,7 +22,7 @@ export async function loadProject(platform: Platform, dir: string): Promise<Proj
 
   // The likeliest broken state after a bad merge of the shared structure
   // file — name it instead of surfacing a YAML parse error.
-  if (/^<{7}( |$)/m.test(raw)) {
+  if (/^<{7}( |\r?$)/m.test(raw)) {
     throw new PaperstackError(
       "metadata-conflict-markers",
       `document.yaml contains unresolved Git merge conflict markers (<<<<<<<). ` +
