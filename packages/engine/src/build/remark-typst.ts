@@ -251,7 +251,7 @@ function renderInline(prepared: Prepared, ctx: Ctx): InlinePart | null {
   const node = prepared.node;
   switch (node.type) {
     case "text":
-      return renderText(node.value, ctx);
+      return withLine(node, () => renderText(node.value, ctx));
     case "emphasis":
       return wrapInline("#emph", node.children, ctx);
     case "strong":
@@ -296,11 +296,32 @@ function renderInline(prepared: Prepared, ctx: Ctx): InlinePart | null {
       // Stays inline even when written `$$…$$` on one line: remark-math
       // parses display math only from `$$` fences on their own lines, and
       // the preview must always show what the PDF will do.
-      return { text: `$${latexToTypstMath(node.value)}$`, hashCall: false };
+      return withLine(node, () => ({
+        text: `$${latexToTypstMath(node.value)}$`,
+        hashCall: false,
+      }));
     case "html":
       return null; // raw HTML (incl. comments) is dropped, like pandoc
     default:
       return { text: "", hashCall: false };
+  }
+}
+
+/**
+ * Runs a render step and stamps the node's source line onto any
+ * PaperstackError it throws — "line 12: …" beats "somewhere in this
+ * section" when the section is forty normalsider long. The builder
+ * prepends the section file name.
+ */
+function withLine<T>(node: { position?: { start: { line: number } } }, fn: () => T): T {
+  try {
+    return fn();
+  } catch (e) {
+    const line = node.position?.start.line;
+    if (e instanceof PaperstackError && line !== undefined && !/^line \d+: /.test(e.userMessage)) {
+      throw new PaperstackError(e.code, `line ${line}: ${e.userMessage}`, e.details);
+    }
+    throw e;
   }
 }
 
@@ -493,7 +514,7 @@ function renderBlock(node: RootContent, ctx: Ctx): BlockPart | null {
       return { text: "#line(start: (25%, 0%), end: (75%, 0%))" };
     case "math":
       // `$$…$$` — display math: spaces inside the dollars make it a block.
-      return { text: `$ ${latexToTypstMath(node.value)} $` };
+      return withLine(node, () => ({ text: `$ ${latexToTypstMath(node.value)} $` }));
     case "html":
     case "definition":
     case "footnoteDefinition":
