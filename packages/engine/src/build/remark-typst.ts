@@ -15,6 +15,7 @@
 import { unified } from "unified";
 import remarkParse from "remark-parse";
 import remarkGfm from "remark-gfm";
+import remarkMath from "remark-math";
 import type {
   Code,
   Definition,
@@ -32,8 +33,9 @@ import { PaperstackError } from "../errors.ts";
 import { resolveProjectPath } from "../project/paths.ts";
 import { escapeTypstString } from "./assembler.ts";
 import type { Converter } from "./converter.ts";
+import { latexToTypstMath } from "./typst-math.ts";
 
-const parser = unified().use(remarkParse).use(remarkGfm);
+const parser = unified().use(remarkParse).use(remarkGfm).use(remarkMath);
 
 export class RemarkConverter implements Converter {
   async toTypst(markdown: string, sectionDir: string): Promise<string> {
@@ -271,6 +273,12 @@ function renderInline(prepared: Prepared, ctx: Ctx): InlinePart | null {
       const body = content.trailingHashCall ? `${content.text};` : content.text;
       return { text: `#footnote[${body}]`, hashCall: true };
     }
+    case "inlineMath":
+      // `$x^2$` — LaTeX math (what KaTeX previews) translated to Typst math.
+      // Stays inline even when written `$$…$$` on one line: remark-math
+      // parses display math only from `$$` fences on their own lines, and
+      // the preview must always show what the PDF will do.
+      return { text: `$${latexToTypstMath(node.value)}$`, hashCall: false };
     case "html":
       return null; // raw HTML (incl. comments) is dropped, like pandoc
     default:
@@ -414,6 +422,9 @@ function renderBlock(node: RootContent, ctx: Ctx): BlockPart | null {
       // template — undefined in Paperstack's include-based builds. Emit the
       // same rule pandoc's template defines, inline (documented divergence).
       return { text: "#line(start: (25%, 0%), end: (75%, 0%))" };
+    case "math":
+      // `$$…$$` — display math: spaces inside the dollars make it a block.
+      return { text: `$ ${latexToTypstMath(node.value)} $` };
     case "html":
     case "definition":
     case "footnoteDefinition":
@@ -484,7 +495,8 @@ function githubSlug(text: string): string {
 function plainText(nodes: readonly PhrasingContent[]): string {
   let out = "";
   for (const node of nodes) {
-    if (node.type === "text" || node.type === "inlineCode") out += node.value;
+    if (node.type === "text" || node.type === "inlineCode" || node.type === "inlineMath")
+      out += node.value;
     else if (node.type === "image" || node.type === "imageReference") out += node.alt ?? "";
     else if (node.type === "break") out += " ";
     else if ("children" in node) out += plainText(node.children);

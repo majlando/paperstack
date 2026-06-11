@@ -8,6 +8,7 @@ export type ErrorCode =
   | "diagram-not-rendered"
   | "dependency-missing"
   | "convert-failed"
+  | "math-invalid"
   | "image-missing"
   | "output-locked"
   | "export-failed";

@@ -68,6 +68,34 @@ describe.skipIf(!hasBinaries)("buildReport on the demo fixture", () => {
     expect(result.counts.bodyNormalsider).toBeLessThan(result.counts.cap);
   }, 60_000);
 
+  it("builds a report containing inline and display math", async () => {
+    const mathDir = (await mkdtemp(join(tmpdir(), "paperstack-build-math-"))).replaceAll("\\", "/");
+    try {
+      await cp(fixtureDir, mathDir, { recursive: true });
+      const section = join(mathDir, "sections/03-conclusion.md");
+      await writeFile(
+        section,
+        (await readFile(section, "utf8")) +
+          "\n## Complexity\n\nLookup is $\\mathcal{O}(\\log n)$ because the loop halves the range.\n\n" +
+          "$$\nT(n) = T\\left(\\frac{n}{2}\\right) + 1 \\implies T(n) \\in \\mathcal{O}(\\log n)\n$$\n",
+        "utf8",
+      );
+
+      const platform = new NodePlatform();
+      const result = await buildReport(platform, mathDir, { typst: typstPath });
+      expect(existsSync(result.pdfPath)).toBe(true);
+
+      const typst = await readFile(
+        join(mathDir, "output/.build/converted/003-03-conclusion.typ"),
+        "utf8",
+      );
+      expect(typst).toContain("$cal(O) ( log n )$");
+      expect(typst).toContain("$ T ( n ) = T lr(( (n)/(2) )) + 1 ==> T ( n ) in cal(O) ( log n ) $");
+    } finally {
+      await rm(mathDir, { recursive: true, force: true });
+    }
+  }, 60_000);
+
   it("builds the same project as a Danish report with localized labels", async () => {
     const daDir = (await mkdtemp(join(tmpdir(), "paperstack-build-da-"))).replaceAll("\\", "/");
     try {

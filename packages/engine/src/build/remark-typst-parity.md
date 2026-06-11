@@ -70,9 +70,13 @@ resolution identical to `rewriteImagePaths`.
   emitter everywhere (builder, app, CLI).
 - **Booktabs tables** landed in the *template*, not the emitter, so golden
   parity for tables is intact.
-- **Math and citations** are the next M5 tasks and land *in* the emitter.
-  `$x$` is currently plain text (gfm has no math) — adding it is a feature,
-  not a parity break, since the pandoc path never supported it either.
+- **Math landed in the emitter (2026-06-11)**: `$x$` / `$$…$$` translate
+  LaTeX to Typst math via `typst-math.ts` — a feature the pandoc path never
+  had (its gfm reader runs without `tex_math_dollars`), so it is not a
+  parity break; the real report contains no `$…$` spans (re-verified). Note
+  the standard Markdown-math trade-off: two `$` in one paragraph form a math
+  span — visible immediately in the KaTeX preview, escapable as `\$`.
+  **Citations** are the remaining M5 emitter task.
 - Non-GFM constructs pandoc supports but remark-gfm has no syntax for
   (definition lists, superscript, …) stay out of scope: authors cannot write
   them in Paperstack's GFM anyway.

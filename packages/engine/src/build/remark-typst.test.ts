@@ -314,6 +314,54 @@ describe("images and figures", () => {
   });
 });
 
+describe("math", () => {
+  it("translates inline LaTeX math to Typst math", () => {
+    expect(t("the value $x^2$ grows")).toBe("the value $x^2$ grows");
+    expect(t("$\\frac{n+1}{2}$ steps")).toBe("$(n + 1)/(2)$ steps");
+    expect(t("$\\sum_{i=1}^{n} i^2$")).toBe("$sum_(i = 1)^n i^2$");
+    expect(t("$\\mathcal{O}(n \\log n)$")).toBe("$cal(O) ( n log n )$");
+    expect(t("$x \\in \\mathbb{R}^n$")).toBe("$x in bb(R)^n$");
+    expect(t("$\\sqrt[3]{x} \\neq \\bar{y}$")).toBe("$root(3, x) != macron(y)$");
+    expect(t("$f'(x) = \\lim_{h \\to 0} \\frac{f(x+h)-f(x)}{h}$")).toBe(
+      "$f' ( x ) = lim_(h -> 0) (f ( x + h ) - f ( x ))/(h)$",
+    );
+    expect(t("$\\text{cost} = 5 \\cdot n$")).toBe('$"cost" = 5 dot.op n$');
+  });
+
+  it("implicit multiplication: adjacent letters become separate Typst identifiers", () => {
+    expect(t("$xy + 2ab$")).toBe("$x y + 2 a b$");
+  });
+
+  it("translates $$-fenced display math as a Typst block equation", () => {
+    expect(t("$$\n\\frac{n+1}{2}\n$$")).toBe("$ (n + 1)/(2) $");
+    expect(t("before\n\n$$\ne = mc^2\n$$\n\nafter")).toBe("before\n\n$ e = m c^2 $\n\nafter");
+    // remark-math only treats $$ fences on their own lines as display math —
+    // a single-line $$…$$ stays inline, in the preview and the PDF alike.
+    expect(t("$$e = mc^2$$")).toBe("$e = m c^2$");
+  });
+
+  it("handles \\left…\\right and literal braces", () => {
+    expect(t("$\\left( \\frac{a}{b} \\right)$")).toBe("$lr(( (a)/(b) ))$");
+    expect(t("$\\{1, 2\\}$")).toBe("${ 1 , 2 }$");
+  });
+
+  it("a single dollar amount stays plain text; escaping always works", () => {
+    expect(t("costs $5 today")).toBe("costs \\$5 today");
+    expect(t("a \\$5 fee")).toBe("a \\$5 fee");
+    // Two dollars in one paragraph DO become a math span (the standard
+    // Markdown-math trade-off) — visible immediately in the KaTeX preview,
+    // and \$ escapes it. Pinned so the behavior is deliberate, not a surprise.
+    expect(t("costs $5 and $10 total")).toBe("costs $5 a n d$10 total");
+  });
+
+  it("rejects unsupported commands with a readable error naming them", () => {
+    expect(() => t("$\\foobar{x}$")).toThrow(PaperstackError);
+    expect(() => t("$\\foobar{x}$")).toThrow(/\\foobar/);
+    expect(() => t("$\\begin{matrix}a\\end{matrix}$")).toThrow(/matrix/);
+    expect(() => t("$a & b$")).toThrow(/not supported/);
+  });
+});
+
 describe("tables", () => {
   it("matches pandoc's #figure/#table layout exactly", () => {
     expect(t("| Case | Expected |\n| ---- | -------- |\n| Found | `1` |\n| Empty | `-1` |")).toBe(
