@@ -193,8 +193,8 @@ Goal: the three writing needs the first real report met by hand (tables, math, c
 - [ ] Remaining banked payoffs: converter errors that name the actual line instead of "unusual Markdown"; dropping the pandoc sidecar from the bundle (decide in M6 when release packaging is set up)
 
 **Math:**
-- [ ] Emit Typst math for inline `$x$` and display `$$…$$` (remark-math in the emitter); invalid math fails with a readable error
-- [ ] Preview: KaTeX for the same `$` syntax (check whether the Mermaid bundle's KaTeX can be reused before adding a dependency)
+- [x] Emit Typst math for inline `$x$` and display `$$…$$` (remark-math in the emitter); invalid math fails with a readable error (2026-06-11: `typst-math.ts` translates the practical LaTeX subset — scripts, fractions, roots, Greek, sets, arrows, big operators with limits, `\text`, `\mathbb`/`\mathcal`, `\left…\right` — to Typst math; every emitted symbol validated by compiling a generated probe against the pinned typst. Unsupported commands fail naming the command and the expression. Display math = `$$` fences on their own lines, the remark-math convention, so preview and PDF always agree)
+- [x] Preview: KaTeX for the same `$` syntax (2026-06-11: KaTeX was already in the dependency tree via Mermaid, so the direct dependency added no new packages; math renders post-sanitization from source text, the same trust pattern as the Mermaid pass, with invalid math highlighted inline instead of failing the preview)
 
 **Tables (authoring):**
 - [ ] Insert Table helper: rows × columns → GFM table skeleton at the cursor
