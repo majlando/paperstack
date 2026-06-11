@@ -31,8 +31,44 @@ fn allow_new_project_scope(app: tauri::AppHandle, dir: String) -> Result<String,
     if path.join("document.yaml").exists() {
         return Err("This folder already contains a Paperstack report. Open it instead.".into());
     }
+    require_dedicated_folder(&app, &path)?;
     allow_scope(&app, &path)?;
     Ok(normalize_path(&path))
+}
+
+/// A new report must live in its own folder. The grant below is recursive
+/// read/write, so accepting a drive root or the user's whole profile would
+/// turn one webview compromise into whole-disk access — and a report
+/// scaffolded straight into Documents would be a mess for the user anyway.
+fn require_dedicated_folder(
+    app: &tauri::AppHandle,
+    path: &std::path::Path,
+) -> Result<(), String> {
+    if path.parent().is_none() {
+        return Err(
+            "Pick a dedicated folder for the report — not a whole drive. \
+             Create a new folder and choose that instead."
+                .into(),
+        );
+    }
+    let resolver = app.path();
+    let protected = [
+        resolver.home_dir(),
+        resolver.desktop_dir(),
+        resolver.document_dir(),
+        resolver.download_dir(),
+    ];
+    for known in protected.into_iter().flatten() {
+        // Both sides canonicalized: `path` already is, the resolver's are not.
+        if known.canonicalize().is_ok_and(|known| known == path) {
+            return Err(
+                "Pick a dedicated folder for the report — not your user folder itself. \
+                 Create a new folder inside it and choose that instead."
+                    .into(),
+            );
+        }
+    }
+    Ok(())
 }
 
 #[tauri::command]
