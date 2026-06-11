@@ -77,6 +77,30 @@ describe("extractMermaidBlocks", () => {
     expect(replaced).toContain("shown, not drawn");
   });
 
+  it("keeps the replacement a block of its own next to unpadded text", () => {
+    // A fence interrupts a paragraph (no blank lines needed); the image
+    // replacement must not merge into the neighbouring text as an inline
+    // image when the author wrote the fence flush against it.
+    const markdown = "```mermaid\nA --> B\n```\nFigure text follows.";
+    const { markdown: replaced, blocks } = extractMermaidBlocks(markdown);
+    expect(replaced).toBe(
+      `![](/diagrams/rendered/${blocks[0]?.hash}.svg)\n\n\nFigure text follows.`,
+    );
+
+    const above = "Text above.\n```mermaid\nA --> B\n```";
+    const r2 = extractMermaidBlocks(above);
+    expect(r2.markdown).toBe(
+      `Text above.\n\n![](/diagrams/rendered/${r2.blocks[0]?.hash}.svg)\n`,
+    );
+  });
+
+  it("preserves the section's total line count (converter errors name real lines)", () => {
+    const markdown = "intro\n\n```mermaid\nA --> B\nB --> C\n```\n\n$\\badmath$ on line 8";
+    const { markdown: replaced } = extractMermaidBlocks(markdown);
+    expect(replaced.split("\n")).toHaveLength(markdown.split("\n").length);
+    expect(replaced.split("\n")[7]).toBe("$\\badmath$ on line 8");
+  });
+
   it("hashes are stable and content-sensitive", () => {
     expect(hashDiagram("a --> b")).toBe(hashDiagram("a --> b"));
     expect(hashDiagram("a --> b")).not.toBe(hashDiagram("a --> c"));

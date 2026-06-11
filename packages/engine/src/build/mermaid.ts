@@ -63,8 +63,18 @@ export function extractMermaidBlocks(markdown: string): MermaidExtraction {
         blocks.push({ code, hash, renderedPath });
         // Root-absolute path; empty alt text = plain image, no forced
         // caption. Keep the fence's indentation so a diagram in a list stays
-        // in the list.
-        out.push(`${mermaid[1]!}![](/${renderedPath})`);
+        // in the list. The replacement fills the fence's exact line count
+        // with blank padding: a fence interrupts a paragraph but an image
+        // line does not (it would render inline mid-sentence), and the
+        // unchanged line count keeps converter "line N" errors pointing at
+        // the author's real file.
+        const fenceLines = close - i + 1;
+        const replacement: string[] = [];
+        const prev = out.length > 0 ? out[out.length - 1]! : "";
+        if (/\S/.test(prev) && fenceLines >= 2) replacement.push("");
+        replacement.push(`${mermaid[1]!}![](/${renderedPath})`);
+        while (replacement.length < fenceLines) replacement.push("");
+        out.push(...replacement);
         i = close + 1;
         continue;
       }
