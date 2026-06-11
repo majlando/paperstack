@@ -2,6 +2,8 @@ import { create } from "zustand";
 import {
   loadProject,
   createProject as scaffoldProject,
+  SEA_TEMPLATE,
+  templateStatus,
   countProject,
   applySectionContent,
   extractMermaidBlocks,
@@ -97,6 +99,14 @@ interface AppState {
    * while the form was open is never silently overwritten by stale values.
    */
   metadataBaselineHash: string | null;
+  /**
+   * The project's vendored layout template is an unmodified copy from an
+   * older Paperstack — a banner offers to update it. Never set for
+   * user-customized templates (those are the user's, untouchable).
+   */
+  templateOffer: boolean;
+  /** Projects whose template offer was declined this session ("Keep current look"). */
+  templateOfferMuted: string[];
   /** Snapshot of the last compiled report, shown in the right pane's Report tab. */
   report: { pdfPath: string; warnings: string[]; builtAt: number } | null;
   /** Export was requested while [TODO]s remain — waiting for the user's call. */
@@ -169,6 +179,10 @@ interface AppState {
    * (and saved), the rest directly on disk. Returns what was changed.
    */
   replaceAll(query: string, replacement: string): Promise<{ sections: number; count: number }>;
+  /** Overwrites the project's outdated stock template with the current one. */
+  updateTemplate(): Promise<void>;
+  /** Declines the template offer for the rest of this session. */
+  dismissTemplateOffer(): void;
   openMetadata(): Promise<void>;
   closeMetadata(): void;
   setMetadataDirty(dirty: boolean): void;
@@ -243,6 +257,16 @@ async function projectHasReferences(projectDir: string): Promise<boolean> {
     return parseBibliography(text).length > 0;
   } catch {
     return false;
+  }
+}
+
+/** True when the vendored template is unmodified stock from an older Paperstack. */
+async function projectTemplateOutdated(projectDir: string): Promise<boolean> {
+  try {
+    const text = await platform.readTextFile(`${projectDir}/paperstack-template.typ`);
+    return templateStatus(text) === "outdated";
+  } catch {
+    return false; // not vendored yet — the next build writes the current one
   }
 }
 
@@ -405,6 +429,8 @@ export const useStore = create<AppState>((set, get) => {
   building: false,
   hasReferences: false,
   metadataBaselineHash: null,
+  templateOffer: false,
+  templateOfferMuted: [],
   report: null,
   confirmExport: null,
   pane: "preview",
@@ -445,6 +471,9 @@ export const useStore = create<AppState>((set, get) => {
         pane: "preview",
         metadataOpen: false,
         hasReferences: await projectHasReferences(normalized),
+        templateOffer:
+          !get().templateOfferMuted.includes(normalized) &&
+          (await projectTemplateOutdated(normalized)),
       });
       rememberProject(normalized);
       setWindowTitle(project.meta.title);
@@ -499,6 +528,10 @@ export const useStore = create<AppState>((set, get) => {
         error: null,
         // references.bib entries may have arrived or left with the external change
         hasReferences: await projectHasReferences(projectDir),
+        // a git pull may have brought an older group member's stock template
+        templateOffer:
+          !get().templateOfferMuted.includes(projectDir) &&
+          (await projectTemplateOutdated(projectDir)),
       });
       setWindowTitle(project.meta.title);
       // re-read the open section unless the user has unsaved changes
@@ -871,6 +904,29 @@ export const useStore = create<AppState>((set, get) => {
       set({ error: toError(e) });
       return false;
     }
+  },
+
+  async updateTemplate() {
+    const { projectDir } = get();
+    if (!projectDir) return;
+    try {
+      await platform.writeTextFile(`${projectDir}/paperstack-template.typ`, SEA_TEMPLATE);
+      set({
+        templateOffer: false,
+        notice:
+          "The report layout was updated to this Paperstack version. The next View Report or Export shows the new look.",
+      });
+    } catch (e) {
+      set({ error: toError(e) });
+    }
+  },
+
+  dismissTemplateOffer() {
+    const { projectDir, templateOfferMuted } = get();
+    set({
+      templateOffer: false,
+      templateOfferMuted: projectDir ? [...templateOfferMuted, projectDir] : templateOfferMuted,
+    });
   },
 
   clearError() {

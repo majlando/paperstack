@@ -69,6 +69,9 @@ export default function App() {
   const confirmExport = useStore((s) => s.confirmExport);
   const exportPdf = useStore((s) => s.exportPdf);
   const cancelExport = useStore((s) => s.cancelExport);
+  const templateOffer = useStore((s) => s.templateOffer);
+  const updateTemplate = useStore((s) => s.updateTemplate);
+  const dismissTemplateOffer = useStore((s) => s.dismissTemplateOffer);
 
   // The autosave debounce dies with the webview: flush pending edits before
   // the window closes. A failed or conflicted save keeps the window open so
@@ -216,6 +219,21 @@ export default function App() {
           onPrimary={() => void exportPdf(true)}
           secondaryLabel="Cancel"
           onSecondary={cancelExport}
+        />
+      )}
+      {templateOffer && (
+        <WarningBanner
+          message={
+            <>
+              This report's layout template came from an older Paperstack. Update it to the
+              current layout? The report's look may change slightly — your writing is untouched
+              either way.
+            </>
+          }
+          primaryLabel="Update layout"
+          onPrimary={() => void updateTemplate()}
+          secondaryLabel="Keep current look"
+          onSecondary={dismissTemplateOffer}
         />
       )}
       {conflict && (

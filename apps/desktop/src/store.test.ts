@@ -136,6 +136,36 @@ describe("metadata form", () => {
   });
 });
 
+describe("template update offer", () => {
+  // The outdated-stock classification itself is engine-tested
+  // (template.test.ts); these cover the store's offer lifecycle.
+  it("updates the layout template in place and clears the offer", async () => {
+    await openProject();
+    useStore.setState({ templateOffer: true });
+    await useStore.getState().updateTemplate();
+    const s = useStore.getState();
+    expect(s.templateOffer).toBe(false);
+    expect(s.notice).toMatch(/layout was updated/);
+    expect(fake.files.get("/p/paperstack-template.typ")).toContain("Paperstack SEA report template");
+  });
+
+  it("a declined offer stays declined across reloads this session", async () => {
+    await openProject();
+    useStore.setState({ templateOffer: true });
+    useStore.getState().dismissTemplateOffer();
+    expect(useStore.getState().templateOffer).toBe(false);
+    await useStore.getState().reloadProject();
+    expect(useStore.getState().templateOffer).toBe(false);
+  });
+
+  it("never offers for a customized template", async () => {
+    fake.reset(projectFiles());
+    fake.files.set("/p/paperstack-template.typ", "// my own template\n#let report(..a) = {}\n");
+    await openProject();
+    expect(useStore.getState().templateOffer).toBe(false);
+  });
+});
+
 describe("replace all", () => {
   it("replaces in the active section via the editor path and saves it", async () => {
     await openProject(); // sections/a.md is active: "# A\n\nalpha\n"
