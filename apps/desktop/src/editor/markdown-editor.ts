@@ -91,6 +91,15 @@ export interface MarkdownEditorOptions {
 
 export class MarkdownEditor {
   private view: EditorView;
+  /**
+   * Per-section editor states, so undo history survives switching sections
+   * and coming back. Keyed by the caller's section key; a state is only
+   * restored when its text still matches what the store hands over —
+   * undoing into stale text (the file changed on disk meanwhile) would
+   * resurrect overwritten content.
+   */
+  private readonly states = new Map<string, EditorState>();
+  private currentKey: string | null = null;
 
   constructor(
     parent: HTMLElement,
@@ -139,9 +148,26 @@ export class MarkdownEditor {
     });
   }
 
-  /** Replace the document (e.g. switching sections) — fresh undo history. */
+  /** Replace the document in place (external change to the same section) — fresh undo history. */
   setDoc(doc: string): void {
     this.view.setState(this.createState(doc));
+    if (this.currentKey !== null) this.states.delete(this.currentKey);
+  }
+
+  /**
+   * Switch to a different section: parks the current section's editor state
+   * (undo history, cursor, scroll anchor) under its key and restores the new
+   * section's parked state when its text is still current. Undo history
+   * never crosses section files — a missing or stale park starts fresh.
+   */
+  switchTo(key: string | null, doc: string): void {
+    if (this.currentKey !== null) this.states.set(this.currentKey, this.view.state);
+    if (this.states.size > 64) this.states.clear(); // bound long-session growth
+    const parked = key === null ? undefined : this.states.get(key);
+    this.view.setState(
+      parked !== undefined && parked.doc.toString() === doc ? parked : this.createState(doc),
+    );
+    this.currentKey = key;
   }
 
   getDoc(): string {
