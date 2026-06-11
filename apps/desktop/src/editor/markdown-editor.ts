@@ -81,6 +81,12 @@ export interface MarkdownEditorOptions {
   doc: string;
   onChange: (doc: string) => void;
   onBlur: () => void;
+  /**
+   * Called when the clipboard being pasted holds an image (a screenshot,
+   * an image copied from a browser). Returning true consumes the paste —
+   * the image bytes go through the figure-import flow instead of CodeMirror.
+   */
+  onPasteImage?: (image: File) => boolean;
 }
 
 export class MarkdownEditor {
@@ -113,6 +119,21 @@ export class MarkdownEditor {
         }),
         EditorView.domEventHandlers({
           blur: () => this.options.onBlur(),
+          paste: (event) => {
+            const handler = this.options.onPasteImage;
+            if (!handler) return false;
+            for (const item of event.clipboardData?.items ?? []) {
+              if (!item.type.startsWith("image/")) continue;
+              const image = item.getAsFile();
+              // An image wins over any accompanying text/html rendition
+              // (copying an image from a browser carries both).
+              if (image && handler(image)) {
+                event.preventDefault();
+                return true;
+              }
+            }
+            return false;
+          },
         }),
       ],
     });

@@ -123,6 +123,24 @@ export default function App() {
     };
   }, []);
 
+  // Group workflow: a git pull usually happens in a terminal while Paperstack
+  // is unfocused. Reload on focus-regain so the sidebar, counters, and the
+  // changed-on-disk dots catch up without the manual ⟳ — reloadProject never
+  // touches unsaved edits (covered by store tests), so this is always safe.
+  useEffect(() => {
+    let last = 0;
+    const unlisten = getCurrentWindow().onFocusChanged(({ payload: focused }) => {
+      if (!focused) return;
+      const now = Date.now();
+      if (now - last < 2000) return; // focus events can bounce; reads are cheap but not free
+      last = now;
+      const s = useStore.getState();
+      if (!s.projectDir || s.building || s.metadataOpen) return;
+      void s.reloadProject();
+    });
+    return () => void unlisten.then((fn) => fn());
+  }, []);
+
   // Writers press Ctrl+S no matter what autosave promises — honor it instead
   // of letting the webview's "save page" default swallow it.
   useEffect(() => {

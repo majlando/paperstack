@@ -13,6 +13,9 @@ import {
   editMetadataInYaml,
   newSectionFile,
   importFigure as importFigureFile,
+  importFigureBytes,
+  suggestedCaption,
+  searchContent,
   dirOf,
   baseOf,
   humanize,
@@ -21,6 +24,7 @@ import {
   type Project,
   type ProjectCounts,
   type SectionRole,
+  type SearchMatch,
 } from "@paperstack/engine";
 import {
   platform,
@@ -29,6 +33,14 @@ import {
   allowNewProjectScope,
 } from "./platform/tauri-platform.ts";
 import { renderMermaidSvg } from "./preview/mermaid.ts";
+
+/** One project-wide search hit: an engine match plus which section it lives in. */
+export type ProjectSearchMatch = SearchMatch & { file: string };
+
+/** Where a figure being inserted comes from: a picked file, or pasted bytes. */
+export type FigureSource =
+  | { kind: "path"; path: string }
+  | { kind: "bytes"; bytes: Uint8Array; name: string };
 
 interface AppState {
   projectDir: string | null;
@@ -55,6 +67,13 @@ interface AppState {
    */
   contentVersion: number;
   dirty: boolean;
+  /**
+   * Sections whose disk content changed since they were last loaded or opened
+   * here (detected by content hash on reload — e.g. after a git pull).
+   * Drives the sidebar's changed-on-disk dots; opening a section clears its
+   * entry.
+   */
+  changedOnDisk: string[];
   /** `message` is the readable headline; `details` is raw tool output for diagnostics. */
   error: { message: string; details?: string } | null;
   /** Success message (e.g. after export) — the friendly counterpart of `error`. */
@@ -107,10 +126,24 @@ interface AppState {
   cancelExport(): void;
   showPreview(): void;
   /**
-   * Copies an image into the project's images folder (collision-safe) and
-   * returns its project-relative path, or null on failure.
+   * A figure waiting for its caption (the dialog is open). Fed by both the
+   * Insert Figure button and an image pasted into the editor.
    */
-  importFigure(sourcePath: string): Promise<string | null>;
+  pendingFigure: { source: FigureSource; suggestedCaption: string } | null;
+  requestFigure(source: FigureSource): void;
+  cancelFigure(): void;
+  /**
+   * Imports the pending figure into the project's images folder
+   * (collision-safe) and returns its project-relative path, or null on
+   * failure — the caller inserts the Markdown.
+   */
+  confirmFigure(): Promise<string | null>;
+  /**
+   * Case-insensitive text search across every section. The active section is
+   * searched as it stands in the editor (unsaved edits included); the rest
+   * read from disk. Capped at 500 matches.
+   */
+  searchProject(query: string): Promise<ProjectSearchMatch[]>;
   openMetadata(): Promise<void>;
   closeMetadata(): void;
   setMetadataDirty(dirty: boolean): void;
@@ -283,6 +316,16 @@ export const useStore = create<AppState>((set, get) => {
     if (!(await get().saveActive())) return null;
     set({ building: true });
     try {
+      // A group member may have added a diagram in another editor — render
+      // any missing SVGs first instead of failing the build with "open that
+      // section in Paperstack". Best-effort: invalid diagrams still surface
+      // as the engine's readable export error.
+      for (const s of get().project?.meta.sections ?? []) {
+        const content = await platform
+          .readTextFile(`${projectDir}/${s.file}`)
+          .catch(() => null);
+        if (content !== null) await renderDiagramsToDisk(projectDir, content);
+      }
       const result = await buildReport(platform, projectDir, {
         typst: SIDECARS.typst,
         pandoc: SIDECARS.pandoc,
@@ -312,6 +355,7 @@ export const useStore = create<AppState>((set, get) => {
   conflict: null,
   contentVersion: 0,
   dirty: false,
+  changedOnDisk: [],
   error: null,
   notice: null,
   building: false,
@@ -320,6 +364,7 @@ export const useStore = create<AppState>((set, get) => {
   pane: "preview",
   metadataOpen: false,
   metadataDirty: false,
+  pendingFigure: null,
 
   async openProject(dir: string) {
     try {
@@ -335,6 +380,7 @@ export const useStore = create<AppState>((set, get) => {
         baseline: "",
         conflict: null,
         dirty: false,
+        changedOnDisk: [],
         error: null,
         notice: null,
         report: null,
@@ -374,7 +420,21 @@ export const useStore = create<AppState>((set, get) => {
     try {
       const project = await loadProject(platform, projectDir);
       const counts = await countProject(platform, project);
-      set({ project, counts, error: null });
+      // Changed-on-disk dots: a section whose content hash moved between the
+      // previous counts and this re-read was edited outside the app (git
+      // pull, another editor). Earlier dots survive until the section is
+      // opened; dots for sections no longer in the report are dropped.
+      const previous = new Map(get().counts?.sections.map((s) => [s.file, s.hash]) ?? []);
+      const inProject = new Set(counts.sections.map((s) => s.file));
+      const changedOnDisk = [
+        ...new Set([
+          ...get().changedOnDisk.filter((f) => inProject.has(f)),
+          ...counts.sections
+            .filter((s) => previous.has(s.file) && previous.get(s.file) !== s.hash)
+            .map((s) => s.file),
+        ]),
+      ];
+      set({ project, counts, changedOnDisk, error: null });
       setWindowTitle(project.meta.title);
       // re-read the open section unless the user has unsaved changes
       if (activeFile && !dirty && project.meta.sections.some((s) => s.file === activeFile)) {
@@ -382,7 +442,13 @@ export const useStore = create<AppState>((set, get) => {
         // Keystrokes (or a section switch) may have landed during the reads
         // above — never let the disk copy clobber newer unsaved edits.
         if (!get().dirty && get().activeFile === activeFile) {
-          set({ content, baseline: content, contentVersion: get().contentVersion + 1 });
+          set({
+            content,
+            baseline: content,
+            contentVersion: get().contentVersion + 1,
+            // the fresh disk content is now on screen — no dot needed
+            changedOnDisk: get().changedOnDisk.filter((f) => f !== activeFile),
+          });
         }
       }
     } catch (e) {
@@ -405,6 +471,7 @@ export const useStore = create<AppState>((set, get) => {
         conflict: null,
         contentVersion: get().contentVersion + 1,
         dirty: false,
+        changedOnDisk: get().changedOnDisk.filter((f) => f !== file),
         error: null,
       });
       // Sections edited outside the app may contain never-rendered diagrams.
@@ -585,15 +652,50 @@ export const useStore = create<AppState>((set, get) => {
     set({ pane: "preview" });
   },
 
-  async importFigure(sourcePath: string) {
-    const { projectDir } = get();
-    if (!projectDir) return null;
+  requestFigure(source: FigureSource) {
+    set({
+      pendingFigure: {
+        source,
+        suggestedCaption: suggestedCaption(source.kind === "path" ? source.path : source.name),
+      },
+    });
+  },
+
+  cancelFigure() {
+    set({ pendingFigure: null });
+  },
+
+  async confirmFigure() {
+    const { projectDir, pendingFigure } = get();
+    set({ pendingFigure: null });
+    if (!projectDir || !pendingFigure) return null;
     try {
-      return await importFigureFile(platform, projectDir, sourcePath);
+      const source = pendingFigure.source;
+      return source.kind === "path"
+        ? await importFigureFile(platform, projectDir, source.path)
+        : await importFigureBytes(platform, projectDir, source.name, source.bytes);
     } catch (e) {
       set({ error: toError(e) });
       return null;
     }
+  },
+
+  async searchProject(query: string) {
+    const { projectDir, project, activeFile, content } = get();
+    if (!projectDir || !project || !query.trim()) return [];
+    const out: ProjectSearchMatch[] = [];
+    for (const s of project.meta.sections) {
+      const text =
+        s.file === activeFile
+          ? content
+          : await platform.readTextFile(`${projectDir}/${s.file}`).catch(() => null);
+      if (text === null) continue;
+      for (const m of searchContent(text, query)) {
+        out.push({ file: s.file, ...m });
+        if (out.length >= 500) return out;
+      }
+    }
+    return out;
   },
 
   async openMetadata() {

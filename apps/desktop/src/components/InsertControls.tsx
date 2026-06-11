@@ -1,6 +1,6 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { open } from "@tauri-apps/plugin-dialog";
-import { figureMarkdown, suggestedCaption } from "@paperstack/engine";
+import { figureMarkdown } from "@paperstack/engine";
 import { useStore } from "../store.ts";
 import { activeEditor } from "../editor/editor-registry.ts";
 
@@ -8,15 +8,24 @@ const CODE_SNIPPET = "```\n\n```";
 const DIAGRAM_SNIPPET = "```mermaid\nflowchart TD\n    A[Start] --> B[Next step]\n```";
 
 /**
- * The editor-header insert actions. Figure: pick an image, give it the
- * caption that becomes "Figure N: …" in the PDF, and the file is copied into
- * the project. Code/diagram insert ready-made fenced blocks at the cursor.
- * The caption prompt is a deliberately tiny hand-rolled overlay — one input,
- * two buttons; shadcn/radix arrive when a dialog needs real plumbing.
+ * The editor-header insert actions. Figure: pick an image (or paste one into
+ * the editor — both flows land in the store's pendingFigure), give it the
+ * caption that becomes "Figure N: …" in the PDF, and the image lands in the
+ * project's images folder. Code/diagram insert ready-made fenced blocks at
+ * the cursor. The caption prompt is a deliberately tiny hand-rolled overlay —
+ * one input, two buttons; shadcn/radix arrive when a dialog needs real
+ * plumbing.
  */
 export function InsertControls() {
-  const [pendingFigure, setPendingFigure] = useState<string | null>(null);
+  const pendingFigure = useStore((s) => s.pendingFigure);
+  const requestFigure = useStore((s) => s.requestFigure);
+  const cancelFigure = useStore((s) => s.cancelFigure);
   const [caption, setCaption] = useState("");
+
+  // A new pending figure (picked or pasted) starts from its suggested caption.
+  useEffect(() => {
+    setCaption(pendingFigure?.suggestedCaption ?? "");
+  }, [pendingFigure]);
 
   async function pickFigure() {
     const file = await open({
@@ -24,15 +33,11 @@ export function InsertControls() {
       filters: [{ name: "Images", extensions: ["png", "jpg", "jpeg", "svg", "gif", "webp"] }],
     });
     if (typeof file !== "string") return;
-    setCaption(suggestedCaption(file));
-    setPendingFigure(file);
+    requestFigure({ kind: "path", path: file });
   }
 
   async function confirmFigure() {
-    const source = pendingFigure;
-    setPendingFigure(null);
-    if (!source) return;
-    const rel = await useStore.getState().importFigure(source);
+    const rel = await useStore.getState().confirmFigure();
     if (!rel) return; // error banner already explains
     activeEditor()?.insertBlock(figureMarkdown(rel, caption.trim()));
   }
@@ -72,13 +77,13 @@ export function InsertControls() {
               onChange={(e) => setCaption(e.target.value)}
               onKeyDown={(e) => {
                 if (e.key === "Enter") void confirmFigure();
-                if (e.key === "Escape") setPendingFigure(null);
+                if (e.key === "Escape") cancelFigure();
               }}
               className="w-full rounded border border-zinc-700 bg-zinc-950 px-2.5 py-1.5 text-sm text-zinc-100 outline-none focus:border-zinc-500"
             />
             <div className="flex justify-end gap-2 pt-3">
               <button
-                onClick={() => setPendingFigure(null)}
+                onClick={cancelFigure}
                 className="rounded border border-zinc-700 px-3 py-1 text-sm text-zinc-300 hover:bg-zinc-800"
               >
                 Cancel

@@ -1,5 +1,6 @@
-import { useState, type ReactNode } from "react";
-import { useStore } from "../store.ts";
+import { useEffect, useRef, useState, type ReactNode } from "react";
+import { useStore, type ProjectSearchMatch } from "../store.ts";
+import { activeEditor } from "../editor/editor-registry.ts";
 import { baseOf, type SectionRole } from "@paperstack/engine";
 
 const GROUPS: { role: SectionRole; label: string; addHint: string }[] = [
@@ -62,10 +63,101 @@ function InlineInput(props: {
   );
 }
 
+/** Select the match in the editor, switching sections first when needed. */
+async function jumpToMatch(match: ProjectSearchMatch, length: number): Promise<void> {
+  const { activeFile, openSection } = useStore.getState();
+  const select = () => activeEditor()?.select(match.offset, match.offset + length);
+  if (activeFile === match.file) {
+    select();
+    return;
+  }
+  await openSection(match.file);
+  // same deferred-select pattern as the TODO jump: wait for the editor to
+  // receive the newly opened section before selecting into it
+  setTimeout(select, 50);
+}
+
+function SearchPanel(props: { onClose: () => void }) {
+  const searchProject = useStore((s) => s.searchProject);
+  const [query, setQuery] = useState("");
+  const [results, setResults] = useState<ProjectSearchMatch[]>([]);
+  const seq = useRef(0);
+
+  // Debounced live search; a stale (slower) search must not overwrite a newer one.
+  useEffect(() => {
+    const mine = ++seq.current;
+    const t = setTimeout(() => {
+      void searchProject(query).then((r) => {
+        if (seq.current === mine) setResults(r);
+      });
+    }, 200);
+    return () => clearTimeout(t);
+  }, [query, searchProject]);
+
+  const grouped = new Map<string, ProjectSearchMatch[]>();
+  for (const m of results) {
+    const list = grouped.get(m.file) ?? [];
+    list.push(m);
+    grouped.set(m.file, list);
+  }
+
+  return (
+    <div className="border-b border-zinc-800">
+      <div className="px-4 py-2">
+        <input
+          autoFocus
+          value={query}
+          placeholder="Search all sections"
+          onChange={(e) => setQuery(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === "Escape") props.onClose();
+          }}
+          className="w-full rounded border border-zinc-600 bg-zinc-800 px-2 py-1 text-sm text-zinc-100 outline-none placeholder:text-zinc-600"
+        />
+      </div>
+      {query.trim() !== "" && (
+        <div className="max-h-72 overflow-y-auto pb-2">
+          {results.length === 0 && (
+            <div className="px-4 py-1 text-xs text-zinc-500">No matches.</div>
+          )}
+          {[...grouped].map(([file, matches]) => (
+            <div key={file}>
+              <div className="px-4 pt-1 text-[11px] font-semibold uppercase tracking-wider text-zinc-500 capitalize">
+                {displayName(file)}
+              </div>
+              {matches.map((m) => {
+                // keep the match visible even when it sits deep in a long line
+                const start = m.column > 32 ? m.column - 24 : 0;
+                const preview = (start > 0 ? "…" : "") + m.preview.slice(start);
+                const at = m.column - start + (start > 0 ? 1 : 0);
+                return (
+                  <button
+                    key={`${m.offset}-${m.line}-${m.column}`}
+                    onClick={() => void jumpToMatch(m, query.length)}
+                    title={`Line ${m.line}`}
+                    className="block w-full truncate px-4 py-0.5 text-left text-xs text-zinc-400 hover:bg-zinc-800 hover:text-zinc-200"
+                  >
+                    {preview.slice(0, at)}
+                    <span className="rounded-sm bg-amber-500/30 text-amber-200">
+                      {preview.slice(at, at + query.length)}
+                    </span>
+                    {preview.slice(at + query.length)}
+                  </button>
+                );
+              })}
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 export function Sidebar() {
   const project = useStore((s) => s.project);
   const counts = useStore((s) => s.counts);
   const activeFile = useStore((s) => s.activeFile);
+  const changedOnDisk = useStore((s) => s.changedOnDisk);
   const openSection = useStore((s) => s.openSection);
   const reloadProject = useStore((s) => s.reloadProject);
   const openMetadata = useStore((s) => s.openMetadata);
@@ -77,6 +169,19 @@ export function Sidebar() {
   const [adding, setAdding] = useState<SectionRole | null>(null);
   const [renaming, setRenaming] = useState<string | null>(null);
   const [confirmRemove, setConfirmRemove] = useState<string | null>(null);
+  const [searching, setSearching] = useState(false);
+
+  // Writers expect the IDE shortcut for project-wide search.
+  useEffect(() => {
+    const onKeyDown = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key.toLowerCase() === "f") {
+        e.preventDefault();
+        setSearching(true);
+      }
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, []);
 
   if (!project) return null;
 
@@ -90,6 +195,15 @@ export function Sidebar() {
           <div className="text-xs text-zinc-500 truncate">{project.dir}</div>
         </div>
         <span className="flex shrink-0 gap-0.5">
+          <button
+            onClick={() => setSearching((s) => !s)}
+            title="Search all sections (Ctrl+Shift+F)"
+            className={`rounded px-1.5 py-0.5 hover:bg-zinc-800 hover:text-zinc-200 ${
+              searching ? "text-zinc-200" : "text-zinc-500"
+            }`}
+          >
+            🔍
+          </button>
           <button
             onClick={() => void openMetadata()}
             title="Report details — title, authors, language, length cap"
@@ -106,6 +220,7 @@ export function Sidebar() {
           </button>
         </span>
       </div>
+      {searching && <SearchPanel onClose={() => setSearching(false)} />}
       {GROUPS.map(({ role, label, addHint }) => {
         const sections = project.meta.sections.filter((s) => s.role === role);
         return (
@@ -175,7 +290,15 @@ export function Sidebar() {
                       active ? "text-white" : "text-zinc-300"
                     }`}
                   >
-                    <span className="block truncate">{displayName(s.file)}</span>
+                    <span className="flex min-w-0 items-center gap-1.5">
+                      <span className="truncate">{displayName(s.file)}</span>
+                      {changedOnDisk.includes(s.file) && (
+                        <span
+                          title="Changed on disk since you last opened it — e.g. a git pull or another editor"
+                          className="h-1.5 w-1.5 shrink-0 rounded-full bg-sky-400"
+                        />
+                      )}
+                    </span>
                   </button>
                   {count && count.todos > 0 && (
                     <span className="mr-2 shrink-0 rounded bg-amber-500/20 px-1.5 text-[10px] font-medium text-amber-400 group-hover:hidden">

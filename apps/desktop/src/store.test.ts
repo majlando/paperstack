@@ -20,6 +20,7 @@ vi.mock("./preview/mermaid.ts", () => ({
   renderMermaidSvg: async () => "<svg/>",
 }));
 
+import { hashDiagram } from "@paperstack/engine";
 import { platform } from "./platform/tauri-platform.ts";
 import { useStore } from "./store.ts";
 
@@ -302,6 +303,84 @@ describe("structure edits", () => {
     const before = writesTo("/p/document.yaml");
     await useStore.getState().moveSection("sections/a.md", "up"); // already first
     expect(writesTo("/p/document.yaml")).toBe(before);
+  });
+});
+
+describe("group workflow", () => {
+  it("marks externally edited sections changed-on-disk; opening clears the dot", async () => {
+    await openProject();
+    fake.files.set("/p/sections/b.md", "# B\n\nchanged externally\n");
+
+    await useStore.getState().reloadProject();
+    expect(useStore.getState().changedOnDisk).toEqual(["sections/b.md"]);
+
+    await useStore.getState().openSection("sections/b.md");
+    expect(useStore.getState().changedOnDisk).toEqual([]);
+  });
+
+  it("no dot for the active section when the reload already shows the new text", async () => {
+    await openProject();
+    fake.files.set(A, "# A\n\npulled\n");
+
+    await useStore.getState().reloadProject();
+    expect(useStore.getState().content).toBe("# A\n\npulled\n");
+    expect(useStore.getState().changedOnDisk).toEqual([]);
+  });
+
+  it("the app's own saves never produce a changed-on-disk dot", async () => {
+    await openProject();
+    useStore.getState().setContent("# A\n\nmine\n");
+    await useStore.getState().saveActive();
+
+    await useStore.getState().reloadProject();
+    expect(useStore.getState().changedOnDisk).toEqual([]);
+  });
+
+  it("export renders missing diagrams from never-opened sections first", async () => {
+    await openProject();
+    // A group member added a diagram to section b in another editor.
+    fake.files.set("/p/sections/b.md", "```mermaid\nA --> B\n```\n");
+
+    await useStore.getState().exportPdf(true);
+    // The build itself fails here (FakePlatform runs no binaries), but the
+    // missing render must already be self-healed by then.
+    const svg = fake.files.get(`/p/diagrams/rendered/${hashDiagram("A --> B")}.svg`);
+    expect(svg).toBe("<svg/>");
+    expect(useStore.getState().error).not.toBeNull();
+  });
+});
+
+describe("project search", () => {
+  it("searches every section, using the unsaved editor text for the active one", async () => {
+    await openProject();
+    useStore.getState().setContent("# A\n\nneedle in the editor\n"); // unsaved edit
+
+    const hits = await useStore.getState().searchProject("needle");
+    expect(hits).toHaveLength(1);
+    expect(hits[0]).toMatchObject({ file: "sections/a.md", line: 3 });
+
+    // a's disk text says "alpha", but the editor no longer does — the search
+    // must reflect what the writer sees
+    expect(await useStore.getState().searchProject("alpha")).toEqual([]);
+    // other sections come from disk
+    expect(await useStore.getState().searchProject("beta")).toHaveLength(1);
+  });
+});
+
+describe("figures", () => {
+  it("imports pasted image bytes through the pending-figure flow", async () => {
+    await openProject();
+    useStore.getState().requestFigure({
+      kind: "bytes",
+      bytes: new Uint8Array(5),
+      name: "image.png",
+    });
+    expect(useStore.getState().pendingFigure?.suggestedCaption).toBe("Image");
+
+    const rel = await useStore.getState().confirmFigure();
+    expect(rel).toBe("figures/image.png");
+    expect(fake.files.has("/p/figures/image.png")).toBe(true);
+    expect(useStore.getState().pendingFigure).toBeNull();
   });
 });
 

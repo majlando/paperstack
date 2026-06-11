@@ -27,6 +27,18 @@ export function Editor() {
         timer.current = setTimeout(() => void useStore.getState().saveActive(), 800);
       },
       onBlur: () => void useStore.getState().saveActive(),
+      onPasteImage: (image) => {
+        // Screenshots are the bulk of a CS report's figures — Ctrl+V goes
+        // straight into the Insert Figure flow (caption prompt included).
+        void image.arrayBuffer().then((buffer) => {
+          useStore.getState().requestFigure({
+            kind: "bytes",
+            bytes: new Uint8Array(buffer),
+            name: image.name || "pasted-image.png",
+          });
+        });
+        return true;
+      },
     });
     editorRef.current = editor;
     registerEditor(editor);

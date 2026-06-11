@@ -1,6 +1,7 @@
 import {
   readTextFile,
   writeTextFile,
+  writeFile,
   exists,
   readDir,
   mkdir,
@@ -45,6 +46,18 @@ export class TauriPlatform implements Platform {
     // rename replaces the destination atomically on every desktop platform.
     const tmp = `${path}.paperstack-tmp`;
     await writeTextFile(tmp, content);
+    try {
+      await rename(tmp, path);
+    } catch (e) {
+      await remove(tmp).catch(() => {});
+      throw e;
+    }
+  }
+
+  async writeBinaryFile(path: string, bytes: Uint8Array): Promise<void> {
+    // Same crash-safe temp-then-rename as writeTextFile.
+    const tmp = `${path}.paperstack-tmp`;
+    await writeFile(tmp, bytes);
     try {
       await rename(tmp, path);
     } catch (e) {
