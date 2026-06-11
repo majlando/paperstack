@@ -48,6 +48,35 @@ describe("extractMermaidBlocks", () => {
     expect(blocks[0]?.code).toBe("A --> B");
   });
 
+  it("keeps the fence's indentation so a diagram in a list stays in the list", () => {
+    const markdown = "- step\n  ```mermaid\n  A --> B\n  ```\n";
+    const { markdown: replaced, blocks } = extractMermaidBlocks(markdown);
+    expect(replaced).toContain(`  ![](/diagrams/rendered/${blocks[0]?.hash}.svg)`);
+  });
+
+  it("does not extract a mermaid example shown inside another code block", () => {
+    const markdown =
+      "Diagrams are written like this:\n\n````markdown\n```mermaid\nA --> B\n```\n````\n";
+    const { markdown: replaced, blocks } = extractMermaidBlocks(markdown);
+    expect(blocks).toHaveLength(0);
+    expect(replaced).toBe(markdown);
+  });
+
+  it("does not extract a mermaid example inside a tilde fence", () => {
+    const markdown = "~~~\n```mermaid\nA --> B\n```\n~~~\n";
+    const { markdown: replaced, blocks } = extractMermaidBlocks(markdown);
+    expect(blocks).toHaveLength(0);
+    expect(replaced).toBe(markdown);
+  });
+
+  it("still extracts a real diagram after an enclosing fence has closed", () => {
+    const markdown = "````\n```mermaid\nshown, not drawn\n```\n````\n\n```mermaid\nA --> B\n```\n";
+    const { markdown: replaced, blocks } = extractMermaidBlocks(markdown);
+    expect(blocks).toHaveLength(1);
+    expect(blocks[0]?.code).toBe("A --> B");
+    expect(replaced).toContain("shown, not drawn");
+  });
+
   it("hashes are stable and content-sensitive", () => {
     expect(hashDiagram("a --> b")).toBe(hashDiagram("a --> b"));
     expect(hashDiagram("a --> b")).not.toBe(hashDiagram("a --> c"));

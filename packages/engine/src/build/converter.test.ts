@@ -65,4 +65,28 @@ describe("rewriteImagePaths", () => {
       `#image("/sections/a.png")\ntext\n#image("/figures/b.png")`,
     );
   });
+
+  it("leaves image(...) inside a raw code listing untouched", () => {
+    // Pandoc emits code blocks as backtick-delimited Typst raw — verbatim
+    // text in the PDF, so it must never be rewritten.
+    const typst = '```python\nimg = image("../shot.png")\n```';
+    expect(rewriteImagePaths(typst, "sections")).toBe(typst);
+  });
+
+  it("does not fail the export on traversal-looking text in a listing", () => {
+    const typst = '```\nimage("../../outside.png")\n```';
+    expect(rewriteImagePaths(typst, "sections")).toBe(typst);
+  });
+
+  it("leaves inline code spans untouched", () => {
+    const typst = 'Call `image("../x.png")` to embed it.';
+    expect(rewriteImagePaths(typst, "sections")).toBe(typst);
+  });
+
+  it("still rewrites real images around a listing", () => {
+    const typst = '#image("a.png")\n```\nimage("b.png")\n```\n#image("c.png")';
+    expect(rewriteImagePaths(typst, "sections")).toBe(
+      '#image("/sections/a.png")\n```\nimage("b.png")\n```\n#image("/sections/c.png")',
+    );
+  });
 });

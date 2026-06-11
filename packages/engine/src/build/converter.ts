@@ -50,8 +50,24 @@ export class PandocConverter implements Converter {
  * Converted sections live in output/.build/, so relative image paths from the
  * original section location would break. Rewrite them to root-absolute Typst
  * paths ("/figures/x.svg"), which resolve against the project root.
+ *
+ * Raw segments — code listings and inline code, which Pandoc emits as
+ * backtick-delimited Typst raw — are verbatim text and must pass through
+ * untouched: an image("...") inside a code sample is not an image.
  */
 export function rewriteImagePaths(typst: string, sectionDir: string): string {
+  const RAW_SEGMENT = /(`+)[\s\S]*?\1/g;
+  let out = "";
+  let last = 0;
+  for (const raw of typst.matchAll(RAW_SEGMENT)) {
+    out += rewriteSegment(typst.slice(last, raw.index), sectionDir);
+    out += raw[0];
+    last = raw.index + raw[0].length;
+  }
+  return out + rewriteSegment(typst.slice(last), sectionDir);
+}
+
+function rewriteSegment(typst: string, sectionDir: string): string {
   return typst.replace(/image\("([^"]+)"/g, (match, path: string) => {
     if (path.startsWith("/")) return match;
     return `image("${resolveProjectPath(sectionDir, path, "image path")}"`;

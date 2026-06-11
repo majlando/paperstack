@@ -38,24 +38,62 @@ export interface MermaidExtraction {
  * Anchored to line starts so prose that merely mentions ```mermaid is left
  * alone, while indented fences (e.g. inside lists) still match.
  */
-const MERMAID_FENCE = /^[ \t]*```mermaid(?:[ \t][^\n]*)?\r?\n([\s\S]*?)^[ \t]*```[ \t]*\r?$/gm;
+const MERMAID_OPEN = /^([ \t]*)```mermaid(?:[ \t][^\n]*)?\r?$/;
+const MERMAID_CLOSE = /^[ \t]*```[ \t]*\r?$/;
+/** Any other fence opener (longer backtick runs, tildes, other languages). */
+const FENCE_OPEN = /^[ \t]*(`{3,}|~{3,})/;
 
 export function extractMermaidBlocks(markdown: string): MermaidExtraction {
   const blocks: MermaidBlock[] = [];
-  const replaced = markdown.replace(
-    MERMAID_FENCE,
-    (_match, code: string) => {
-      // Normalize line endings before hashing so CRLF and LF checkouts of the
-      // same diagram map to the same rendered SVG file.
-      const trimmed = code.replace(/\r\n?/g, "\n").trim();
-      const hash = hashDiagram(trimmed);
-      const renderedPath = `diagrams/rendered/${hash}.svg`;
-      blocks.push({ code: trimmed, hash, renderedPath });
-      // Root-absolute path; empty alt text = plain image, no forced caption.
-      return `![](/${renderedPath})`;
-    },
-  );
-  return { markdown: replaced, blocks };
+  const lines = markdown.split("\n");
+  const out: string[] = [];
+  let i = 0;
+  while (i < lines.length) {
+    const line = lines[i]!;
+    const mermaid = MERMAID_OPEN.exec(line);
+    if (mermaid) {
+      let close = i + 1;
+      while (close < lines.length && !MERMAID_CLOSE.test(lines[close]!)) close++;
+      if (close < lines.length) {
+        // Normalize line endings before hashing so CRLF and LF checkouts of
+        // the same diagram map to the same rendered SVG file.
+        const code = lines.slice(i + 1, close).join("\n").replace(/\r\n?/g, "\n").trim();
+        const hash = hashDiagram(code);
+        const renderedPath = `diagrams/rendered/${hash}.svg`;
+        blocks.push({ code, hash, renderedPath });
+        // Root-absolute path; empty alt text = plain image, no forced
+        // caption. Keep the fence's indentation so a diagram in a list stays
+        // in the list.
+        out.push(`${mermaid[1]!}![](/${renderedPath})`);
+        i = close + 1;
+        continue;
+      }
+      // Unclosed mermaid fence: leave it alone, like the rest of the line.
+    }
+    const fence = !mermaid && FENCE_OPEN.exec(line);
+    if (fence) {
+      // A non-mermaid fence: copy it through verbatim up to its closing line,
+      // so a ```mermaid example *shown inside* another code block is never
+      // extracted (matching how the preview's CommonMark parser reads it).
+      const marker = fence[1]![0]!;
+      const minLen = fence[1]!.length;
+      const closeRe = new RegExp(`^[ \\t]*\\${marker}{${minLen},}[ \\t]*\\r?$`);
+      out.push(line);
+      i++;
+      while (i < lines.length && !closeRe.test(lines[i]!)) {
+        out.push(lines[i]!);
+        i++;
+      }
+      if (i < lines.length) {
+        out.push(lines[i]!);
+        i++;
+      }
+      continue;
+    }
+    out.push(line);
+    i++;
+  }
+  return { markdown: out.join("\n"), blocks };
 }
 
 /**
