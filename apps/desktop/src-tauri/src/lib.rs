@@ -260,7 +260,18 @@ fn canonical_for_check(path: &str, must_exist: bool) -> Result<std::path::PathBu
     let file_name = path
         .file_name()
         .ok_or_else(|| "Sidecar output path has no file name.".to_string())?;
-    Ok(parent.join(file_name))
+    let candidate = parent.join(file_name);
+    // Only the parent is canonicalized here — a symlink left at the output
+    // name itself (e.g. a committed `report.pdf` link in a shared project)
+    // would pass the containment check while the write lands wherever the
+    // link points. Refuse rather than resolve.
+    if candidate
+        .symlink_metadata()
+        .is_ok_and(|m| m.file_type().is_symlink())
+    {
+        return Err("Sidecar output path is a symbolic link.".into());
+    }
+    Ok(candidate)
 }
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
