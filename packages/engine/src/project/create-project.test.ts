@@ -37,6 +37,7 @@ describe("createProject", () => {
 
     const gitignore = platform.files.get("/proj/.gitignore")!;
     expect(gitignore).toContain("output/");
+    expect(gitignore).toContain("*.paperstack-tmp"); // crash-orphaned atomic-write temps
     // Rendered diagrams are deliberately committed: content-hashed renders
     // are conflict-free, and group members/CI can build sections containing
     // diagrams they never opened in Paperstack.
@@ -55,6 +56,20 @@ describe("createProject", () => {
     const gitignore = platform.files.get("/proj/.gitignore")!;
     expect(gitignore).toContain("node_modules/");
     expect(gitignore).toContain("output/");
+    expect(gitignore).toContain("*.paperstack-tmp");
+  });
+
+  it("recognizes its rules only as whole lines, not substrings", async () => {
+    // "build-output/" must not count as the output/ rule — and rules the
+    // file already has (with or without a leading slash) are not duplicated.
+    const platform = new FakePlatform(
+      new Map([["/proj/.gitignore", "build-output/\n/output/\n"]]),
+    );
+    await createProject(platform, "/proj", { title: "T" });
+
+    const gitignore = platform.files.get("/proj/.gitignore")!;
+    expect(gitignore.match(/^\/?output\/$/gm)).toHaveLength(1); // not re-added
+    expect(gitignore).toContain("*.paperstack-tmp"); // missing rule appended
   });
 
   it("writes a .gitattributes that normalizes line endings", async () => {
