@@ -55,7 +55,8 @@ export {
   humanize,
   resolveProjectPath,
 } from "./project/paths.ts";
-export { searchContent, type SearchMatch } from "./project/search.ts";
+export { searchContent, replaceContent, type SearchMatch } from "./project/search.ts";
+export { tableMarkdown, formatTableAt, type TableEdit } from "./project/format-table.ts";
 export { newSectionFile } from "./project/new-section-file.ts";
 export {
   importFigure,
