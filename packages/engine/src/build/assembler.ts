@@ -25,13 +25,16 @@ export interface ConvertedSection {
 /**
  * Generates main.typ: template call + includes, with heading numbering
  * switched by section role (front/back matter unnumbered, body "1.1",
- * appendices "A.1." with the heading counter reset).
+ * appendices "A.1." with the heading counter reset). When the project has a
+ * references.bib, Typst's native bibliography is emitted before the first
+ * appendix (or last) — numbered style, localized title, unnumbered heading.
  */
 export function generateMainTypst(
   meta: DocumentMeta,
   sections: ConvertedSection[],
   lengthLine: string,
   templatePath = "/paperstack-template.typ",
+  bibliographyPath?: string,
 ): string {
   const lines: string[] = [];
   lines.push(`#import "${escapeTypstString(templatePath)}": report`, "");
@@ -67,7 +70,21 @@ export function generateMainTypst(
   // hand-edited document.yaml), and re-entering body must continue numbering,
   // not silently restart at 1 in the middle of a graded report.
   const entered = new Set<Mode>();
+  let bibliographyEmitted = false;
+  const emitBibliography = () => {
+    if (bibliographyPath === undefined || bibliographyEmitted) return;
+    bibliographyEmitted = true;
+    const title = meta.language === "da" ? "Referencer" : "References";
+    lines.push("");
+    lines.push(`#set heading(numbering: none)`);
+    lines.push(
+      `#bibliography("${escapeTypstString(bibliographyPath)}", title: "${escapeTypstString(title)}", style: "ieee")`,
+    );
+    current = "plain"; // the set rule above — a following mode re-switches
+  };
   for (const section of sections) {
+    // References come after the report's content but before the appendices.
+    if (section.role === "appendix") emitBibliography();
     const mode = modeFor(section.role);
     if (mode !== current) {
       lines.push("");
@@ -85,6 +102,7 @@ export function generateMainTypst(
     }
     lines.push(`#include "${section.path}"`);
   }
+  emitBibliography();
   lines.push("");
   return lines.join("\n");
 }

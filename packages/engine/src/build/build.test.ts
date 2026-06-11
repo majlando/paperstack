@@ -96,6 +96,59 @@ describe.skipIf(!hasBinaries)("buildReport on the demo fixture", () => {
     }
   }, 60_000);
 
+  it("builds a report with citations and a generated bibliography", async () => {
+    const citeDir = (await mkdtemp(join(tmpdir(), "paperstack-build-cite-"))).replaceAll("\\", "/");
+    try {
+      await cp(fixtureDir, citeDir, { recursive: true });
+      await writeFile(
+        join(citeDir, "references.bib"),
+        "@book{knuth84,\n  title = {The {TeX}book},\n  author = {Donald E. Knuth},\n  year = 1984,\n  publisher = {Addison-Wesley}\n}\n" +
+          "@online{typst-docs,\n  title = {Typst Documentation},\n  url = {https://typst.app/docs/},\n  urldate = {2026-01-15}\n}\n",
+        "utf8",
+      );
+      const section = join(citeDir, "sections/01-introduction.md");
+      await writeFile(
+        section,
+        (await readFile(section, "utf8")) +
+          "\nTypesetting is well studied [@knuth84, p. 42] and documented [@knuth84; @typst-docs].\n",
+        "utf8",
+      );
+
+      const platform = new NodePlatform();
+      const result = await buildReport(platform, citeDir, { typst: typstPath });
+      expect(existsSync(result.pdfPath)).toBe(true);
+
+      const typst = await readFile(
+        join(citeDir, "output/.build/converted/001-01-introduction.typ"),
+        "utf8",
+      );
+      expect(typst).toContain("#cite(<knuth84>, supplement: [p. 42])");
+      expect(typst).toContain("#cite(<knuth84>)#cite(<typst-docs>)");
+      const main = await readFile(join(citeDir, "output/.build/main.typ"), "utf8");
+      expect(main).toContain('#bibliography("/references.bib", title: "References", style: "ieee")');
+    } finally {
+      await rm(citeDir, { recursive: true, force: true });
+    }
+  }, 60_000);
+
+  it("names the section when a citation key has no references.bib entry", async () => {
+    const badDir = (await mkdtemp(join(tmpdir(), "paperstack-build-badcite-"))).replaceAll("\\", "/");
+    try {
+      await cp(fixtureDir, badDir, { recursive: true });
+      await writeFile(join(badDir, "references.bib"), "@book{knuth84, year = 1984}\n", "utf8");
+      const section = join(badDir, "sections/01-introduction.md");
+      await writeFile(section, (await readFile(section, "utf8")) + "\nSee [@knuht84].\n", "utf8");
+
+      const platform = new NodePlatform();
+      const error = await buildReport(platform, badDir, { typst: typstPath }).catch((e) => e);
+      expect(error.code).toBe("citation-unknown");
+      expect(error.userMessage).toContain("01-introduction.md");
+      expect(error.userMessage).toContain("@knuht84");
+    } finally {
+      await rm(badDir, { recursive: true, force: true });
+    }
+  }, 60_000);
+
   it("builds the same project as a Danish report with localized labels", async () => {
     const daDir = (await mkdtemp(join(tmpdir(), "paperstack-build-da-"))).replaceAll("\\", "/");
     try {

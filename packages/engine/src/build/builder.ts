@@ -3,6 +3,7 @@ import { PaperstackError } from "../errors.ts";
 import { loadProject } from "../project/load-project.ts";
 import { countProject, type ProjectCounts } from "../project/counters.ts";
 import { extractMermaidBlocks, sweepStaleRenders } from "./mermaid.ts";
+import { bibliographyKeys } from "./bibliography.ts";
 import type { Converter } from "./converter.ts";
 import { RemarkConverter } from "./remark-typst.ts";
 import { SEA_TEMPLATE } from "./template.ts";
@@ -78,10 +79,17 @@ export async function buildReport(
 
   const buildDir = `${projectDir}/output/.build`;
   await platform.mkdir(`${buildDir}/converted`);
+  // A references.bib at the project root switches citations on: `[@key]`
+  // spans become Typst #cite calls and the bibliography section is generated.
+  const bibText = await platform
+    .readTextFile(`${projectDir}/references.bib`)
+    .catch(() => null);
   // The in-house remark→Typst emitter is the default since the M5 cutover
   // (byte-identical with pandoc on the demo fixture and the migrated real
   // report — fixtures/golden-typst/ and scripts/converter-parity.ts).
-  const converter = options.converter ?? new RemarkConverter();
+  const converter =
+    options.converter ??
+    new RemarkConverter(bibText === null ? {} : { citationKeys: bibliographyKeys(bibText) });
 
   const converted: ConvertedSection[] = [];
   const referencedRenders = new Set<string>();
@@ -111,7 +119,17 @@ export async function buildReport(
 
     const slash = section.file.lastIndexOf("/");
     const sectionDir = slash === -1 ? "" : section.file.slice(0, slash);
-    const typst = await converter.toTypst(markdown, sectionDir);
+    let typst: string;
+    try {
+      typst = await converter.toTypst(markdown, sectionDir);
+    } catch (e) {
+      // Conversion errors (unsupported math, unknown citation key, …) say
+      // which section to open — the converter alone cannot know.
+      if (e instanceof PaperstackError) {
+        throw new PaperstackError(e.code, `In "${section.file}": ${e.userMessage}`, e.details);
+      }
+      throw e;
+    }
 
     const stem = section.file.slice(slash + 1).replace(/\.md$/i, "");
     const outRel = `output/.build/converted/${String(i).padStart(3, "0")}-${stem}.typ`;
@@ -128,6 +146,7 @@ export async function buildReport(
     converted,
     buildLengthLine(project.meta, counts),
     `/${templateRel}`,
+    bibText === null ? undefined : "/references.bib",
   );
   await platform.writeTextFile(`${buildDir}/main.typ`, main);
 

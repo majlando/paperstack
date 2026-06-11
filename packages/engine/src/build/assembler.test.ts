@@ -124,6 +124,42 @@ describe("generateMainTypst", () => {
     expect(main.match(/#counter\(heading\)\.update\(0\)/g)).toHaveLength(2);
   });
 
+  it("emits the bibliography before the first appendix, unnumbered", () => {
+    const main = generateMainTypst(
+      meta(),
+      [body("/o/a.typ"), appendix("/o/x.typ")],
+      "L",
+      "/paperstack-template.typ",
+      "/references.bib",
+    );
+    const bib = main.indexOf("#bibliography(");
+    expect(main).toContain(
+      `#bibliography("/references.bib", title: "References", style: "ieee")`,
+    );
+    expect(bib).toBeGreaterThan(main.indexOf(`#include "/o/a.typ"`));
+    expect(bib).toBeLessThan(main.indexOf(`#include "/o/x.typ"`));
+    // unnumbered title, and the appendix mode re-establishes its numbering after
+    expect(main.lastIndexOf("#set heading(numbering: none)", bib)).toBeGreaterThan(-1);
+    expect(main.indexOf(`#set heading(numbering: "A.1.")`)).toBeGreaterThan(bib);
+  });
+
+  it("emits the bibliography last when there are no appendices, localized", () => {
+    const main = generateMainTypst(
+      meta({ language: "da" }),
+      [body("/o/a.typ")],
+      "L",
+      "/paperstack-template.typ",
+      "/references.bib",
+    );
+    expect(main).toContain(`title: "Referencer"`);
+    expect(main.indexOf("#bibliography(")).toBeGreaterThan(main.indexOf(`#include "/o/a.typ"`));
+  });
+
+  it("emits no bibliography when the project has none", () => {
+    const main = generateMainTypst(meta(), [body("/o/a.typ")], "L");
+    expect(main).not.toContain("#bibliography(");
+  });
+
   it("does not restart body numbering when roles are interleaved", () => {
     // body, front-matter, body is schema-legal in a hand-edited
     // document.yaml — the second body run must continue numbering, not

@@ -64,4 +64,9 @@ export {
   figureMarkdown,
 } from "./project/import-figure.ts";
 export { buildReport, type BuildOptions, type BuildResult } from "./build/builder.ts";
-export { RemarkConverter, markdownToTypst } from "./build/remark-typst.ts";
+export {
+  RemarkConverter,
+  markdownToTypst,
+  type RemarkConverterOptions,
+} from "./build/remark-typst.ts";
+export { parseBibliography, bibliographyKeys, type BibEntry } from "./build/bibliography.ts";

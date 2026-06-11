@@ -76,7 +76,11 @@ resolution identical to `rewriteImagePaths`.
   parity break; the real report contains no `$…$` spans (re-verified). Note
   the standard Markdown-math trade-off: two `$` in one paragraph form a math
   span — visible immediately in the KaTeX preview, escapable as `\$`.
-  **Citations** are the remaining M5 emitter task.
+- **Citations landed in the emitter (2026-06-11)**: `[@key]` spans become
+  `#cite` calls *only* when the project has a references.bib (the builder
+  passes its keys in), so projects without one keep exact pandoc parity.
+  With a bibliography, unknown keys fail the build by design. Emitter-only,
+  like math: the pandoc fallback prints `[@key]` literally.
 - Non-GFM constructs pandoc supports but remark-gfm has no syntax for
   (definition lists, superscript, …) stay out of scope: authors cannot write
   them in Paperstack's GFM anyway.

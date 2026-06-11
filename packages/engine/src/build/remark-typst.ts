@@ -37,10 +37,21 @@ import { latexToTypstMath } from "./typst-math.ts";
 
 const parser = unified().use(remarkParse).use(remarkGfm).use(remarkMath);
 
+export interface RemarkConverterOptions {
+  /**
+   * Keys of the project's references.bib. When set, `[@key]` spans become
+   * Typst #cite calls (validated against these keys); when absent, they
+   * stay prose — citations only activate for projects with a bibliography.
+   */
+  citationKeys?: ReadonlySet<string>;
+}
+
 export class RemarkConverter implements Converter {
+  constructor(private readonly options: RemarkConverterOptions = {}) {}
+
   async toTypst(markdown: string, sectionDir: string): Promise<string> {
     try {
-      return markdownToTypst(markdown, sectionDir);
+      return markdownToTypst(markdown, sectionDir, this.options);
     } catch (error) {
       if (error instanceof PaperstackError) throw error;
       throw new PaperstackError(
@@ -52,11 +63,16 @@ export class RemarkConverter implements Converter {
   }
 }
 
-export function markdownToTypst(markdown: string, sectionDir: string): string {
+export function markdownToTypst(
+  markdown: string,
+  sectionDir: string,
+  options: RemarkConverterOptions = {},
+): string {
   const root = parser.parse(markdown);
   const ctx: Ctx = {
     sectionDir,
     source: markdown,
+    citationKeys: options.citationKeys ?? null,
     usedSlugs: new Set(),
     footnotes: new Map(),
     definitions: new Map(),
@@ -69,6 +85,8 @@ interface Ctx {
   readonly sectionDir: string;
   /** The Markdown being converted — for re-reading raw spans (image alt). */
   readonly source: string;
+  /** references.bib keys, or null when the project has no bibliography. */
+  readonly citationKeys: ReadonlySet<string> | null;
   /** Heading label slugs already taken (GitHub-style dedup with -1, -2, …). */
   readonly usedSlugs: Set<string>;
   readonly footnotes: Map<string, FootnoteDefinition>;
@@ -233,7 +251,7 @@ function renderInline(prepared: Prepared, ctx: Ctx): InlinePart | null {
   const node = prepared.node;
   switch (node.type) {
     case "text":
-      return { text: escapeTypstText(node.value), hashCall: false };
+      return renderText(node.value, ctx);
     case "emphasis":
       return wrapInline("#emph", node.children, ctx);
     case "strong":
@@ -284,6 +302,57 @@ function renderInline(prepared: Prepared, ctx: Ctx): InlinePart | null {
     default:
       return { text: "", hashCall: false };
   }
+}
+
+/** A citation key as pandoc and Typst labels both accept it. */
+const CITE_ITEM = /^@([A-Za-z0-9_][A-Za-z0-9_.:-]*)(?:\s*,\s*(.+))?$/;
+
+/**
+ * Plain text, with `[@key]` / `[@a; @b]` / `[@key, p. 12]` citation spans
+ * turned into Typst #cite calls when the project has a references.bib.
+ * Adjacent calls collapse into one bracket group ("[1, 2]") in the PDF.
+ */
+function renderText(value: string, ctx: Ctx): InlinePart {
+  const keys = ctx.citationKeys;
+  if (keys === null) return { text: escapeTypstText(value), hashCall: false };
+  const parts: InlinePart[] = [];
+  let last = 0;
+  for (const m of value.matchAll(/\[@[^\]]*\]/g)) {
+    const cite = renderCitationSpan(m[0], keys);
+    if (cite === null) continue; // not citation syntax — stays prose
+    if (m.index > last) {
+      parts.push({ text: escapeTypstText(value.slice(last, m.index)), hashCall: false });
+    }
+    parts.push({ text: cite, hashCall: true });
+    last = m.index + m[0].length;
+  }
+  if (parts.length === 0) return { text: escapeTypstText(value), hashCall: false };
+  if (last < value.length) {
+    parts.push({ text: escapeTypstText(value.slice(last)), hashCall: false });
+  }
+  return joinParts(parts);
+}
+
+/** `[@a; @b, p. 12]` → cite calls, or null when it isn't citation syntax. */
+function renderCitationSpan(span: string, keys: ReadonlySet<string>): string | null {
+  const items = span.slice(1, -1).split(";").map((item) => CITE_ITEM.exec(item.trim()));
+  if (items.some((m) => m === null)) return null;
+  return items
+    .map((m) => {
+      const key = m![1]!;
+      if (!keys.has(key)) {
+        throw new PaperstackError(
+          "citation-unknown",
+          `The citation "@${key}" has no matching entry in references.bib. Check the key against the file.`,
+          span,
+        );
+      }
+      const locator = m![2];
+      return locator === undefined
+        ? `#cite(<${key}>)`
+        : `#cite(<${key}>, supplement: [${escapeTypstText(locator)}])`;
+    })
+    .join("");
 }
 
 function wrapInline(fn: string, children: readonly PhrasingContent[], ctx: Ctx): InlinePart {

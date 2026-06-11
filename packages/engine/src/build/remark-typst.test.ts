@@ -362,6 +362,46 @@ describe("math", () => {
   });
 });
 
+describe("citations", () => {
+  /** Convert with a known key set, like a project with a references.bib. */
+  const tc = (md: string, keys: string[] = ["knuth84", "lamport94"]) =>
+    markdownToTypst(md, "sections", { citationKeys: new Set(keys) }).replace(/\n$/, "");
+
+  it("turns [@key] into a Typst cite call", () => {
+    expect(tc("As shown in [@knuth84] earlier.")).toBe(
+      "As shown in #cite(<knuth84>) earlier.",
+    );
+  });
+
+  it("terminates the call before adjacent punctuation", () => {
+    expect(tc("see [@knuth84].")).toBe("see #cite(<knuth84>);.");
+  });
+
+  it("renders multi-key spans as adjacent calls (Typst groups them)", () => {
+    expect(tc("[@knuth84; @lamport94]")).toBe("#cite(<knuth84>)#cite(<lamport94>)");
+  });
+
+  it("passes a locator as the supplement", () => {
+    expect(tc("[@knuth84, p. 12]")).toBe("#cite(<knuth84>, supplement: [p. 12])");
+  });
+
+  it("leaves non-citation brackets and @-text as prose", () => {
+    expect(tc("an array [@ index zero] of things")).toBe(
+      "an array \\[\\@ index zero\\] of things",
+    );
+    expect(tc("mail me @home")).toBe("mail me \\@home");
+  });
+
+  it("stays prose entirely when the project has no references.bib", () => {
+    expect(t("As shown in [@knuth84].")).toBe("As shown in \\[\\@knuth84\\].");
+  });
+
+  it("rejects a key missing from references.bib, naming it", () => {
+    expect(() => tc("[@nosuch]")).toThrow(PaperstackError);
+    expect(() => tc("[@nosuch]")).toThrow(/@nosuch/);
+  });
+});
+
 describe("tables", () => {
   it("matches pandoc's #figure/#table layout exactly", () => {
     expect(t("| Case | Expected |\n| ---- | -------- |\n| Found | `1` |\n| Empty | `-1` |")).toBe(

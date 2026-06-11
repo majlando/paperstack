@@ -9,6 +9,7 @@ export type ErrorCode =
   | "dependency-missing"
   | "convert-failed"
   | "math-invalid"
+  | "citation-unknown"
   | "image-missing"
   | "output-locked"
   | "export-failed";
