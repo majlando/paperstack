@@ -90,6 +90,52 @@ describe("editMetadataInYaml", () => {
     expect(editMetadataInYaml(YAML, {})).toBe(YAML);
   });
 
+  it("a full-field save with no changes is byte-identical on a scaffold-shaped file", () => {
+    // What the form actually sends on first save: every field, most empty.
+    const scaffold = [
+      `title: "Demo"`,
+      `course: ""`,
+      `institution: ""`,
+      `authors: [] # - { name: "Full Name", student_id: "12345" }`,
+      `language: en`,
+      `body_cap_normalsider: 40`,
+      `sections:`,
+      `  - { file: sections/01-introduction.md, role: body }`,
+      ``,
+    ].join("\n");
+    const out = editMetadataInYaml(scaffold, {
+      title: "Demo",
+      subtitle: "",
+      course: "",
+      institution: "",
+      logo: "",
+      date: "",
+      language: "en",
+      body_cap_normalsider: 40,
+      authors: [],
+    });
+    expect(out).toBe(scaffold);
+  });
+
+  it("leaves an unchanged author list (and its comments) untouched", () => {
+    const flow = [
+      `title: Demo`,
+      `authors: [{ name: Ada, student_id: "1" }] # hand-written`,
+      `sections:`,
+      `  - { file: sections/01.md, role: body }`,
+      ``,
+    ].join("\n");
+    const out = editMetadataInYaml(flow, {
+      authors: [{ name: "Ada", student_id: "1" }],
+      course: "SEA",
+    });
+    // The node is not replaced: the comment riding on it and the flow style
+    // survive (the emitter normalizes flow spacing; that churn is the yaml
+    // library's, not a node replacement).
+    expect(out).toContain(`authors: [ { name: Ada, student_id: "1" } ] # hand-written`);
+    expect(out).toContain("course: SEA");
+  });
+
   it("never rewraps hand-written long lines (Git no-churn rule)", () => {
     const long = [
       "title: Demo",

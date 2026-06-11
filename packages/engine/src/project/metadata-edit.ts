@@ -40,6 +40,22 @@ function keyName(pairKey: unknown): string {
   return pairKey instanceof Scalar ? String(pairKey.value) : String(pairKey);
 }
 
+/** True when the existing authors node already encodes exactly `next`. */
+function sameAuthors(existingNode: unknown, next: { name: string; student_id?: string }[]): boolean {
+  const toJson = (existingNode as { toJSON?: () => unknown } | null)?.toJSON;
+  const existing = typeof toJson === "function" ? toJson.call(existingNode) : existingNode;
+  if (!Array.isArray(existing) || existing.length !== next.length) return false;
+  return existing.every((item, i) => {
+    if (typeof item !== "object" || item === null) return false;
+    const rec = item as Record<string, unknown>;
+    if (Object.keys(rec).some((k) => k !== "name" && k !== "student_id")) return false;
+    const want = next[i]!;
+    if (String(rec.name) !== want.name) return false;
+    const haveId = rec.student_id == null ? undefined : String(rec.student_id);
+    return haveId === want.student_id;
+  });
+}
+
 /** Replace in place when the key exists; otherwise insert at its canonical spot. */
 function setInOrder(doc: Document, map: YAMLMap, key: string, value: unknown): void {
   const node = doc.createNode(value);
@@ -86,8 +102,17 @@ export function editMetadataInYaml(yamlText: string, edit: MetadataEdit): string
   const setOptionalText = (key: string, value: string | undefined) => {
     if (value === undefined) return;
     const trimmed = value.trim();
-    if (trimmed === "") doc.delete(key);
-    else setScalar(key, trimmed);
+    if (trimmed === "") {
+      // Only delete a key that actually held text. The scaffold writes
+      // placeholders like `course: ""` — a form save that never filled the
+      // field must not strip them from the shared file.
+      const existing: unknown = map.get(key, true);
+      const alreadyEmpty =
+        existing === undefined ||
+        (existing instanceof Scalar &&
+          (existing.value == null || String(existing.value).trim() === ""));
+      if (!alreadyEmpty) doc.delete(key);
+    } else setScalar(key, trimmed);
   };
 
   if (edit.title !== undefined) setScalar("title", edit.title.trim());
@@ -105,7 +130,12 @@ export function editMetadataInYaml(yamlText: string, edit: MetadataEdit): string
       .map((a) => ({ name: a.name.trim(), student_id: a.student_id?.trim() }))
       .filter((a) => a.name !== "")
       .map((a) => (a.student_id ? a : { name: a.name }));
-    setInOrder(doc, map, "authors", authors);
+    // Replacing the node would drop comments riding on it (the scaffold's
+    // hint comment) and re-style hand-written flow lists, so an unchanged
+    // list is left exactly as the group wrote it.
+    if (!sameAuthors(map.get("authors"), authors)) {
+      setInOrder(doc, map, "authors", authors);
+    }
   }
 
   // The result must still be a loadable document — same schema as the loader.
