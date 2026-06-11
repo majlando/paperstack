@@ -176,6 +176,11 @@ Revised after the 2026-06-11 full review and the side-by-side against the origin
 
 The same day's code-level review added: M4.5 above (data integrity, gates v0.1.0), CI coverage of the real PDF pipeline plus webview privilege hardening in M6, and the rendered-diagrams and line-endings decisions in M7 — the two holes in the group-via-Git story.
 
+## Shipped ahead of schedule (2026-06-11) — writing conveniences outside the original plan
+
+- [x] **Paste image from clipboard**: Ctrl+V of a screenshot (or an image copied from a browser) in the editor goes straight into the Insert Figure flow — same caption prompt, same slugified collision-safe naming via the engine (`importFigureBytes`), image bytes written atomically into the project's images folder. Screenshots are the bulk of a CS report's figures; this collapses save-to-file → dialog → pick into one keystroke
+- [x] **Project-wide search**: 🔍 in the sidebar (Ctrl+Shift+F) searches every section — the active one as it stands in the editor, unsaved edits included — with live results grouped by section and click-to-jump selection in the editor (engine `searchContent` is pure and unit-tested; capped at 500 matches)
+
 ## Milestone 5 — Own the converter, then the writing features *(L)*
 
 Goal: the three writing needs the first real report met by hand (tables, math, citations) stop needing hand-work — built on a Markdown→Typst emitter we own, not layered on the converter we always planned to replace (2026-06-11 review decision: emitter first, because math, citations, and the table-styling fix all want control pandoc doesn't give).
@@ -223,10 +228,10 @@ Goal: a stranger on Windows, macOS, or Linux installs a release build and trusts
 
 Goal: the group report is written in Paperstack while some group members edit the same project in plain editors over Git.
 
-- [ ] Auto-reload when the window regains focus and project files changed on disk (the conflict guard already protects unsaved edits; the manual Reload button stays)
-- [ ] Per-section changed-on-disk indicators in the sidebar after an external change
+- [x] Auto-reload when the window regains focus and project files changed on disk (the conflict guard already protects unsaved edits; the manual Reload button stays) (2026-06-11: focus-regain triggers a throttled `reloadProject`, which store tests prove never touches unsaved edits)
+- [x] Per-section changed-on-disk indicators in the sidebar after an external change (2026-06-11: per-section content hashes in the counters; a dot appears when a reload sees a hash move, clears when the section is opened; the app's own saves never dot)
 - [x] **Rendered-diagrams default decided (2026-06-11): committed, not ignored.** Scaffolded projects no longer git-ignore `diagrams/rendered/` — the renders are content-hashed and deterministic, so committing them is conflict-free, and group members/CLI/CI can build sections containing diagrams they never opened in Paperstack. Self-healing (next item) is now convenience, not the fix. (Projects scaffolded before this keep their old `.gitignore` — removing the line by hand re-enables committing)
-- [ ] Export self-heals diagrams: render missing Mermaid SVGs in-app before building, instead of telling the user to go open the section — a group member adding a diagram in another editor is exactly this case (the readable error stays for the CLI path, which has no renderer)
+- [x] Export self-heals diagrams: render missing Mermaid SVGs in-app before building, instead of telling the user to go open the section — a group member adding a diagram in another editor is exactly this case (the readable error stays for the CLI path, which has no renderer) (2026-06-11: `runBuild` renders missing SVGs for every section first, best-effort)
 - [x] Scaffold a `.gitattributes` (`* text=auto`) into new projects alongside the `.gitignore` — mixed Windows/macOS groups hit CRLF diff churn in week one; counters are already CR-insensitive, diffs weren't (2026-06-11; never overwrites an existing one)
 - [x] Readable error when `document.yaml` contains Git conflict markers (`<<<<<<<`) — the likeliest broken state after a bad merge of the shared ordering file (2026-06-11; pulled forward from M7, it was a 10-line fix with a test)
 - [ ] Group repo CI: the report builds and the normalsider count is checked on every push, via the packaged CLI from M6 — members who don't run Paperstack still see the PDF and the count on their changes
