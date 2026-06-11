@@ -1,6 +1,9 @@
 // NOTE: NodePlatform deliberately lives in the "./node" subpath export —
 // the main entry must stay importable from the webview (no node:* imports).
 export type { Platform } from "./platform/platform.ts";
+// Test helper (in-memory, zero deps) — exported so app-level tests can drive
+// the store/engine against a controllable Platform without touching disk.
+export { FakePlatform } from "./platform/fake-platform.ts";
 export { PaperstackError, type ErrorCode } from "./errors.ts";
 export {
   documentSchema,

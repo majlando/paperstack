@@ -19,7 +19,17 @@ export class NodePlatform implements Platform {
   }
 
   async writeTextFile(path: string, content: string): Promise<void> {
-    await writeFile(path, content, "utf8");
+    // Crash-safe: write a sibling temp file, then rename over the target —
+    // a crash mid-write must never leave a truncated document.yaml or
+    // section file (often the only copy of the user's writing).
+    const tmp = `${path}.paperstack-tmp`;
+    await writeFile(tmp, content, "utf8");
+    try {
+      await rename(tmp, path);
+    } catch (e) {
+      await rm(tmp, { force: true }).catch(() => {});
+      throw e;
+    }
   }
 
   async fileExists(path: string): Promise<boolean> {
