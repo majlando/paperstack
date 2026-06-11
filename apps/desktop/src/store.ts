@@ -168,15 +168,27 @@ function setWindowTitle(reportTitle: string): void {
   document.title = `${reportTitle} — Paperstack`;
 }
 
-/** Read–edit–write document.yaml; skips the write when nothing changed. */
-async function editDocumentYaml(
+/**
+ * Read–edit–write document.yaml; skips the write when nothing changed.
+ * Serialized through a promise chain: two overlapping structure edits (e.g.
+ * rapid "Move up" clicks) would otherwise both read the same base text and
+ * the second write would silently drop the first edit.
+ */
+let yamlEditChain: Promise<unknown> = Promise.resolve();
+function editDocumentYaml(
   projectDir: string,
   edit: (yamlText: string) => string,
 ): Promise<void> {
-  const path = `${projectDir}/document.yaml`;
-  const text = await platform.readTextFile(path);
-  const next = edit(text);
-  if (next !== text) await platform.writeTextFile(path, next);
+  const run = yamlEditChain
+    .catch(() => {}) // a failed edit must not jam the chain
+    .then(async () => {
+      const path = `${projectDir}/document.yaml`;
+      const text = await platform.readTextFile(path);
+      const next = edit(text);
+      if (next !== text) await platform.writeTextFile(path, next);
+    });
+  yamlEditChain = run;
+  return run;
 }
 
 /**
@@ -367,7 +379,11 @@ export const useStore = create<AppState>((set, get) => {
       // re-read the open section unless the user has unsaved changes
       if (activeFile && !dirty && project.meta.sections.some((s) => s.file === activeFile)) {
         const content = await platform.readTextFile(`${projectDir}/${activeFile}`);
-        set({ content, baseline: content, contentVersion: get().contentVersion + 1 });
+        // Keystrokes (or a section switch) may have landed during the reads
+        // above — never let the disk copy clobber newer unsaved edits.
+        if (!get().dirty && get().activeFile === activeFile) {
+          set({ content, baseline: content, contentVersion: get().contentVersion + 1 });
+        }
       }
     } catch (e) {
       set({ error: toError(e) });

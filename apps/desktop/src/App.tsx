@@ -80,6 +80,12 @@ export default function App() {
     // next one is allowed to discard. Conflicts always block — their banner
     // resolves them. Every close attempt still tries the save first.
     let closeDiscardArmed = false;
+    // A successful save (autosave, Ctrl+S, section switch) means the failure
+    // the user was told about is gone — a later, different failure must block
+    // and explain again rather than silently discard on the first close.
+    const disarmOnSave = useStore.subscribe((s, prev) => {
+      if (closeDiscardArmed && prev.dirty && !s.dirty) closeDiscardArmed = false;
+    });
     const unlisten = getCurrentWindow().onCloseRequested(async (event) => {
       const state = useStore.getState();
       if (state.metadataOpen && state.metadataDirty) {
@@ -111,7 +117,10 @@ export default function App() {
       }
       // armed and still failing: the close proceeds, discarding the edits
     });
-    return () => void unlisten.then((fn) => fn());
+    return () => {
+      disarmOnSave();
+      void unlisten.then((fn) => fn());
+    };
   }, []);
 
   // Writers press Ctrl+S no matter what autosave promises — honor it instead

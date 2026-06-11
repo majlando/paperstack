@@ -39,7 +39,18 @@ export class TauriPlatform implements Platform {
   }
 
   async writeTextFile(path: string, content: string): Promise<void> {
-    await writeTextFile(path, content);
+    // Crash-safe: write a sibling temp file, then rename over the target —
+    // a crash mid-write must never leave a truncated document.yaml or
+    // section file (often the only copy of the user's writing). Rust's
+    // rename replaces the destination atomically on every desktop platform.
+    const tmp = `${path}.paperstack-tmp`;
+    await writeTextFile(tmp, content);
+    try {
+      await rename(tmp, path);
+    } catch (e) {
+      await remove(tmp).catch(() => {});
+      throw e;
+    }
   }
 
   fileExists(path: string): Promise<boolean> {
