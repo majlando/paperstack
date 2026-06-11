@@ -212,8 +212,9 @@ Goal: a stranger on Windows, macOS, or Linux installs a release build and trusts
 - [ ] Vendor the template into the project: the first build writes the `.typ` template as a Git-tracked, user-editable project file instead of rewriting it into `output/.build/` on every build — app updates *offer* the new template instead of silently changing a finished report's layout (the figure-float regression caught in review was exactly this failure mode). This is also the honest answer to template customization, currently "explicitly cut"
 
 **Platforms and release machinery:**
-- [ ] `fetch-binaries` becomes cross-platform (TS port run via tsx; per-target typst/pandoc triples for dev and CI; carries the M4.5 SHA-256 pins forward)
-- [ ] CI runs the real pipeline: fetch the pinned Linux binaries in CI and run the currently-skipped PDF integration test on every push — today the entire Markdown→Pandoc→Typst→PDF path, the product's one technically risky part, has zero CI coverage (unlocked by the TS port above; pull both forward if the rest of M6 waits). Add a `da`-language fixture build to the matrix so label localization is covered end to end
+- [x] `fetch-binaries` becomes cross-platform (TS port run via tsx; per-target typst/pandoc triples for dev and CI; carries the M4.5 SHA-256 pins forward) (2026-06-11, pulled forward: `scripts/fetch-binaries.ts` with pinned hashes for Windows x64, macOS x64/arm64, Linux x64/arm64 — every archive hashed from the upstream releases; the .ps1 is gone, `pnpm fetch-binaries` everywhere)
+- [x] CI runs the real pipeline: fetch the pinned Linux binaries in CI and run the previously-skipped PDF integration test on every push — the entire Markdown→Pandoc→Typst→PDF path used to have zero CI coverage (2026-06-11, pulled forward with the TS port; `bin/` is cached keyed on the fetch script, so pin bumps re-fetch automatically. The pandoc golden-file drift test now runs in CI too)
+- [ ] Add a `da`-language fixture build to the CI matrix so label localization is covered end to end
 - [ ] PDF pane via pdf.js everywhere (the documented upgrade path): webkitgtk on Linux does not render PDFs in iframes, so this is a prerequisite, not polish — and it fixes the accepted scroll-reset-on-recompile annoyance as a side effect
 - [ ] `pnpm smoke` passes on macOS and Linux (needs a desktop session, so it stays a release-checklist step, not CI)
 - [ ] CI release workflow: tag → matrix build (NSIS/MSI, dmg, AppImage + deb) → GitHub release with artifacts attached
@@ -235,7 +236,7 @@ Goal: the group report is written in Paperstack while some group members edit th
 - [x] Scaffold a `.gitattributes` (`* text=auto`) into new projects alongside the `.gitignore` — mixed Windows/macOS groups hit CRLF diff churn in week one; counters are already CR-insensitive, diffs weren't (2026-06-11; never overwrites an existing one)
 - [x] Readable error when `document.yaml` contains Git conflict markers (`<<<<<<<`) — the likeliest broken state after a bad merge of the shared ordering file (2026-06-11; pulled forward from M7, it was a 10-line fix with a test)
 - [ ] Group repo CI: the report builds and the normalsider count is checked on every push, via the packaged CLI from M6 — members who don't run Paperstack still see the PDF and the count on their changes
-- [ ] Recents: drop entries that fail to open (from the backlog)
+- [x] Recents: drop entries that fail to open (2026-06-11: an entry whose folder is gone or no longer holds a document.yaml is dropped when clicked; fixable load errors — e.g. a bad merge in document.yaml — keep their entry)
 - [ ] Editor: preserve undo history across section switches (from the backlog)
 - [ ] Preview scroll: restore by anchor rather than raw `scrollTop` (from the backlog)
 - [ ] Dogfood gate: the group report is written in Paperstack — the v1 bar from PROJECT.md carries over to v0.2
@@ -247,11 +248,11 @@ Goal: the group report is written in Paperstack while some group members edit th
 Known-good improvements that don't gate any milestone — pick up when touching the area anyway:
 
 - [x] Scripted smoke test for the app shell: `pnpm smoke` scaffolds a scratch project, launches the real app (`tauri dev` + `VITE_SMOKE_SCRIPT`), drives the store through open → edit → save → TODO confirm → export, and asserts the result the app writes to `output/smoke-result.json`. Local only (needs sidecars, port 1420, and a desktop session)
-- [ ] `vite.config.ts`: replace the `@ts-expect-error` on `process` with `@types/node` in devDependencies
+- [x] `vite.config.ts`: replace the `declare const process` workaround with `@types/node` in devDependencies (2026-06-11)
 - [x] Store unit tests: every real data-loss bug found in review (both rounds) lived in `store.ts`, not the engine — vitest for `apps/desktop` with a mocked platform (the Tauri imports need stubbing) would have caught them before review did. The save path especially deserves a delayed-write fake-platform test (2026-06-11: `store.test.ts` + `GatedPlatform`, 17 tests pinning every reviewed race; runs in CI via `pnpm -r test`)
 - [x] Ctrl+S bound to `saveActive` — autosave makes it redundant, but writers will press it; the binding is pure reassurance (2026-06-11)
 - [ ] "Show in folder" button on the export notice (`tauri-plugin-opener`) instead of only printing the relative path
-- [ ] Sidebar inline rename/add: commit on blur instead of silently discarding (Enter is the only commit path today, and nothing says so)
+- [x] Sidebar inline rename/add: commit on blur instead of silently discarding (2026-06-11: leaving the field commits like Enter; Escape stays the cancel path)
 - [ ] Section-remove confirm copy tells the user the file stays on disk and how to re-add it (the data is safe; the copy doesn't say so)
 - [x] `toError`: render non-`Error` throws readably (2026-06-11)
 - [x] Sweep stale `.typ` files from `output/.build/converted/` after a successful export, with the diagram sweep's only-our-naming-scheme rule (2026-06-11)
@@ -282,6 +283,6 @@ Known-good improvements that don't gate any milestone — pick up when touching 
 | Typst's native bibliography can't express the report's references | M5 engine-only spike against real references from the SEA report — before any citation UI exists (pandoc-citeproc is not a fallback here; it dies with the converter) |
 | Linux webview cannot show PDFs in an iframe | Known going in: pdf.js replaces the built-in viewer in M6 *before* the first Linux release; it also fixes the scroll-reset annoyance |
 | Autosave can lose writing (save race, no flush on close) | Found 2026-06-11 — both fixes are M4.5 items and gate v0.1.0; the smoke test should assert the close-flush once it exists |
-| Unverified binary downloads ship to end users as sidecars | M4.5 adds SHA-256 pins to `fetch-binaries.ps1`; the M6 TS port carries them to every platform and CI |
-| Build string layer (assembler/converter) untested in CI | M4.5 unit-tests the pure functions; M6 runs the full PDF integration test in CI on Linux |
+| Unverified binary downloads ship to end users as sidecars | **Cleared (2026-06-11)** — SHA-256 pins for every platform in `scripts/fetch-binaries.ts`, verified before install, used by dev and CI |
+| Build string layer (assembler/converter) untested in CI | **Cleared (2026-06-11)** — M4.5 unit-tested the pure functions; CI now fetches pinned binaries and runs the full PDF integration test on Linux |
 | Group member adds a diagram outside the app → export breaks for everyone | M7 decision item: commit content-hashed renders (recommended) and/or in-app self-healing; until then, the readable error is the only mitigation |
