@@ -7,9 +7,12 @@
 import { unified, type Processor } from "unified";
 import remarkParse from "remark-parse";
 import remarkGfm from "remark-gfm";
+import remarkMath from "remark-math";
 import remarkRehype from "remark-rehype";
 import rehypeHighlight from "rehype-highlight";
 import rehypeStringify from "rehype-stringify";
+import katex from "katex";
+import "katex/dist/katex.min.css";
 import { hashDiagram } from "@paperstack/engine";
 import { renderMermaidSvg } from "./mermaid.ts";
 
@@ -42,6 +45,7 @@ export class MarkdownPreview {
     this.processor = unified()
       .use(remarkParse)
       .use(remarkGfm)
+      .use(remarkMath)
       .use(remarkRehype)
       .use(rehypeHighlight)
       .use(rehypeStringify) as unknown as Processor;
@@ -78,6 +82,25 @@ export class MarkdownPreview {
           img.replaceWith(this.errorBox((e as Error).message));
         }
       }
+    }
+
+    // Math is rendered after sanitization, like Mermaid below: KaTeX builds
+    // its DOM from the math source text directly, so nothing it produces
+    // ever passes through innerHTML.
+    for (const code of Array.from(
+      this.container.querySelectorAll("code.math-inline, code.math-display"),
+    )) {
+      const display = code.classList.contains("math-display");
+      const host = document.createElement(display ? "div" : "span");
+      if (display) host.className = "my-4 text-center";
+      katex.render(code.textContent ?? "", host, {
+        displayMode: display,
+        // Invalid math renders highlighted in place instead of failing the
+        // whole preview — the PDF export reports it as a readable error.
+        throwOnError: false,
+        errorColor: "#f87171",
+      });
+      (display ? (code.closest("pre") ?? code) : code).replaceWith(host);
     }
 
     const mermaidBlocks = Array.from(
