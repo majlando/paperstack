@@ -68,6 +68,11 @@ describe("generateMainTypst", () => {
     );
   });
 
+  it("escapes include paths (a quote in a section filename is legal on macOS/Linux)", () => {
+    const main = generateMainTypst(meta(), [body(`/o/a"b.typ`)], "L");
+    expect(main).toContain(`#include "/o/a\\"b.typ"`);
+  });
+
   it("escapes metadata that contains quotes and backslashes", () => {
     const main = generateMainTypst(
       meta({ title: 'Smart "Home" \\ Hub' }),

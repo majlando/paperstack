@@ -100,7 +100,7 @@ export function generateMainTypst(
       entered.add(mode);
       current = mode;
     }
-    lines.push(`#include "${section.path}"`);
+    lines.push(`#include "${escapeTypstString(section.path)}"`);
   }
   emitBibliography();
   lines.push("");
