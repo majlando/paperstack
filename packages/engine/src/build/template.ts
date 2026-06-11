@@ -1,11 +1,18 @@
+import { hashContent } from "../project/counters.ts";
+
 /**
- * The SEA report Typst template. Written into output/.build/sea.typ at build
- * time (Typst can only include files under --root, so the template must live
- * inside the project during a build).
+ * The SEA report Typst template, vendored into the project on first build
+ * (Typst can only include files under --root, and a Git-tracked template
+ * means app updates can never silently change a finished report's layout —
+ * see templateStatus below for the update offer).
  *
- * Fonts fall back left to right. Typst-bundled fonts are first so projects
- * render consistently across machines; Windows report-style fonts remain
- * fallback options for users who customize the template later.
+ * Fonts: builds run with --ignore-system-fonts, so only the fonts embedded
+ * in the bundled Typst (Libertinus Serif, New Computer Modern, DejaVu Sans
+ * Mono — all with full bold/italic variants) and fonts committed into the
+ * project's fonts/ folder resolve — the same commit renders the same PDF
+ * for every group member on any OS. Customizing the look means editing the
+ * vendored template (yours from the first build) and, for non-embedded
+ * fonts, committing the files to fonts/ so the whole group has them.
  */
 export const SEA_TEMPLATE = `// Paperstack SEA report template (written by Paperstack at build time)
 #let report(
@@ -21,8 +28,8 @@ export const SEA_TEMPLATE = `// Paperstack SEA report template (written by Paper
   body,
 ) = {
   set document(title: title)
-  set text(lang: language, size: 11pt, font: ("Libertinus Serif", "New Computer Modern", "Cambria"))
-  show raw: set text(font: ("DejaVu Sans Mono", "Consolas"), size: 9pt)
+  set text(lang: language, size: 11pt, font: ("Libertinus Serif", "New Computer Modern"))
+  show raw: set text(font: "DejaVu Sans Mono", size: 9pt)
   let margins = (x: 2.4cm, top: 2.6cm, bottom: 2.6cm)
   set page(paper: "a4", margin: margins)
   set par(justify: true)
@@ -114,3 +121,31 @@ export const SEA_TEMPLATE = `// Paperstack SEA report template (written by Paper
   body
 }
 `;
+
+/**
+ * CR-insensitive hashes of every stock template Paperstack has ever shipped
+ * (templateStatus checks the current one first, so entries only ever mean
+ * "unmodified stock"). A vendored copy matching one of these is safe to
+ * offer an update for; a copy matching nothing was customized by the user
+ * and is never touched. Append the old hash here whenever SEA_TEMPLATE
+ * changes — the templateStatus test fails if you forget.
+ */
+const STOCK_TEMPLATE_HASHES: ReadonlySet<string> = new Set([
+  "3aa45202", // 2026-06-11, booktabs tables
+  "3ba1be3b", // 2026-06-11, pre-booktabs
+  "e3e77669", // M4 polish (figure floats, navy headings, logo)
+  "5fe9d137",
+  "2094940e", // M1 original
+]);
+
+export type TemplateStatus = "current" | "outdated" | "customized";
+
+/** Classifies a project's vendored paperstack-template.typ (see hashes above). */
+export function templateStatus(
+  text: string,
+  stockHashes: ReadonlySet<string> = STOCK_TEMPLATE_HASHES,
+): TemplateStatus {
+  const hash = hashContent(text);
+  if (hash === hashContent(SEA_TEMPLATE)) return "current";
+  return stockHashes.has(hash) ? "outdated" : "customized";
+}

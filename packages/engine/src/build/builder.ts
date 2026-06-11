@@ -154,11 +154,21 @@ export async function buildReport(
   );
   await platform.writeTextFile(`${buildDir}/main.typ`, main);
 
+  // Deterministic output (M6): system fonts are never searched, so the
+  // default look — typst's embedded Libertinus/New Computer Modern/DejaVu,
+  // the template's first-choice stack — renders identically on every OS.
+  // Fonts committed into the project's fonts/ folder are the customization
+  // path: they travel with the group repo, so customization stays
+  // deterministic too.
+  const fontsDir = `${projectDir}/fonts`;
+  const fontArgs = (await platform.dirExists(fontsDir)) ? ["--font-path", fontsDir] : [];
   const compile = (outputRel: string) =>
     platform.runBinary(options.typst, [
       "compile",
       "--root",
       projectDir,
+      "--ignore-system-fonts",
+      ...fontArgs,
       `${buildDir}/main.typ`,
       `${projectDir}/${outputRel}`,
     ]);

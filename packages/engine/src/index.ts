@@ -71,3 +71,4 @@ export {
   type RemarkConverterOptions,
 } from "./build/remark-typst.ts";
 export { parseBibliography, bibliographyKeys, type BibEntry } from "./build/bibliography.ts";
+export { SEA_TEMPLATE, templateStatus, type TemplateStatus } from "./build/template.ts";

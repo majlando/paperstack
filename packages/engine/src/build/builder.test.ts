@@ -72,6 +72,40 @@ describe("buildReport preflight", () => {
   });
 });
 
+describe("deterministic fonts (M6)", () => {
+  it("compiles with --ignore-system-fonts so every machine renders the same PDF", async () => {
+    const platform = new RunnablePlatform(projectFiles());
+    await buildReport(platform, "/proj", {
+      typst: "typst",
+      converter: stubConverter,
+      skipPreflight: true,
+    });
+    expect(platform.compiles[0]).toEqual([
+      "compile",
+      "--root",
+      "/proj",
+      "--ignore-system-fonts",
+      "/proj/output/.build/main.typ",
+      "/proj/output/report.pdf",
+    ]);
+  });
+
+  it("adds the project's committed fonts/ folder via --font-path when it exists", async () => {
+    const files = projectFiles();
+    files.set("/proj/fonts/cambria.ttf", "[font]");
+    const platform = new RunnablePlatform(files);
+    await buildReport(platform, "/proj", {
+      typst: "typst",
+      converter: stubConverter,
+      skipPreflight: true,
+    });
+    expect(platform.compiles[0]).toContain("--font-path");
+    expect(platform.compiles[0]![platform.compiles[0]!.indexOf("--font-path") + 1]).toBe(
+      "/proj/fonts",
+    );
+  });
+});
+
 describe("buildReport orchestration (stub converter, fake compile)", () => {
   it("converts sections in order, assembles main.typ, and reports the PDF path", async () => {
     const platform = new RunnablePlatform(projectFiles());
