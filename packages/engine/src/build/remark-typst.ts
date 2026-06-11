@@ -54,6 +54,7 @@ export function markdownToTypst(markdown: string, sectionDir: string): string {
   const root = parser.parse(markdown);
   const ctx: Ctx = {
     sectionDir,
+    source: markdown,
     usedSlugs: new Set(),
     footnotes: new Map(),
     definitions: new Map(),
@@ -64,6 +65,8 @@ export function markdownToTypst(markdown: string, sectionDir: string): string {
 
 interface Ctx {
   readonly sectionDir: string;
+  /** The Markdown being converted — for re-reading raw spans (image alt). */
+  readonly source: string;
   /** Heading label slugs already taken (GitHub-style dedup with -1, -2, …). */
   readonly usedSlugs: Set<string>;
   readonly footnotes: Map<string, FootnoteDefinition>;
@@ -305,6 +308,39 @@ function renderLink(
   return { text: `#link(${target})[${renderBracketBody(children, ctx)}]`, hashCall: true };
 }
 
+/**
+ * The inline content of an image's description, with its markup intact.
+ * mdast flattens the description to plain text (`alt` — backticks, emphasis
+ * gone), but pandoc renders the full markup in figure captions, and code
+ * spans in captions are everyday CS-report writing. The raw description is
+ * still in the source — slice it back out via the node's position and
+ * re-parse it as inlines. Returns null when the span cannot be recovered
+ * (no position, unbalanced label, or it parses as anything but one
+ * paragraph); callers fall back to the plain alt text.
+ */
+function altInlines(node: Image, ctx: Ctx): readonly PhrasingContent[] | null {
+  const start = node.position?.start.offset;
+  if (start === undefined || ctx.source.slice(start, start + 2) !== "![") return null;
+  let depth = 0;
+  for (let i = start + 2; i < ctx.source.length; i++) {
+    const c = ctx.source[i];
+    if (c === "\\") {
+      i++; // an escaped character can never open or close the label
+    } else if (c === "[") {
+      depth++;
+    } else if (c === "]") {
+      if (depth > 0) {
+        depth--;
+        continue;
+      }
+      const root = parser.parse(ctx.source.slice(start + 2, i));
+      const only = root.children.length === 1 ? root.children[0] : undefined;
+      return only?.type === "paragraph" ? only.children : null;
+    }
+  }
+  return null;
+}
+
 function imageCall(url: string, attrs: ImageAttrs | undefined, ctx: Ctx): string {
   let path = url;
   try {
@@ -399,9 +435,14 @@ function renderParagraph(node: Paragraph, ctx: Ctx): BlockPart | null {
     const attrs = visible[0]!.attrs;
     const call = imageCall(image.url, attrs, ctx);
     if (image.alt !== null && image.alt !== undefined && image.alt !== "") {
+      const inlines = altInlines(image, ctx);
+      // No `;` after a trailing hash call: the caption's `]` sits on its own
+      // line, and pandoc only terminates calls before non-whitespace.
+      const caption =
+        inlines === null ? escapeTypstText(image.alt) : renderInlines(inlines, ctx).text;
       const label = attrs?.id === undefined ? "" : `\n<${attrs.id}>`;
       return {
-        text: `#figure(${call},\n  caption: [\n    ${escapeTypstText(image.alt)}\n  ]\n)${label}`,
+        text: `#figure(${call},\n  caption: [\n    ${caption}\n  ]\n)${label}`,
       };
     }
     return { text: `#box(${call})` };

@@ -244,6 +244,22 @@ describe("images and figures", () => {
     );
   });
 
+  it("renders the caption's inline markup, like pandoc — code spans are everyday caption writing", () => {
+    expect(t("![uses `Foo.bar` and *emph* here](img.png)")).toBe(
+      '#figure(image("/sections/img.png"),\n  caption: [\n    uses `Foo.bar` and #emph[emph] here\n  ]\n)',
+    );
+    expect(t("![a \\] bracket and `tick`](img.png)")).toBe(
+      '#figure(image("/sections/img.png"),\n  caption: [\n    a \\] bracket and `tick`\n  ]\n)',
+    );
+    // No `;` after a trailing hash call — the `]` follows on its own line.
+    expect(t("![caption ending in *emph*](img.png)")).toBe(
+      '#figure(image("/sections/img.png"),\n  caption: [\n    caption ending in #emph[emph]\n  ]\n)',
+    );
+    expect(t("![caption ending in [a link](https://x.dk)](img.png)")).toBe(
+      '#figure(image("/sections/img.png"),\n  caption: [\n    caption ending in #link("https://x.dk")[a link]\n  ]\n)',
+    );
+  });
+
   it("renders an alt-less standalone image as a plain #box", () => {
     expect(t("![](/diagrams/rendered/2e06c61f.svg)")).toBe(
       '#box(image("/diagrams/rendered/2e06c61f.svg"))',
