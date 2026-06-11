@@ -188,7 +188,7 @@ Goal: the three writing needs the first real report met by hand (tables, math, c
 **Remark→Typst emitter (the keystone):**
 - [x] Golden-file safety net first: snapshot pandoc's `.typ` output for the demo fixture (committed) and the migrated real report (local), so emitter parity is measurable — and pandoc upgrades stop being invisible in the meantime (2026-06-11: `fixtures/golden-typst/` + `scripts/update-golden-typst.ts`; the drift test auto-skips without `bin/`. Real-report goldens stay a local step before cutover)
 - [x] Emitter behind the existing `Converter` interface: headings, paragraphs, emphasis, links, lists, code fences, images (incl. `{width=…}` attributes), tables, blockquotes — driven to parity against the golden files; pandoc stays as the fallback converter until the real report renders identically (2026-06-11: `remark-typst.ts`, **byte-identical with pandoc on all six fixture sections**, 65 unit tests; opt-in via `--converter=remark` / `PAPERSTACK_CONVERTER=remark`, pandoc still the default everywhere; divergences and the real-report cutover gate documented in `remark-typst-parity.md`. Bonus: the emitter fixes a real pandoc-path bug — a `---` thematic break emits `#horizontalrule`, undefined in our include-based builds, i.e. it would fail the export)
-- [ ] Table output: booktabs-style (horizontal rules, padded) instead of pandoc's full-grid boxes — the biggest body-content gap from the report side-by-side
+- [x] Table output: booktabs-style (horizontal rules, padded) instead of pandoc's full-grid boxes — the biggest body-content gap from the report side-by-side (2026-06-11: solved in the template, not the emitter — `set table(stroke: none)` + top/bottom rules + bold header around the hline both converters already emit, so the pandoc path gets the same look and emitter parity is untouched. Verified on the rendered fixture. Vendored templates in existing projects keep their old look by design)
 - [ ] Banked payoffs once parity lands: conversion becomes a function call (no per-section process spawn), converter errors name the actual line instead of "unusual Markdown", and the pandoc sidecar can eventually be dropped from the bundle
 
 **Math:**
@@ -214,7 +214,7 @@ Goal: a stranger on Windows, macOS, or Linux installs a release build and trusts
 **Platforms and release machinery:**
 - [x] `fetch-binaries` becomes cross-platform (TS port run via tsx; per-target typst/pandoc triples for dev and CI; carries the M4.5 SHA-256 pins forward) (2026-06-11, pulled forward: `scripts/fetch-binaries.ts` with pinned hashes for Windows x64, macOS x64/arm64, Linux x64/arm64 — every archive hashed from the upstream releases; the .ps1 is gone, `pnpm fetch-binaries` everywhere)
 - [x] CI runs the real pipeline: fetch the pinned Linux binaries in CI and run the previously-skipped PDF integration test on every push — the entire Markdown→Pandoc→Typst→PDF path used to have zero CI coverage (2026-06-11, pulled forward with the TS port; `bin/` is cached keyed on the fetch script, so pin bumps re-fetch automatically. The pandoc golden-file drift test now runs in CI too)
-- [ ] Add a `da`-language fixture build to the CI matrix so label localization is covered end to end
+- [x] Add a `da`-language fixture build so label localization is covered end to end (2026-06-11: a second integration test builds the demo fixture with `language: da` and asserts the localized cover line — runs in CI with the binaries fetch, no separate matrix entry needed)
 - [ ] PDF pane via pdf.js everywhere (the documented upgrade path): webkitgtk on Linux does not render PDFs in iframes, so this is a prerequisite, not polish — and it fixes the accepted scroll-reset-on-recompile annoyance as a side effect
 - [ ] `pnpm smoke` passes on macOS and Linux (needs a desktop session, so it stays a release-checklist step, not CI)
 - [ ] CI release workflow: tag → matrix build (NSIS/MSI, dmg, AppImage + deb) → GitHub release with artifacts attached
@@ -237,7 +237,7 @@ Goal: the group report is written in Paperstack while some group members edit th
 - [x] Readable error when `document.yaml` contains Git conflict markers (`<<<<<<<`) — the likeliest broken state after a bad merge of the shared ordering file (2026-06-11; pulled forward from M7, it was a 10-line fix with a test)
 - [ ] Group repo CI: the report builds and the normalsider count is checked on every push, via the packaged CLI from M6 — members who don't run Paperstack still see the PDF and the count on their changes
 - [x] Recents: drop entries that fail to open (2026-06-11: an entry whose folder is gone or no longer holds a document.yaml is dropped when clicked; fixable load errors — e.g. a bad merge in document.yaml — keep their entry)
-- [ ] Editor: preserve undo history across section switches (from the backlog)
+- [x] Editor: preserve undo history across section switches (2026-06-11: per-section editor states parked in the CodeMirror wrapper, keyed by project+file; a parked state is only restored while its text still matches the store's — undo can never resurrect stale disk content, and history still never crosses files)
 - [ ] Preview scroll: restore by anchor rather than raw `scrollTop` (from the backlog)
 - [ ] Dogfood gate: the group report is written in Paperstack — the v1 bar from PROJECT.md carries over to v0.2
 
