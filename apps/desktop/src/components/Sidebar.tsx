@@ -89,11 +89,14 @@ function SearchPanel(props: { onClose: () => void }) {
   const searchProject = useStore((s) => s.searchProject);
   const [query, setQuery] = useState("");
   const [results, setResults] = useState<ProjectSearchMatch[]>([]);
+  const [replacement, setReplacement] = useState("");
+  const [summary, setSummary] = useState<string | null>(null);
   const seq = useRef(0);
 
   // Debounced live search; a stale (slower) search must not overwrite a newer one.
   useEffect(() => {
     const mine = ++seq.current;
+    setSummary(null);
     const t = setTimeout(() => {
       void searchProject(query).then((r) => {
         if (seq.current === mine) setResults(r);
@@ -101,6 +104,16 @@ function SearchPanel(props: { onClose: () => void }) {
     }, 200);
     return () => clearTimeout(t);
   }, [query, searchProject]);
+
+  async function replaceAll() {
+    const { sections, count } = await useStore.getState().replaceAll(query, replacement);
+    setResults(await useStore.getState().searchProject(query));
+    setSummary(
+      count === 0
+        ? "Nothing replaced."
+        : `Replaced ${count} match${count === 1 ? "" : "es"} in ${sections} section${sections === 1 ? "" : "s"}.`,
+    );
+  }
 
   const grouped = new Map<string, ProjectSearchMatch[]>();
   for (const m of results) {
@@ -111,7 +124,7 @@ function SearchPanel(props: { onClose: () => void }) {
 
   return (
     <div className="border-b border-zinc-800">
-      <div className="px-4 py-2">
+      <div className="flex flex-col gap-1.5 px-4 py-2">
         <input
           autoFocus
           value={query}
@@ -122,6 +135,26 @@ function SearchPanel(props: { onClose: () => void }) {
           }}
           className="w-full rounded border border-zinc-600 bg-zinc-800 px-2 py-1 text-sm text-zinc-100 outline-none placeholder:text-zinc-600"
         />
+        <div className="flex gap-1.5">
+          <input
+            value={replacement}
+            placeholder="Replace with"
+            onChange={(e) => setReplacement(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Escape") props.onClose();
+            }}
+            className="min-w-0 flex-1 rounded border border-zinc-600 bg-zinc-800 px-2 py-1 text-sm text-zinc-100 outline-none placeholder:text-zinc-600"
+          />
+          <button
+            disabled={results.length === 0}
+            onClick={() => void replaceAll()}
+            title="Replace every match, in all sections — saved immediately"
+            className="shrink-0 rounded border border-zinc-600 px-2 py-1 text-xs text-zinc-300 hover:bg-zinc-800 disabled:opacity-40"
+          >
+            Replace all
+          </button>
+        </div>
+        {summary && <div className="text-xs text-zinc-500">{summary}</div>}
       </div>
       {query.trim() !== "" && (
         <div className="max-h-72 overflow-y-auto pb-2">

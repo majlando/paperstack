@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { open } from "@tauri-apps/plugin-dialog";
-import { figureMarkdown, type BibEntry } from "@paperstack/engine";
+import { figureMarkdown, formatTableAt, tableMarkdown, type BibEntry } from "@paperstack/engine";
 import { useStore } from "../store.ts";
 import { activeEditor } from "../editor/editor-registry.ts";
 
@@ -23,6 +23,7 @@ export function InsertControls() {
   const hasReferences = useStore((s) => s.hasReferences);
   const [caption, setCaption] = useState("");
   const [references, setReferences] = useState<BibEntry[] | null>(null);
+  const [tableShape, setTableShape] = useState<{ rows: string; cols: string } | null>(null);
 
   async function openCitations() {
     setReferences(await useStore.getState().listReferences());
@@ -31,6 +32,28 @@ export function InsertControls() {
   function insertCitation(key: string) {
     setReferences(null);
     activeEditor()?.insertInline(`[@${key}]`);
+  }
+
+  // One Table button, two jobs: inside an existing table it re-aligns the
+  // pipes; anywhere else it asks for a shape and inserts a skeleton.
+  function tableAction() {
+    const editor = activeEditor();
+    if (!editor) return;
+    const edit = formatTableAt(editor.getDoc(), editor.cursorOffset());
+    if (edit) {
+      editor.applyEdit(edit.from, edit.to, edit.text);
+      return;
+    }
+    setTableShape({ rows: "2", cols: "3" });
+  }
+
+  function insertTable() {
+    if (!tableShape) return;
+    const rows = Number.parseInt(tableShape.rows, 10) || 2;
+    const cols = Number.parseInt(tableShape.cols, 10) || 3;
+    setTableShape(null);
+    // cursor lands in the first header cell
+    activeEditor()?.insertBlock(tableMarkdown(rows, cols), 2);
   }
 
   // A new pending figure (picked or pasted) starts from its suggested caption.
@@ -74,6 +97,13 @@ export function InsertControls() {
       >
         Diagram
       </button>
+      <button
+        title="Insert a table — or re-align the table under the cursor"
+        className={buttonCls}
+        onClick={tableAction}
+      >
+        Table
+      </button>
       {/* Only offered when the project has a references.bib — without one,
           [@key] would print literally in the report. */}
       {hasReferences && (
@@ -84,6 +114,59 @@ export function InsertControls() {
         >
           Cite
         </button>
+      )}
+
+      {tableShape !== null && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/60"
+          onClick={() => setTableShape(null)}
+        >
+          <div
+            className="w-full max-w-xs rounded-lg border border-zinc-700 bg-zinc-900 p-4 shadow-xl"
+            onClick={(e) => e.stopPropagation()}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") insertTable();
+              if (e.key === "Escape") setTableShape(null);
+            }}
+          >
+            <div className="pb-3 text-sm font-semibold text-zinc-100">Insert Table</div>
+            <div className="flex items-center gap-3">
+              <label className="flex-1 text-xs text-zinc-500">
+                Rows
+                <input
+                  autoFocus
+                  value={tableShape.rows}
+                  inputMode="numeric"
+                  onChange={(e) => setTableShape({ ...tableShape, rows: e.target.value })}
+                  className="mt-1 w-full rounded border border-zinc-700 bg-zinc-950 px-2.5 py-1.5 text-sm text-zinc-100 outline-none focus:border-zinc-500"
+                />
+              </label>
+              <label className="flex-1 text-xs text-zinc-500">
+                Columns
+                <input
+                  value={tableShape.cols}
+                  inputMode="numeric"
+                  onChange={(e) => setTableShape({ ...tableShape, cols: e.target.value })}
+                  className="mt-1 w-full rounded border border-zinc-700 bg-zinc-950 px-2.5 py-1.5 text-sm text-zinc-100 outline-none focus:border-zinc-500"
+                />
+              </label>
+            </div>
+            <div className="flex justify-end gap-2 pt-4">
+              <button
+                onClick={() => setTableShape(null)}
+                className="rounded border border-zinc-700 px-3 py-1 text-sm text-zinc-300 hover:bg-zinc-800"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={insertTable}
+                className="rounded bg-blue-600 px-3 py-1 text-sm font-medium text-white hover:bg-blue-500"
+              >
+                Insert Table
+              </button>
+            </div>
+          </div>
+        </div>
       )}
 
       {references !== null && (

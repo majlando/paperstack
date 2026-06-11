@@ -207,6 +207,12 @@ export class MarkdownEditor {
     this.view.focus();
   }
 
+  /** Replace a document range (e.g. a re-formatted table) and focus. */
+  applyEdit(from: number, to: number, text: string): void {
+    this.view.dispatch({ changes: { from, to, insert: text } });
+    this.view.focus();
+  }
+
   /** Insert inline text at the cursor (replacing any selection) and focus. */
   insertInline(text: string): void {
     const { from, to } = this.view.state.selection.main;
