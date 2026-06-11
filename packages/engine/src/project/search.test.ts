@@ -33,6 +33,20 @@ describe("searchContent", () => {
   it("matches never span lines", () => {
     expect(searchContent("end\nstart", "end\nstart")).toEqual([]);
   });
+
+  it("treats the query as literal text, not a regex", () => {
+    const [m] = searchContent("price (kr)", "(kr)");
+    expect(m?.column).toBe(6);
+    expect(searchContent("abc", ".*")).toEqual([]);
+  });
+
+  it("keeps offsets raw when lowercasing would change the line's length", () => {
+    // "İ" (U+0130) lowercases to two code units — offsets must still index
+    // the original content, not a lowercased copy.
+    const content = "İstanbul and Ankara";
+    const [m] = searchContent(content, "ankara");
+    expect(content.slice(m!.offset, m!.offset + 6)).toBe("Ankara");
+  });
 });
 
 describe("replaceContent", () => {
@@ -54,5 +68,12 @@ describe("replaceContent", () => {
 
   it("preserves CRLF line endings around replacements", () => {
     expect(replaceContent("one\r\ntwo\r\n", "two", "2").text).toBe("one\r\n2\r\n");
+  });
+
+  it("does not corrupt text after a character whose lowercase form is longer", () => {
+    expect(replaceContent("İstanbul and Ankara", "ankara", "Izmir")).toEqual({
+      text: "İstanbul and Izmir",
+      count: 1,
+    });
   });
 });

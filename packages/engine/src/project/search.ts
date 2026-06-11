@@ -21,19 +21,21 @@ export interface SearchMatch {
  * occurrences report once per non-overlapping position.
  */
 export function searchContent(content: string, query: string): SearchMatch[] {
-  const q = query.toLowerCase();
-  if (!q) return [];
+  if (!query) return [];
+  // Case-insensitivity comes from a regex over the *raw* line, never from
+  // lowercasing the haystack: toLowerCase() is not length-preserving
+  // ("İ" lowercases to two code units), so indexes into a lowercased copy
+  // would mis-slice the original — replaceContent corrupts text on those.
+  const pattern = new RegExp(query.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "giu");
   const matches: SearchMatch[] = [];
   const lines = content.split("\n");
   let offset = 0;
   for (let i = 0; i < lines.length; i++) {
     const raw = lines[i]!;
     const line = raw.replace(/\r$/, "");
-    const lower = line.toLowerCase();
-    let column = lower.indexOf(q);
-    while (column !== -1) {
-      matches.push({ line: i + 1, offset: offset + column, column, preview: line });
-      column = lower.indexOf(q, column + q.length);
+    pattern.lastIndex = 0;
+    for (let m = pattern.exec(line); m !== null; m = pattern.exec(line)) {
+      matches.push({ line: i + 1, offset: offset + m.index, column: m.index, preview: line });
     }
     offset += raw.length + 1; // +1 for the split-away \n
   }
