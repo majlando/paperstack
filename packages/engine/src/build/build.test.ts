@@ -15,8 +15,8 @@ const exe = process.platform === "win32" ? ".exe" : "";
 const typstPath = join(root, "bin", `typst${exe}`);
 const pandocPath = join(root, "bin", `pandoc${exe}`);
 
-// Integration test: needs the dev binaries (scripts/fetch-binaries.ps1).
-// Skipped where they are absent (e.g. CI) — unit tests still cover the logic.
+// Integration test: needs the dev binaries (pnpm fetch-binaries). Skipped
+// where they are absent — CI fetches them, so this runs on every push.
 const hasBinaries = existsSync(typstPath) && existsSync(pandocPath);
 
 describe.skipIf(!hasBinaries)("buildReport on the demo fixture", () => {

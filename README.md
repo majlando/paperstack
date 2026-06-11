@@ -58,14 +58,13 @@ Tauri 2 · TypeScript · React + Vite · CodeMirror 6 · Mermaid · Pandoc → T
 Prerequisites:
 
 - [Node.js](https://nodejs.org/) 22+ and [pnpm](https://pnpm.io/) (the repo pins the exact version via the `packageManager` field — `corepack enable` is enough)
-- PowerShell 7 (`pwsh`) for the binary-fetch script
 - Only for the desktop app: the [Rust toolchain](https://rustup.rs/) (Tauri 2). Engine work needs no Rust.
 
 ### Setup (once)
 
 ```powershell
 pnpm install                          # install workspace dependencies
-pwsh ./scripts/fetch-binaries.ps1     # download pinned typst + pandoc
+pnpm fetch-binaries                   # download pinned typst + pandoc
 ```
 
 The fetch script places the binaries twice, both locations git-ignored: `bin/` (used by tests and the terminal build) and `apps/desktop/src-tauri/binaries/` (the Tauri sidecars the app runs). These same pinned versions ship inside the installer in releases.
@@ -79,7 +78,7 @@ pnpm typecheck     # strict TypeScript check across the workspace
 pnpm --filter @paperstack/engine test:watch   # watch mode while working on the engine
 ```
 
-Run both before committing — CI (`.github/workflows/ci.yml`) runs these plus `pnpm --filter @paperstack/desktop build` on every push. CI has no binaries, so the PDF integration test only runs locally; populate `bin/` and run `pnpm test` yourself before pushing pipeline changes.
+Run both before committing — CI (`.github/workflows/ci.yml`) runs these plus `pnpm --filter @paperstack/desktop build` on every push. CI fetches the pinned Linux binaries (cached between runs), so the full Markdown → PDF integration test runs on every push too.
 
 ### Build reports from the terminal (engine only, no app)
 

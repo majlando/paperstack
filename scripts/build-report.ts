@@ -2,7 +2,7 @@
  * Dev runner for the report engine: builds a Paperstack project folder to PDF.
  * Usage: pnpm build:demo            (builds fixtures/demo-report)
  *        pnpm tsx scripts/build-report.ts <project-dir>
- * Requires bin/typst + bin/pandoc (scripts/fetch-binaries.ps1).
+ * Requires bin/typst + bin/pandoc (pnpm fetch-binaries).
  * Set PAPERSTACK_CONVERTER=remark (or pass --converter=remark) to build with
  * the in-house remark→Typst emitter instead of pandoc (Milestone 5; pandoc
  * stays the default).

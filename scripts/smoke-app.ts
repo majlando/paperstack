@@ -5,7 +5,7 @@
  * TODO confirm → export, see apps/desktop/src/dev/smoke.ts).
  *
  * Usage: pnpm smoke
- * Needs sidecars in apps/desktop/src-tauri/binaries (fetch-binaries.ps1),
+ * Needs sidecars in apps/desktop/src-tauri/binaries (pnpm fetch-binaries),
  * a free port 1420, and a desktop session — local only, never CI.
  */
 import { spawn, execSync } from "node:child_process";

@@ -6,5 +6,5 @@
 # will have schema files for capabilities auto-completion
 /gen/schemas
 
-# Sidecar binaries (typst, pandoc) — placed by scripts/fetch-binaries.ps1, never committed
+# Sidecar binaries (typst, pandoc) — placed by scripts/fetch-binaries.ts, never committed
 /binaries

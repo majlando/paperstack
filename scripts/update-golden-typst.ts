@@ -7,7 +7,7 @@
  * visible (see docs/DEVELOPMENT.md, Milestone 5).
  *
  * Usage: pnpm tsx scripts/update-golden-typst.ts
- * Requires bin/pandoc (populate via scripts/fetch-binaries.ps1).
+ * Requires bin/pandoc (populate via pnpm fetch-binaries).
  */
 import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";

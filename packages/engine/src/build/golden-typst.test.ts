@@ -16,8 +16,8 @@ const goldenDir = join(root, "fixtures/golden-typst");
 const exe = process.platform === "win32" ? ".exe" : "";
 const pandocPath = join(root, "bin", `pandoc${exe}`);
 
-// Integration test: needs the dev pandoc (scripts/fetch-binaries.ps1), like
-// the PDF test in build.test.ts. Skipped where it is absent (e.g. CI).
+// Integration test: needs the dev pandoc (pnpm fetch-binaries), like the
+// PDF test in build.test.ts. Skipped where it is absent — CI fetches it.
 const hasPandoc = existsSync(pandocPath);
 
 const normalizeEol = (s: string) => s.replaceAll("\r\n", "\n");

@@ -47,7 +47,7 @@ export async function buildReport(
     if (probe.exitCode !== 0) {
       throw new PaperstackError(
         "dependency-missing",
-        `The ${name} could not be started. Reinstall Paperstack — or, in development, run scripts/fetch-binaries.ps1.`,
+        `The ${name} could not be started. Reinstall Paperstack — or, in development, run pnpm fetch-binaries.`,
         `probe failed for ${binary}: ${probe.stderr}`,
       );
     }

@@ -3,7 +3,7 @@ node_modules/
 dist/
 target/
 
-# Dev binaries (typst, pandoc) — fetched by scripts/fetch-binaries.ps1
+# Dev binaries (typst, pandoc) — fetched by scripts/fetch-binaries.ts
 bin/
 
 # Tauri
@@ -27,6 +27,9 @@ report-migrated/
 .vscode/
 Thumbs.db
 .DS_Store
+
+# Claude Code session state (worktrees hold node_modules copies)
+.claude/
 
 # Logs
 *.log

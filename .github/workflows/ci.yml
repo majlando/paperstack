@@ -22,6 +22,14 @@ jobs:
           node-version: 22
           cache: pnpm
       - run: pnpm install --frozen-lockfile
+      # Pinned typst + pandoc so the PDF integration test runs the real
+      # pipeline on every push. Cache keyed on the fetch script — a version
+      # or hash bump invalidates it automatically.
+      - uses: actions/cache@v4
+        with:
+          path: bin
+          key: binaries-${{ runner.os }}-${{ hashFiles('scripts/fetch-binaries.ts') }}
+      - run: pnpm fetch-binaries
       - run: pnpm typecheck
       - run: pnpm test
       - run: pnpm --filter @paperstack/desktop build
