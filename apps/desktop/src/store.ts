@@ -16,7 +16,9 @@ import {
   importFigureBytes,
   suggestedCaption,
   searchContent,
+  replaceContent,
   parseBibliography,
+  hashContent,
   dirOf,
   baseOf,
   humanize,
@@ -83,11 +85,18 @@ interface AppState {
   /** A report compile is running (View Report / Export PDF). */
   building: boolean;
   /**
-   * The project has a references.bib at its root — citations are active:
-   * [@key] spans become numbered references in the PDF, the preview shows
-   * placeholders, and the editor offers Insert Citation.
+   * The project's references.bib has at least one real entry — citations
+   * are active: [@key] spans become numbered references in the PDF, the
+   * preview shows placeholders, and the editor offers Insert Citation.
+   * (The scaffolded file ships commented-out examples only and stays inert.)
    */
   hasReferences: boolean;
+  /**
+   * Hash of document.yaml as it stood when the report-details form opened.
+   * The save compares against it so a git pull / teammate edit that landed
+   * while the form was open is never silently overwritten by stale values.
+   */
+  metadataBaselineHash: string | null;
   /** Snapshot of the last compiled report, shown in the right pane's Report tab. */
   report: { pdfPath: string; warnings: string[]; builtAt: number } | null;
   /** Export was requested while [TODO]s remain — waiting for the user's call. */
@@ -154,6 +163,12 @@ interface AppState {
   searchProject(query: string): Promise<ProjectSearchMatch[]>;
   /** Entries of references.bib for the Insert Citation list ([] without one). */
   listReferences(): Promise<BibEntry[]>;
+  /**
+   * Replaces every match of `query` (case-insensitive, same rules as
+   * searchProject) across all sections — the active one through the editor
+   * (and saved), the rest directly on disk. Returns what was changed.
+   */
+  replaceAll(query: string, replacement: string): Promise<{ sections: number; count: number }>;
   openMetadata(): Promise<void>;
   closeMetadata(): void;
   setMetadataDirty(dirty: boolean): void;
@@ -219,6 +234,16 @@ function titleFromDir(dir: string): string {
 /** The window chrome shows the report title wherever the project (re)loads. */
 function setWindowTitle(reportTitle: string): void {
   document.title = `${reportTitle} — Paperstack`;
+}
+
+/** Citations are active only when references.bib holds at least one real entry. */
+async function projectHasReferences(projectDir: string): Promise<boolean> {
+  try {
+    const text = await platform.readTextFile(`${projectDir}/references.bib`);
+    return parseBibliography(text).length > 0;
+  } catch {
+    return false;
+  }
 }
 
 /**
@@ -379,6 +404,7 @@ export const useStore = create<AppState>((set, get) => {
   notice: null,
   building: false,
   hasReferences: false,
+  metadataBaselineHash: null,
   report: null,
   confirmExport: null,
   pane: "preview",
@@ -418,7 +444,7 @@ export const useStore = create<AppState>((set, get) => {
         confirmExport: null,
         pane: "preview",
         metadataOpen: false,
-        hasReferences: await platform.fileExists(`${normalized}/references.bib`),
+        hasReferences: await projectHasReferences(normalized),
       });
       rememberProject(normalized);
       setWindowTitle(project.meta.title);
@@ -471,8 +497,8 @@ export const useStore = create<AppState>((set, get) => {
         counts,
         changedOnDisk,
         error: null,
-        // a references.bib may have arrived or left with the external change
-        hasReferences: await platform.fileExists(`${projectDir}/references.bib`),
+        // references.bib entries may have arrived or left with the external change
+        hasReferences: await projectHasReferences(projectDir),
       });
       setWindowTitle(project.meta.title);
       // re-read the open section unless the user has unsaved changes
@@ -747,17 +773,75 @@ export const useStore = create<AppState>((set, get) => {
     }
   },
 
+  async replaceAll(query: string, replacement: string) {
+    const { projectDir, project } = get();
+    if (!projectDir || !project || !query) return { sections: 0, count: 0 };
+    let sections = 0;
+    let count = 0;
+    const replaced: string[] = [];
+    try {
+      for (const s of project.meta.sections) {
+        if (s.file === get().activeFile) {
+          // The open section is replaced through the editor state and saved,
+          // so the change is visible immediately and undo-safe to inspect.
+          const r = replaceContent(get().content, query, replacement);
+          if (r.count === 0) continue;
+          sections++;
+          count += r.count;
+          replaced.push(s.file);
+          set({
+            content: r.text,
+            dirty: true,
+            contentVersion: get().contentVersion + 1,
+            counts: get().counts
+              ? applySectionContent(get().counts!, s.file, r.text)
+              : get().counts,
+          });
+          await get().saveActive();
+        } else {
+          const text = await platform
+            .readTextFile(`${projectDir}/${s.file}`)
+            .catch(() => null);
+          if (text === null) continue;
+          const r = replaceContent(text, query, replacement);
+          if (r.count === 0) continue;
+          sections++;
+          count += r.count;
+          replaced.push(s.file);
+          await platform.writeTextFile(`${projectDir}/${s.file}`, r.text);
+        }
+      }
+      if (count > 0) {
+        await get().reloadProject();
+        // The hashes moved because *we* wrote the files — these are not
+        // external changes, so no changed-on-disk dots for them.
+        set({ changedOnDisk: get().changedOnDisk.filter((f) => !replaced.includes(f)) });
+      }
+    } catch (e) {
+      set({ error: toError(e) });
+    }
+    return { sections, count };
+  },
+
   async openMetadata() {
+    const { projectDir } = get();
+    if (!projectDir) return;
     // Flush pending section edits first — the editor unmounts while the
     // form is open, so nothing should be left waiting on an autosave timer.
     // A failed or conflicted save keeps the section visible instead of
     // hiding it behind the form while a banner asks about it.
     if (!(await get().saveActive())) return;
-    set({ metadataOpen: true, metadataDirty: false });
+    // Snapshot what the form is editing: the save refuses to overwrite a
+    // document.yaml that changed on disk while the form was open.
+    const baseline = await platform
+      .readTextFile(`${projectDir}/document.yaml`)
+      .then(hashContent)
+      .catch(() => null);
+    set({ metadataOpen: true, metadataDirty: false, metadataBaselineHash: baseline });
   },
 
   closeMetadata() {
-    set({ metadataOpen: false, metadataDirty: false });
+    set({ metadataOpen: false, metadataDirty: false, metadataBaselineHash: null });
   },
 
   setMetadataDirty(dirty: boolean) {
@@ -765,12 +849,23 @@ export const useStore = create<AppState>((set, get) => {
   },
 
   async saveMetadata(edit: MetadataEdit) {
-    const { projectDir } = get();
+    const { projectDir, metadataBaselineHash } = get();
     if (!projectDir) return false;
     try {
-      await editDocumentYaml(projectDir, (t) => editMetadataInYaml(t, edit));
+      await editDocumentYaml(projectDir, (t) => {
+        // Conflict guard, like the section save path: the file changed on
+        // disk while the form was open (git pull, a teammate's edit) — the
+        // stale form values must not silently overwrite it.
+        if (metadataBaselineHash !== null && hashContent(t) !== metadataBaselineHash) {
+          throw new Error(
+            "The report details changed on disk while this form was open — probably a git pull. " +
+              "Close the form and reopen it to load the new values, then redo your edits.",
+          );
+        }
+        return editMetadataInYaml(t, edit);
+      });
       await get().reloadProject();
-      set({ metadataOpen: false, metadataDirty: false });
+      set({ metadataOpen: false, metadataDirty: false, metadataBaselineHash: null });
       return true;
     } catch (e) {
       set({ error: toError(e) });

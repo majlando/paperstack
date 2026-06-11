@@ -109,6 +109,56 @@ describe("opening", () => {
   });
 });
 
+describe("metadata form", () => {
+  it("blocks a form save when document.yaml changed on disk while it was open", async () => {
+    await openProject();
+    await useStore.getState().openMetadata();
+    expect(useStore.getState().metadataOpen).toBe(true);
+
+    // a git pull lands while the form is open
+    const pulled = DOC_YAML.replace("Test Report", "Pulled Title");
+    fake.files.set("/p/document.yaml", pulled);
+
+    const ok = await useStore.getState().saveMetadata({ title: "Stale Form Title" });
+    expect(ok).toBe(false);
+    expect(useStore.getState().error?.message).toMatch(/changed on disk/);
+    expect(useStore.getState().metadataOpen).toBe(true); // form stays open
+    expect(fake.files.get("/p/document.yaml")).toBe(pulled); // pull never overwritten
+  });
+
+  it("saves normally when nothing changed underneath the form", async () => {
+    await openProject();
+    await useStore.getState().openMetadata();
+    const ok = await useStore.getState().saveMetadata({ title: "New Title" });
+    expect(ok).toBe(true);
+    expect(fake.files.get("/p/document.yaml")).toContain("New Title");
+    expect(useStore.getState().metadataOpen).toBe(false);
+  });
+});
+
+describe("replace all", () => {
+  it("replaces in the active section via the editor path and saves it", async () => {
+    await openProject(); // sections/a.md is active: "# A\n\nalpha\n"
+    const before = useStore.getState().contentVersion;
+    const r = await useStore.getState().replaceAll("ALPHA", "omega");
+    expect(r).toEqual({ sections: 1, count: 1 });
+    expect(useStore.getState().content).toBe("# A\n\nomega\n");
+    expect(useStore.getState().contentVersion).toBeGreaterThan(before); // editor follows
+    expect(useStore.getState().dirty).toBe(false); // saved
+    expect(fake.files.get(A)).toBe("# A\n\nomega\n");
+  });
+
+  it("replaces directly on disk in sections that are not open, without dots", async () => {
+    await openProject();
+    const r = await useStore.getState().replaceAll("gamma", "delta");
+    expect(r).toEqual({ sections: 1, count: 1 });
+    expect(fake.files.get("/p/sections/c.md")).toBe("# C\n\ndelta\n");
+    // the hash moved because we wrote the file — never a changed-on-disk dot
+    expect(useStore.getState().changedOnDisk).toEqual([]);
+    expect(useStore.getState().error).toBeNull();
+  });
+});
+
 describe("the save path", () => {
   it("writes edits, marks clean, and suppresses no-op saves", async () => {
     await openProject();
