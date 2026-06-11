@@ -3,19 +3,28 @@
  * Usage: pnpm build:demo            (builds fixtures/demo-report)
  *        pnpm tsx scripts/build-report.ts <project-dir>
  * Requires bin/typst + bin/pandoc (scripts/fetch-binaries.ps1).
+ * Set PAPERSTACK_CONVERTER=remark (or pass --converter=remark) to build with
+ * the in-house remark→Typst emitter instead of pandoc (Milestone 5; pandoc
+ * stays the default).
  */
 import { resolve, join } from "node:path";
-import { buildReport, PaperstackError } from "@paperstack/engine";
+import { buildReport, PaperstackError, RemarkConverter } from "@paperstack/engine";
 import { NodePlatform } from "@paperstack/engine/node";
 
-const projectDir = resolve(process.argv[2] ?? "fixtures/demo-report").replaceAll("\\", "/");
+const args = process.argv.slice(2).filter((a) => !a.startsWith("--"));
+const flags = process.argv.slice(2).filter((a) => a.startsWith("--"));
+const projectDir = resolve(args[0] ?? "fixtures/demo-report").replaceAll("\\", "/");
 const exe = process.platform === "win32" ? ".exe" : "";
 const binDir = resolve("bin");
+const useRemark =
+  process.env.PAPERSTACK_CONVERTER === "remark" || flags.includes("--converter=remark");
+if (useRemark) console.log("Converter: remark emitter");
 
 try {
   const result = await buildReport(new NodePlatform(), projectDir, {
     typst: join(binDir, `typst${exe}`),
     pandoc: join(binDir, `pandoc${exe}`),
+    ...(useRemark ? { converter: new RemarkConverter() } : {}),
   });
 
   console.log("\nSection lengths:");

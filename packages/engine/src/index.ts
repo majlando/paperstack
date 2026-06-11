@@ -64,3 +64,4 @@ export {
   figureMarkdown,
 } from "./project/import-figure.ts";
 export { buildReport, type BuildOptions, type BuildResult } from "./build/builder.ts";
+export { RemarkConverter, markdownToTypst } from "./build/remark-typst.ts";
