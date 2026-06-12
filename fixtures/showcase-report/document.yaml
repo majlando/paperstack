@@ -1,0 +1,32 @@
+# The long showcase fixture: a realistic, fully fictional SEA exam report.
+# Used for manual testing and demos — nothing here is pinned by goldens
+# (those live on fixtures/demo-report, which must stay small and stable).
+title: "Kantina"
+subtitle: "A pre-order system for the academy canteen"
+course: "SEA"
+institution: "Example Academy"
+authors:
+  - name: "Ada Demo"
+    student_id: "100001"
+  - name: "Bob Fixture"
+    student_id: "100002"
+  - name: "Cleo Sample"
+    student_id: "100003"
+date: 2026-06-12
+language: en
+body_cap_normalsider: 40
+sections:
+  - { file: sections/00-preface.md, role: front-matter }
+  - { file: sections/01-introduction.md, role: body }
+  - { file: sections/02-process-and-method.md, role: body }
+  - { file: sections/03-requirements.md, role: body }
+  - { file: sections/04-architecture-and-design.md, role: body }
+  - { file: sections/05-implementation.md, role: body }
+  - { file: sections/06-testing.md, role: body }
+  - { file: sections/07-concurrency.md, role: body }
+  - { file: sections/08-discussion.md, role: body }
+  - { file: sections/09-conclusion.md, role: body }
+  - { file: sections/10-glossary.md, role: back-matter }
+  - { file: appendices/appendix-a-installation.md, role: appendix }
+  - { file: appendices/appendix-b-test-protocol.md, role: appendix }
+  - { file: appendices/appendix-c-sprint-backlogs.md, role: appendix }

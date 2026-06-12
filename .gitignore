@@ -13,9 +13,10 @@ src-tauri/target/
 output/
 
 # The builder vendors the template into a project on first build. Real
-# projects commit theirs; the demo fixture must not — a committed copy would
+# projects commit theirs; the fixtures must not — a committed copy would
 # shadow SEA_TEMPLATE and template.ts changes would stop being tested.
 /fixtures/demo-report/paperstack-template.typ
+/fixtures/showcase-report/paperstack-template.typ
 
 # The author's actual SEA report (separate private repo, used as a local
 # test fixture only — contains personal exam content, never committed here)

@@ -8,6 +8,7 @@
     "test": "pnpm -r test",
     "typecheck": "pnpm -r typecheck",
     "build:demo": "tsx scripts/build-report.ts fixtures/demo-report",
+    "build:showcase": "tsx scripts/build-report.ts fixtures/showcase-report",
     "fetch-binaries": "tsx scripts/fetch-binaries.ts",
     "smoke": "tsx scripts/smoke-app.ts"
   },
