@@ -11,8 +11,9 @@ import { useStore } from "../store.ts";
  */
 const formSchema = documentSchema.omit({ sections: true });
 
-const inputCls =
-  "w-full rounded border border-zinc-700 bg-zinc-900 px-2.5 py-1.5 text-sm text-zinc-100 outline-none placeholder:text-zinc-600 focus:border-zinc-500";
+const inputBaseCls =
+  "rounded border border-zinc-700 bg-zinc-900 px-2.5 py-1.5 text-sm text-zinc-100 outline-none placeholder:text-zinc-600 focus:border-zinc-500";
+const inputCls = `w-full ${inputBaseCls}`;
 
 function Field(props: { label: string; error?: string; children: ReactNode }) {
   return (
@@ -124,6 +125,7 @@ export function MetadataForm() {
           <button
             onClick={closeMetadata}
             title="Close (Esc)"
+            aria-label="Close report details"
             className="rounded px-1.5 py-0.5 text-zinc-500 hover:bg-zinc-800 hover:text-zinc-200"
           >
             ✕
@@ -212,13 +214,13 @@ export function MetadataForm() {
                     value={author.name}
                     onChange={(e) => updateAuthor(i, { name: e.target.value })}
                     placeholder="Full name"
-                    className={inputCls}
+                    className={`${inputBaseCls} min-w-0 flex-1`}
                   />
                   <input
                     value={author.student_id}
                     onChange={(e) => updateAuthor(i, { student_id: e.target.value })}
                     placeholder="Student ID"
-                    className={`${inputCls} w-36 shrink-0`}
+                    className={`${inputBaseCls} w-36 shrink-0`}
                   />
                   <button
                     onClick={() =>
@@ -228,6 +230,7 @@ export function MetadataForm() {
                       }))
                     }
                     title="Remove author"
+                    aria-label="Remove author"
                     className="shrink-0 rounded px-1.5 py-1 text-zinc-500 hover:bg-zinc-800 hover:text-zinc-200"
                   >
                     ✕
