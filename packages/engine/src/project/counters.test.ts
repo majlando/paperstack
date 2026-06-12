@@ -4,6 +4,7 @@ import {
   countAnslag,
   countTodos,
   findTodoOffsets,
+  firstHeading,
   hashContent,
   type ProjectCounts,
 } from "./counters.ts";
@@ -31,9 +32,9 @@ describe("countAnslag", () => {
 describe("applySectionContent", () => {
   const base: ProjectCounts = {
     sections: [
-      { file: "sections/01-a.md", role: "body", chars: 2400, normalsider: 1, todos: 0, hash: "0" },
-      { file: "sections/02-b.md", role: "body", chars: 4800, normalsider: 2, todos: 1, hash: "0" },
-      { file: "appendices/a.md", role: "appendix", chars: 100, normalsider: 100 / 2400, todos: 0, hash: "0" },
+      { file: "sections/01-a.md", role: "body", title: "A", chars: 2400, normalsider: 1, todos: 0, hash: "0" },
+      { file: "sections/02-b.md", role: "body", title: "B", chars: 4800, normalsider: 2, todos: 1, hash: "0" },
+      { file: "appendices/a.md", role: "appendix", title: null, chars: 100, normalsider: 100 / 2400, todos: 0, hash: "0" },
     ],
     bodyChars: 7200,
     bodyNormalsider: 3,
@@ -62,6 +63,12 @@ describe("applySectionContent", () => {
     expect(next.overCap).toBe(false);
   });
 
+  it("re-extracts the title, so a heading edit renames the sidebar entry live", () => {
+    const next = applySectionContent(base, "sections/01-a.md", "# Renamed section\n\ntext");
+    expect(next.sections[0]?.title).toBe("Renamed section");
+    expect(next.sections[1]?.title).toBe("B");
+  });
+
   it("tracks the content hash of applied edits", () => {
     const next = applySectionContent(base, "sections/01-a.md", "new text");
     expect(next.sections[0]?.hash).toBe(hashContent("new text"));
@@ -75,6 +82,33 @@ describe("hashContent", () => {
     expect(hashContent("abc")).not.toBe(hashContent("abd"));
     // a CRLF-rewriting git checkout must not read as "section changed"
     expect(hashContent("a\r\nb")).toBe(hashContent("a\nb"));
+  });
+});
+
+describe("firstHeading", () => {
+  it("returns the text of the first ATX heading", () => {
+    expect(firstHeading("# Introduction\n\nBody text")).toBe("Introduction");
+    expect(firstHeading("intro line\n\n## Deeper heading\n")).toBe("Deeper heading");
+  });
+
+  it("returns null when the file has no heading", () => {
+    expect(firstHeading("just prose, no heading")).toBeNull();
+    expect(firstHeading("")).toBeNull();
+  });
+
+  it("ignores # lines inside fenced code blocks", () => {
+    expect(firstHeading("```sh\n# a shell comment\n```\n\n# Real title\n")).toBe("Real title");
+    expect(firstHeading("~~~\n# only inside the fence\n~~~\n")).toBeNull();
+  });
+
+  it("strips inline markup and closing hashes — the sidebar renders plain text", () => {
+    expect(firstHeading("# **Results** and `findings` ##")).toBe("Results and findings");
+    expect(firstHeading("#    spaced   ")).toBe("spaced");
+  });
+
+  it("does not treat #hashtag-style lines or empty headings as titles", () => {
+    expect(firstHeading("#no-space\n\n# Real\n")).toBe("Real");
+    expect(firstHeading("# \n")).toBeNull();
   });
 });
 

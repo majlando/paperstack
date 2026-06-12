@@ -42,12 +42,20 @@ export function StatusBar() {
 
   const active = counts.sections.find((s) => s.file === activeFile);
   const over = counts.overCap;
+  // Hitting the cap is a hand-in blocker — start warning at 90% so the
+  // last sections get written with the limit in view, not discovered late.
+  const nearCap = !over && counts.cap > 0 && counts.bodyNormalsider >= 0.9 * counts.cap;
 
   return (
     <footer className="flex h-7 shrink-0 items-center gap-4 border-t border-zinc-800 bg-zinc-900 px-4 text-xs text-zinc-400">
-      <span className={over ? "font-semibold text-red-400" : ""}>
+      <span
+        className={
+          over ? "font-semibold text-red-400" : nearCap ? "font-medium text-amber-400" : ""
+        }
+      >
         Body: {counts.bodyNormalsider.toFixed(2)} / {counts.cap} normalsider
         {over && " — over the cap"}
+        {nearCap && " — nearing the cap"}
       </span>
       {counts.todosTotal > 0 && (
         <button
@@ -61,7 +69,7 @@ export function StatusBar() {
       <span className="ml-auto flex items-center gap-3">
         {active && (
           <span>
-            This section: {active.normalsider.toFixed(2)} ns
+            This section: {active.normalsider.toFixed(2)} normalsider
             {active.role !== "body" && " (not counted)"}
           </span>
         )}

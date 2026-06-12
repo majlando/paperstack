@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { useStore, type ProjectSearchMatch } from "../store.ts";
 import { activeEditor } from "../editor/editor-registry.ts";
-import { baseOf, type SectionRole } from "@paperstack/engine";
+import { baseOf, type ProjectCounts, type SectionRole } from "@paperstack/engine";
 
 const GROUPS: { role: SectionRole; label: string; addHint: string }[] = [
   { role: "front-matter", label: "Front matter", addHint: "Add front matter" },
@@ -20,6 +20,20 @@ function displayName(file: string): string {
     .replace(/^\d+[-_]?/, "")
     .replace(/^appendix-[a-z][-_]?/, "")
     .replace(/-/g, " ");
+}
+
+/**
+ * What to call a section in the sidebar and search results: the file's own
+ * `# heading` (live — editing the heading renames the entry), falling back
+ * to the de-slugged file name for files without one. Only the fallback is
+ * CSS-capitalized; a real title already carries the author's casing.
+ */
+function sectionLabel(
+  file: string,
+  counts: ProjectCounts | null,
+): { text: string; capitalized: boolean } {
+  const title = counts?.sections.find((c) => c.file === file)?.title;
+  return title ? { text: title, capitalized: false } : { text: displayName(file), capitalized: true };
 }
 
 function ActionButton(props: { title: string; onClick: () => void; children: ReactNode }) {
@@ -134,6 +148,7 @@ async function jumpToMatch(match: ProjectSearchMatch, length: number): Promise<v
 
 function SearchPanel(props: { onClose: () => void }) {
   const searchProject = useStore((s) => s.searchProject);
+  const counts = useStore((s) => s.counts);
   const [query, setQuery] = useState("");
   const [results, setResults] = useState<ProjectSearchMatch[]>([]);
   const [replacement, setReplacement] = useState("");
@@ -210,8 +225,8 @@ function SearchPanel(props: { onClose: () => void }) {
           )}
           {[...grouped].map(([file, matches]) => (
             <div key={file}>
-              <div className="px-4 pt-1 text-[11px] font-semibold uppercase tracking-wider text-zinc-500 capitalize">
-                {displayName(file)}
+              <div className="px-4 pt-1 text-[11px] font-semibold uppercase tracking-wider text-zinc-500">
+                {sectionLabel(file, counts).text}
               </div>
               {matches.map((m) => {
                 // keep the match visible even when it sits deep in a long line
@@ -261,12 +276,27 @@ export function Sidebar() {
   const [confirmRemove, setConfirmRemove] = useState<string | null>(null);
   const [searching, setSearching] = useState(false);
 
-  // Writers expect the IDE shortcut for project-wide search.
+  // Writers expect the IDE shortcuts: Ctrl+Shift+F for project-wide search,
+  // Ctrl+PageUp/PageDown to walk the sections in report order.
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => {
       if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key.toLowerCase() === "f") {
         e.preventDefault();
         setSearching(true);
+        return;
+      }
+      if ((e.ctrlKey || e.metaKey) && (e.key === "PageUp" || e.key === "PageDown")) {
+        e.preventDefault();
+        const state = useStore.getState();
+        if (state.metadataOpen) return; // the form is its own surface
+        const files = state.project?.meta.sections.map((x) => x.file) ?? [];
+        if (files.length === 0) return;
+        const at = files.indexOf(state.activeFile ?? "");
+        const to =
+          at === -1
+            ? 0
+            : Math.min(Math.max(at + (e.key === "PageDown" ? 1 : -1), 0), files.length - 1);
+        if (to !== at) void state.openSection(files[to]!);
       }
     };
     window.addEventListener("keydown", onKeyDown);
@@ -342,6 +372,7 @@ export function Sidebar() {
             {sections.map((s) => {
               const count = counts?.sections.find((c) => c.file === s.file);
               const active = s.file === activeFile;
+              const label = sectionLabel(s.file, counts);
 
               if (renaming === s.file) {
                 return (
@@ -388,12 +419,13 @@ export function Sidebar() {
                 >
                   <button
                     onClick={() => void openSection(s.file)}
-                    className={`min-w-0 flex-1 px-4 py-1.5 text-left text-sm capitalize ${
-                      active ? "text-white" : "text-zinc-300"
-                    }`}
+                    title={s.file}
+                    className={`min-w-0 flex-1 px-4 py-1.5 text-left text-sm ${
+                      label.capitalized ? "capitalize" : ""
+                    } ${active ? "text-white" : "text-zinc-300"}`}
                   >
                     <span className="flex min-w-0 items-center gap-1.5">
-                      <span className="truncate">{displayName(s.file)}</span>
+                      <span className="truncate">{label.text}</span>
                       {changedOnDisk.includes(s.file) && (
                         <span
                           title="Changed on disk since you last opened it — e.g. a git pull or another editor"
@@ -405,6 +437,14 @@ export function Sidebar() {
                   {count && count.todos > 0 && (
                     <span className="mr-2 shrink-0 rounded bg-amber-500/20 px-1.5 text-[10px] font-medium text-amber-400 group-hover:hidden">
                       {count.todos} TODO
+                    </span>
+                  )}
+                  {count && count.role === "body" && (
+                    <span
+                      title={`${count.normalsider.toFixed(2)} normalsider — counts toward the cap`}
+                      className="mr-2 shrink-0 text-[10px] tabular-nums text-zinc-600 group-hover:hidden"
+                    >
+                      {count.normalsider.toFixed(1)}
                     </span>
                   )}
                   <span className="mr-2 hidden shrink-0 items-center gap-0.5 text-zinc-500 group-hover:flex">

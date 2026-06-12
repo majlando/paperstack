@@ -54,9 +54,35 @@ export function hashContent(content: string): string {
   return h.toString(16).padStart(8, "0");
 }
 
+/**
+ * Text of the file's first ATX heading — what the sidebar shows as the
+ * section's name. Headings inside fenced code blocks are not headings
+ * (a section may well open with a shell snippet whose comments start
+ * with `#`). Inline code and emphasis markers are stripped: the sidebar
+ * renders plain text, so `**Results**` must read "Results".
+ */
+export function firstHeading(markdown: string): string | null {
+  let inFence = false;
+  for (const line of markdown.split("\n")) {
+    if (/^\s*(```|~~~)/.test(line)) {
+      inFence = !inFence;
+      continue;
+    }
+    if (inFence) continue;
+    const m = /^ {0,3}#{1,6}\s+(.*?)\s*#*\s*$/.exec(line);
+    if (m) {
+      const text = m[1]!.replace(/[`*]/g, "").trim();
+      if (text !== "") return text;
+    }
+  }
+  return null;
+}
+
 export interface SectionCount {
   file: string;
   role: SectionRole;
+  /** First heading of the file, or null when it has none (display falls back to the file name). */
+  title: string | null;
   chars: number;
   normalsider: number;
   todos: number;
@@ -101,6 +127,7 @@ export async function countProject(
     sections.push({
       file: s.file,
       role: s.role,
+      title: firstHeading(content),
       chars,
       normalsider: chars / CHARS_PER_NORMALSIDE,
       todos: countTodos(content),
@@ -125,6 +152,7 @@ export function applySectionContent(
     s.file === file
       ? {
           ...s,
+          title: firstHeading(content),
           chars,
           normalsider: chars / CHARS_PER_NORMALSIDE,
           todos: countTodos(content),
