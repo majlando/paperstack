@@ -254,14 +254,15 @@ export default function App() {
         <>
           <div className="flex min-h-0 flex-1">
             <Sidebar />
-            {metadataOpen ? (
-              <MetadataForm />
-            ) : (
-              <>
-                <Editor />
-                <Preview />
-              </>
-            )}
+            {metadataOpen && <MetadataForm />}
+            {/* Editor and Preview stay mounted (hidden) under the form: the
+                CodeMirror instance owns every section's parked undo history,
+                and unmounting it made a Report-details visit erase undo for
+                the whole project. */}
+            <div className={metadataOpen ? "hidden" : "flex min-h-0 flex-1"}>
+              <Editor />
+              <Preview />
+            </div>
           </div>
           <StatusBar />
         </>

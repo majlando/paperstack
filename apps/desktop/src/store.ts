@@ -326,6 +326,8 @@ async function renderDiagramsToDisk(projectDir: string, content: string): Promis
 export const useStore = create<AppState>((set, get) => {
   /** The in-flight save chain — concurrent save triggers join it (see saveActive). */
   let saveInFlight: Promise<boolean> | null = null;
+  /** Bumped per openSection call — a slower read for an earlier click loses. */
+  let openSectionSeq = 0;
 
   /**
    * The actual save. Callers go through saveActive (single-flight); only the
@@ -568,8 +570,13 @@ export const useStore = create<AppState>((set, get) => {
     // A failed save must not be papered over: stay on the current section so
     // the unsaved edits and the error stay visible.
     if (dirty && !(await saveActive())) return;
+    const seq = ++openSectionSeq;
     try {
       const content = await platform.readTextFile(`${projectDir}/${file}`);
+      // Latest click wins: two rapid sidebar clicks race their reads, and
+      // the slower read for the earlier click must not land on top of the
+      // section the user actually chose.
+      if (seq !== openSectionSeq) return;
       set({
         activeFile: file,
         content,
@@ -583,7 +590,7 @@ export const useStore = create<AppState>((set, get) => {
       // Sections edited outside the app may contain never-rendered diagrams.
       void renderDiagramsToDisk(projectDir, content);
     } catch (e) {
-      set({ error: toError(e) });
+      if (seq === openSectionSeq) set({ error: toError(e) });
     }
   },
 
@@ -685,11 +692,15 @@ export const useStore = create<AppState>((set, get) => {
 
   setContent(content: string) {
     const { activeFile, counts } = get();
+    // No section on screen → nothing to attribute the text to. Accepting it
+    // would strand dirty:true with nowhere to save, which the close flush
+    // then discards while claiming everything was saved.
+    if (!activeFile) return;
     set({
       content,
       dirty: true,
       // live counters on every keystroke — pure engine math, no disk reads
-      counts: counts && activeFile ? applySectionContent(counts, activeFile, content) : counts,
+      counts: counts ? applySectionContent(counts, activeFile, content) : counts,
     });
   },
 
@@ -841,9 +852,6 @@ export const useStore = create<AppState>((set, get) => {
           // so the change is visible immediately and undo-safe to inspect.
           const r = replaceContent(get().content, query, replacement);
           if (r.count === 0) continue;
-          sections++;
-          count += r.count;
-          replaced.push(s.file);
           set({
             content: r.text,
             dirty: true,
@@ -852,7 +860,13 @@ export const useStore = create<AppState>((set, get) => {
               ? applySectionContent(get().counts!, s.file, r.text)
               : get().counts,
           });
-          await get().saveActive();
+          // A blocked save (conflict, write failure) leaves the disk copy
+          // untouched — the replacement sits in the editor pending the
+          // banner, and the summary must not claim it reached the file.
+          if (!(await get().saveActive())) continue;
+          sections++;
+          count += r.count;
+          replaced.push(s.file);
         } else {
           const text = await platform
             .readTextFile(`${projectDir}/${s.file}`)

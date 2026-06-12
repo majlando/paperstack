@@ -27,6 +27,13 @@ export interface MarkdownPreviewOptions {
 export class MarkdownPreview {
   private readonly processor: Processor;
   private seq = 0;
+  /**
+   * Render calls are async (mermaid awaits) and unserialized: a render that
+   * loses the race must stop touching the DOM the moment it discovers a
+   * newer one started — otherwise a slow diagram from section A applies A's
+   * scroll position (or its error box) onto section B's fresh preview.
+   */
+  private renderGeneration = 0;
   private readonly objectUrls = new Set<string>();
   /** Rendered SVG per diagram content hash — typing pauses re-render the
    * HTML every time, but unchanged diagrams should not re-run mermaid. */
@@ -58,16 +65,19 @@ export class MarkdownPreview {
   ): Promise<void> {
     // Keep scroll position while typing; jump to top on section switch.
     const scrollTop = options?.resetScroll ? 0 : this.container.scrollTop;
+    const generation = ++this.renderGeneration;
     this.revokeObjectUrls();
 
     let html: string;
     try {
       html = String(await this.processor.process(markdown));
     } catch (e) {
+      if (generation !== this.renderGeneration) return;
       this.container.innerHTML = "";
       this.container.appendChild(this.errorBox(`Preview error: ${(e as Error).message}`));
       return;
     }
+    if (generation !== this.renderGeneration) return;
     const template = document.createElement("template");
     template.innerHTML = html;
     sanitizePreviewFragment(template.content);
@@ -124,6 +134,7 @@ export class MarkdownPreview {
           if (this.svgCache.size > 100) this.svgCache.clear();
           this.svgCache.set(hash, svg);
         }
+        if (generation !== this.renderGeneration) return;
         const wrapper = document.createElement("div");
         wrapper.className = "my-4 flex justify-center";
         const img = document.createElement("img");
@@ -135,6 +146,7 @@ export class MarkdownPreview {
         wrapper.appendChild(img);
         pre.replaceWith(wrapper);
       } catch (e) {
+        if (generation !== this.renderGeneration) return;
         pre.replaceWith(this.errorBox(`Diagram error: ${(e as Error).message}`));
       }
     }
@@ -151,6 +163,7 @@ export class MarkdownPreview {
   }
 
   destroy(): void {
+    this.renderGeneration++; // any in-flight render stops touching the DOM
     this.container.removeEventListener("click", this.onClick);
     this.revokeObjectUrls();
     this.container.replaceChildren();

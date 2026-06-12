@@ -198,6 +198,19 @@ describe("replace all", () => {
     expect(fake.files.get(A)).toBe("# A\n\nomega\n");
   });
 
+  it("does not count the active section while its save is conflict-blocked", async () => {
+    await openProject();
+    fake.files.set(A, "# A\n\ntheirs\n"); // external edit while a.md is open
+
+    const r = await useStore.getState().replaceAll("alpha", "omega");
+    // the replacement sits in the editor pending the conflict banner — the
+    // summary must not claim it reached the file
+    expect(r).toEqual({ sections: 0, count: 0 });
+    expect(useStore.getState().conflict).not.toBeNull();
+    expect(fake.files.get(A)).toBe("# A\n\ntheirs\n"); // disk untouched
+    expect(useStore.getState().content).toBe("# A\n\nomega\n"); // editor has it
+  });
+
   it("replaces directly on disk in sections that are not open, without dots", async () => {
     await openProject();
     const r = await useStore.getState().replaceAll("gamma", "delta");
@@ -368,6 +381,31 @@ describe("the conflict guard", () => {
 });
 
 describe("navigation during trouble", () => {
+  it("rapid section clicks settle on the last click, not the slowest read", async () => {
+    await openProject();
+    const gate = fake.gateNextRead((p) => p === "/p/sections/b.md");
+
+    const openB = useStore.getState().openSection("sections/b.md");
+    await gate.reached; // b's read is mid-flight …
+    await useStore.getState().openSection("sections/c.md"); // … c completes first
+    gate.release();
+    await openB;
+
+    const s = useStore.getState();
+    expect(s.activeFile).toBe("sections/c.md"); // the user's last click wins
+    expect(s.content).toBe("# C\n\ngamma\n");
+  });
+
+  it("typing with no section open is ignored, not stranded as unsaved", async () => {
+    await openProject();
+    await useStore.getState().removeSection("sections/a.md"); // active section gone
+    expect(useStore.getState().activeFile).toBeNull();
+
+    useStore.getState().setContent("ghost text with nowhere to go");
+    expect(useStore.getState().dirty).toBe(false);
+    expect(await useStore.getState().saveActive()).toBe(true);
+  });
+
   it("openSection stays put when the flush save fails", async () => {
     await openProject();
     fake.failWrites = (p) => p === A;
