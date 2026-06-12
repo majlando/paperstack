@@ -97,6 +97,32 @@ describe("loadProject error messages", () => {
     expect(error.userMessage).toContain("forward slashes");
   });
 
+  it("refuses an unquoted student id with a leading zero (it already lost the zero)", async () => {
+    const yaml = (id: string) =>
+      `title: T\nauthors:\n  - name: Ada\n    student_id: ${id}\nsections:\n  - { file: a.md, role: body }\n`;
+    const load = (id: string) =>
+      loadProject(
+        new FakePlatform(new Map([["/proj/document.yaml", yaml(id)], ["/proj/a.md", "# A\n"]])),
+        "/proj",
+      );
+    const error = await load("0123456").catch((e) => e);
+    expect(error.code).toBe("metadata-invalid");
+    expect(error.userMessage).toContain('student_id: "0123456"');
+    // quoted ids and zero-less numeric ids keep loading
+    expect((await load('"0123456"')).meta.authors[0]?.student_id).toBe("0123456");
+    expect((await load("123456")).meta.authors[0]?.student_id).toBe("123456");
+  });
+
+  it("names an empty or doubled document.yaml readably", async () => {
+    const load = (content: string) =>
+      loadProject(new FakePlatform(new Map([["/proj/document.yaml", content]])), "/proj");
+    const empty = await load("# only a comment\n").catch((e) => e);
+    expect(empty.userMessage).toContain("document.yaml is empty");
+    const doubled = await load("title: a\n---\ntitle: b\n").catch((e) => e);
+    expect(doubled.userMessage).toContain("more than one YAML document");
+    expect(doubled.userMessage).not.toContain("parseAllDocuments");
+  });
+
   it("rejects section paths that alias other entries via ./ or //", async () => {
     // "./a.md" and "a.md" are the same file — letting both through would
     // defeat the duplicate guard and count the section twice toward the cap.

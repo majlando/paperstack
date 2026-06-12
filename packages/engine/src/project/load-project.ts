@@ -31,13 +31,37 @@ export async function loadProject(platform: Platform, dir: string): Promise<Proj
     );
   }
 
+  // An unquoted `student_id: 0123456` parses as the integer 123456 — the
+  // wrong id would print on the exam cover, and the zeros are unrecoverable
+  // after parsing. Ids without a leading zero stay tolerated as numbers.
+  const zeroId = /student_id:[ \t]*(0\d+)[ \t]*(?=[,}#\r\n]|$)/m.exec(raw);
+  if (zeroId !== null) {
+    throw new PaperstackError(
+      "metadata-invalid",
+      `A student id that starts with 0 must be quoted to keep the zero: ` +
+        `write student_id: "${zeroId[1]}" in document.yaml.`,
+    );
+  }
+
   let parsed: unknown;
   try {
     parsed = parse(raw);
   } catch (e) {
+    // The yaml library's multi-document error suggests calling one of its
+    // own APIs — meaningless advice for a report writer.
+    const message = (e as Error).message.includes("parseAllDocuments")
+      ? "it contains more than one YAML document (a stray --- line?). A report has exactly one."
+      : (e as Error).message;
     throw new PaperstackError(
       "metadata-invalid-yaml",
-      `document.yaml could not be read: ${(e as Error).message}`,
+      `document.yaml could not be read: ${message}`,
+    );
+  }
+  if (parsed === null || parsed === undefined) {
+    throw new PaperstackError(
+      "metadata-invalid",
+      `document.yaml is empty — it should hold the report metadata (title, sections). ` +
+        `Restore it from Git, or create the project again.`,
     );
   }
 
