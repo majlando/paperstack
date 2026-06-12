@@ -6,7 +6,11 @@ function init(): void {
   if (initialized) return;
   mermaid.initialize({
     startOnLoad: false,
-    theme: "dark",
+    // Neutral (print) theme, not "dark": the same SVG is embedded on the
+    // PDF's white page, where dark-filled nodes and pale edge labels are
+    // unreadable. The preview already shows images on a white backing
+    // (prose-img:bg-white), so light diagrams read correctly there too.
+    theme: "neutral",
     // Labels must be SVG <text>, never <foreignObject>-wrapped HTML (the
     // mermaid default): the exported PDF runs this SVG through Typst's
     // renderer, which skips foreignObject entirely (typst/typst#1421) —
