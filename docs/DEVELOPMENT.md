@@ -24,7 +24,7 @@ The working plan for getting from empty repo to v1 (see [MVP.md](MVP.md) for sco
   └─ scripts/                # dev-binary download, etc.
   ```
 - [x] `packages/engine`: strict `tsconfig`, Vitest, no runtime dependencies beyond `yaml` and `zod` (unified/remark moved to the app, where the preview lives — they return to the engine if the remark-based Typst emitter ever happens)
-- [x] `scripts/fetch-binaries.ps1` — downloads pinned versions of `typst` (0.13.1) and `pandoc` (3.6.3) into a git-ignored `bin/` for development (these ship as Tauri sidecars later; never committed)
+- [x] `scripts/fetch-binaries.ps1` — downloads pinned versions of `typst` (0.13.1) and `pandoc` (3.6.3) into a git-ignored `bin/` for development (these ship as Tauri sidecars later; never committed). *Historical: ported to the cross-platform `scripts/fetch-binaries.ts` in M6 — `pnpm fetch-binaries` is the command everywhere*
 - [x] GitHub Actions workflow: install + run engine tests on every push (cheap, and keeps the public repo trustworthy from day one)
 - [x] Two fixtures: `fixtures/demo-report/` (small, synthetic, committed — used by tests) and the real SEA report in `report/` (local only, git-ignored — used to judge output quality)
 
@@ -227,8 +227,8 @@ Goal: a stranger on Windows, macOS, or Linux installs a release build and trusts
 - [ ] CI release workflow: tag → matrix build (NSIS/MSI, dmg, AppImage + deb) → GitHub release with artifacts attached
 - [ ] Auto-update: tauri-plugin-updater against GitHub releases (the updater's own signing keys are free; OS code signing stays deferred — document the SmartScreen/Gatekeeper first-run path in the README instead)
 - [ ] CLI packaging: `paperstack build <dir>` as an installable artifact — the engine + NodePlatform + `scripts/build-report.ts` already *are* the CLI; this is packaging, not a feature. Enables report builds in a group repo's CI (see M7)
-- [ ] CI: add a `tauri build` job so packaging breakage is caught on push, not at release time (engine tests already run on every push)
-- [ ] Webview privilege hardening (before strangers run release builds): the sidecar argument allowlist is done (`run_sidecar` in `lib.rs`; no shell permissions in the capability) and `allow_new_project_scope` now rejects drive roots and the user-profile/Desktop/Documents/Downloads folders (2026-06-11) — what's left is revoking grants when a project is closed (`ProjectRoots` only grows today)
+- [ ] CI: add a `tauri build` job so packaging breakage is caught on push, not at release time (engine tests already run on every push; since 2026-06-12 a `cargo test` job compiles the crate and runs the validator tests on every push — what's left is the bundling step itself)
+- [ ] Webview privilege hardening (before strangers run release builds): the sidecar argument allowlist is done (`run_sidecar` in `lib.rs`; no shell permissions in the capability) and `allow_new_project_scope` now rejects drive roots and the user-profile/Desktop/Documents/Downloads folders (2026-06-11); the validators are unit-tested pure functions with their own CI job, the allowlist accepts typst only (pandoc is CLI-only), and a symlink at the output name is refused (2026-06-12) — what's left is revoking grants when a project is closed (`ProjectRoots` only grows today)
 - [ ] Repo as product: README with screenshots and an install section, LICENSE decision, CONTRIBUTING.md, issue templates
 - [ ] The clean-machine walkthrough (docs/CLEAN-MACHINE-TEST.md) runs per platform before each release
 

@@ -20,18 +20,22 @@ Paperstack packages the Markdown-to-PDF workflow into a focused app. You write t
 
 The first target is the **SEA exam report** (Danish academy CS project report), done extremely well — including a live *normalsider* counter against the page cap. If it works for that, it generalizes.
 
-## Planned v1 features
+## Features (v1 scope, built — plus what landed alongside it)
 
 - Report projects as plain folders — Markdown, YAML, and images you can edit with any tool
 - Structure-aware sidebar: front matter, sections, appendices
 - Markdown editor (CodeMirror) with live per-section preview
 - Metadata form — no raw YAML required
 - Mermaid diagrams, rendered live in preview and embedded as SVG in the PDF
-- Insert helpers for code blocks, figures, and diagrams
+- Insert helpers for code blocks, figures (incl. paste-a-screenshot), diagrams, and tables
+- Math: inline `$x$` and display `$$…$$` — KaTeX in the preview, real Typst math in the PDF
+- Citations: drop a `references.bib` in the project and `[@key]` becomes a numbered reference with a generated bibliography
+- Project-wide search and replace
 - Live length counter (normalsider vs. cap) and `[TODO]` tracker
 - **View Report** — the assembled, real PDF, shown in-app
 - One-click PDF export via a bundled [Typst](https://typst.app/) engine
 - Human-readable errors (never `pandoc exited with code 43`)
+- Group-ready by design: deterministic file writes, conflict guards for `git pull`, changed-on-disk indicators
 
 ## How it works
 
@@ -40,10 +44,11 @@ A Paperstack project is just a folder:
 ```
 my-report/
 ├─ document.yaml      # title, authors, course, section order
+├─ references.bib     # optional — its presence activates [@key] citations
 ├─ sections/          # 01-introduction.md, 02-background.md, ...
 ├─ appendices/
 ├─ figures/
-├─ diagrams/          # Mermaid sources + rendered SVGs
+├─ diagrams/          # rendered SVGs of the report's ```mermaid blocks (content-hashed)
 └─ output/report.pdf
 ```
 
@@ -78,7 +83,9 @@ pnpm typecheck     # strict TypeScript check across the workspace
 pnpm --filter @paperstack/engine test:watch   # watch mode while working on the engine
 ```
 
-Run both before committing — CI (`.github/workflows/ci.yml`) runs these plus `pnpm --filter @paperstack/desktop build` on every push. CI fetches the pinned Linux binaries (cached between runs), so the full Markdown → PDF integration test runs on every push too.
+Run both before committing — CI (`.github/workflows/ci.yml`) runs these plus `pnpm --filter @paperstack/desktop build` and a Rust job (`cargo test` over the app's sidecar validators) on every push. CI fetches the pinned Linux binaries (cached between runs), so the full Markdown → PDF integration test runs on every push too.
+
+`pnpm smoke` drives the real app end to end (scaffold a scratch project → open → edit → save → export, asserted from the app's own result file). Local only — it needs the sidecars, port 1420, and a desktop session.
 
 ### Build reports from the terminal (engine only, no app)
 
@@ -87,7 +94,7 @@ pnpm build:demo                                  # fixtures/demo-report → outp
 pnpm tsx scripts/build-report.ts <project-dir>   # build any report project folder
 ```
 
-Set `$env:DEBUG=1` before a build command to see the underlying Pandoc/Typst output when an error message isn't enough.
+Set `$env:DEBUG=1` before a build command to see the raw converter/Typst output when an error message isn't enough. Conversion uses Paperstack's own remark→Typst emitter; `--converter=pandoc` selects the bundled fallback, and `pnpm tsx scripts/converter-parity.ts <project-dir>` diffs the two over a project.
 
 ### Run the desktop app
 
@@ -117,7 +124,7 @@ pnpm --filter @paperstack/desktop tauri dev
 pnpm --filter @paperstack/desktop tauri build   # release build + NSIS installer, sidecars bundled
 ```
 
-Packaging is Milestone 4 work — the command is wired up but not yet part of the verified release flow.
+The installer builds and runs (verified on the dev machine); the `v0.1.0` release waits on the clean-machine walkthrough in [docs/CLEAN-MACHINE-TEST.md](docs/CLEAN-MACHINE-TEST.md).
 
 See [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md) for the full plan and progress.
 

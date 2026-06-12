@@ -24,6 +24,9 @@ This is the main focus. Nothing outside this document blocks a v1 release.
 
 ## Explicitly cut from v1 (deferred, not abandoned)
 
+*(The cut worked: v1 went feature-complete first, and the first three items
+then shipped in the v0.2 stream on 2026-06-11 — see DEVELOPMENT.md, M5.)*
+
 - Math/equations
 - Table editing helpers
 - Citations / BibTeX (a hand-written references section is the v1 answer)

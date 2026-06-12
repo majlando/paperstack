@@ -7,12 +7,12 @@ Decided stack and the reasoning behind it. Optimized for a solo developer buildi
 | Layer | Choice | Notes / fallback |
 |---|---|---|
 | Desktop shell | Tauri 2 | WebView2 on Windows; small installers. Fallback: Electron |
-| Language | TypeScript | Everywhere. Rust stays at config + official Tauri plugins (fs, dialog, shell) |
+| Language | TypeScript | Everywhere. Rust stays small: config, official Tauri plugins (fs, dialog, shell), and one audited command layer (`run_sidecar` allowlist + project-scope grants — unit-tested pure functions, `cargo test` in CI) |
 | Build | Vite | Tauri default, instant HMR |
 | UI framework | React, **used thin** (see below) | Runner-up: Svelte 5 |
 | Components/styling | Tailwind + shadcn/ui | shadcn components get vendored as source in-repo when first needed (owned code, not a dependency); none vendored yet |
 | Editor | CodeMirror 6 | Vanilla TS class, hand-written React bridge (no wrapper packages) |
-| Markdown parsing (preview) | unified/remark | AST is reusable for a future Typst emitter |
+| Markdown parsing (preview) | unified/remark | The same AST family the Typst emitter is built on — one understanding of the Markdown |
 | Diagrams | Mermaid | Rendered live in preview; pre-rendered to SVG on save for export |
 | Markdown→Typst | In-house remark→Typst emitter | Default since the M5 cutover (byte-identical with pandoc on the fixture and the real report); the bundled Pandoc sidecar stays behind the same converter interface as the fallback |
 | PDF compile | Bundled Typst sidecar | Fast enough that "View Report" = real PDF |
@@ -38,4 +38,4 @@ Hand-rolling policy: hand-roll where it buys control or understanding (the engin
 - **Pandoc for Markdown→Typst, then the in-house emitter** — pandoc was proven, handled every Markdown edge case, and got Milestone 1 done fast. It sat behind a `convert()` interface from day one — which is exactly how the remark emitter replaced it as the default in M5 (driven to byte parity on the real report first; pandoc remains the fallback and the golden-file measuring stick). The emitter is what math, citations, and line-accurate converter errors build on.
 - **React over Svelte 5** — a near-tie on merits. Svelte 5 is the nicer language and the author knows it; React won on AI-assist corpus depth and ecosystem popularity (the stated tiebreaker). Because the engine and the imperative components are framework-free, the React chrome is small and could be ported later cheaply.
 - **CodeMirror 6 over Monaco** — lighter, better at prose-with-code, designed for embedding; the same choice Obsidian made.
-- **unified/remark over markdown-it** — produces a real AST, so the preview parser and a future Typst emitter share one understanding of the Markdown.
+- **unified/remark over markdown-it** — produces a real AST, so the preview parser and the Typst emitter share one understanding of the Markdown (this bet paid off in M5: the emitter is built on the same remark pipeline the preview already used).

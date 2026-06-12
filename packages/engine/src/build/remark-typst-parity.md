@@ -1,6 +1,6 @@
 # remark→Typst emitter — parity status
 
-Status as of 2026-06-11, measured against pandoc 3.6.3
+Status as of 2026-06-12, measured against pandoc 3.6.3
 (`-f gfm+implicit_figures+attributes -t typst --wrap=none` + the image-path
 rewrite — exactly what `PandocConverter` runs).
 
@@ -26,11 +26,13 @@ fallback, links (bodied, autolink, `www.` autolink, internal `#anchor` →
 `label`, reference-style), tight/loose/nested/ordered lists incl.
 `start ≠ 1` (`#block[#set enum(…)]`) and task lists, fenced code blocks,
 implicit figures with `{width=… height=… #id}` attributes (incl. `%`→`50.0%`
-and `px`→`in` conversion), GFM tables in pandoc's exact `#figure`/`#table`
-layout, blockquotes, hard breaks, dropped raw HTML/comments (collapsing the
-double space a dropped inline comment leaves, as pandoc does), GFM
-footnotes, and image-path
-resolution identical to `rewriteImagePaths`.
+and `px`→`in` conversion) — for inline *and* reference-style images
+(`![caption][ref]` resolves its definition into the same figure, fixed
+2026-06-12; the caption used to vanish), GFM tables in pandoc's exact
+`#figure`/`#table` layout, blockquotes, hard breaks, dropped raw
+HTML/comments (collapsing the double space a dropped inline comment leaves,
+as pandoc does), GFM footnotes, and image-path resolution identical to
+`rewriteImagePaths`.
 
 ## Deliberate divergences (all rare in real reports)
 
@@ -48,18 +50,23 @@ resolution identical to `rewriteImagePaths`.
   uses code spans in figure captions, so this was not rare after all. The raw
   description is recovered from the source via the node's position and
   re-parsed as inlines — captions now render their markup exactly like pandoc.
-- **Paragraph-leading `-`/`+`**: pandoc only escapes leading `=` and `/`;
-  the emitter also escapes `-` and `+` (only reachable via markdown-escaped
-  literals; strictly safer in Typst).
+- **Line-start escaping is a superset of pandoc's** (extended 2026-06-12):
+  pandoc escapes leading `=` and `/` at the start of a paragraph only. The
+  emitter escapes `=` `/` `-` `+` and `N.` at *every* line start it creates —
+  the paragraph's first character, after hard breaks, and at figure-caption
+  starts. On the pandoc path a hard break followed by `= 400 kr` becomes a
+  Typst heading mid-paragraph (a compile error inside captions/quotes);
+  strictly safer, and unreachable in the goldens.
 
 ## Pandoc warts mirrored on purpose (parity over polish, revisit post-cutover)
 
 - `#box(image(…))` is never `;`-terminated — not even before `.`, where the
   `.` could parse as a Typst field access. Pandoc behaves identically.
-- A paragraph starting `1925. was…` (markdown-escaped dot) is not escaped and
-  renders as a Typst enum item — same as pandoc.
 - Remote image URLs are mangled by project-path resolution on both paths
   (Typst cannot load remote images anyway).
+- ~~A paragraph starting `1925. was…` renders as a Typst enum item, same as
+  pandoc~~ — no longer mirrored since the 2026-06-12 line-start escaping
+  (see divergences above): the emitter now writes `1925\.`.
 
 ## Cutover record (2026-06-11)
 
@@ -76,6 +83,10 @@ resolution identical to `rewriteImagePaths`.
   parity break; the real report contains no `$…$` spans (re-verified). Note
   the standard Markdown-math trade-off: two `$` in one paragraph form a math
   span — visible immediately in the KaTeX preview, escapable as `\$`.
+  Tokenization follows TeX (2026-06-12): scripts and macro arguments take
+  one digit unless braced ($2^10$ is 2¹0, like the preview shows), and bare
+  `#`/`%` fail readably naming `\#`/`\%` — the preview and the PDF must
+  never silently disagree.
 - **Citations landed in the emitter (2026-06-11)**: `[@key]` spans become
   `#cite` calls *only* when the project has a references.bib (the builder
   passes its keys in), so projects without one keep exact pandoc parity.

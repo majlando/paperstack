@@ -51,7 +51,10 @@ discarded on close — run the whole walkthrough in one session.
 4. **Insert helpers** — Insert Code Block (cursor lands on the language slot), Insert
    Diagram (Mermaid renders in the preview), Insert Figure with an image whose filename
    contains spaces (file is copied into `figures/` slugified; the preview shows the
-   image; the caption appears under it in the exported PDF as "Figure 1: …").
+   image; the caption appears under it in the exported PDF as "Figure 1: …"). Then
+   paste a screenshot with Ctrl+V — the same caption prompt appears and the figure
+   lands in `figures/`. Insert Table, then re-run the same button inside the table:
+   the pipes re-align.
 5. **Citations** — create a `references.bib` in the project folder with Notepad (one
    `@book{key, …}` entry), press the sidebar reload (⟳): a **Cite** button appears in
    the editor header. Insert a citation; the preview shows a `[key]` chip, and the

@@ -15,7 +15,9 @@ jobs:
   test:
     runs-on: ubuntu-latest
     steps:
-      # Node 24 runner majors — GitHub removes Node 20 action support 2026-06-16.
+      # Action majors (v6) run on GitHub's Node 24 action runtime — Node 20
+      # action support ends 2026-06-16. The project itself targets Node 22
+      # (node-version below), which is unrelated to the action runtime.
       - uses: actions/checkout@v6
       - uses: pnpm/action-setup@v6
       - uses: actions/setup-node@v6
