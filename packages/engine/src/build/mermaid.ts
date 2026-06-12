@@ -32,16 +32,57 @@ export interface MermaidExtraction {
 }
 
 /**
- * Matches what the preview's Markdown parser treats as a Mermaid block: a
- * fence line starting with exactly ```mermaid (an info string like
- * "mermaid layout" still counts; "mermaid-x" does not), closed by a ``` line.
- * Anchored to line starts so prose that merely mentions ```mermaid is left
- * alone, while indented fences (e.g. inside lists) still match.
+ * Fence matching mirrors what the preview's Markdown parser treats as a
+ * Mermaid block: any fence of three-plus backticks or tildes whose info
+ * string starts with exactly "mermaid" ("mermaid layout" counts;
+ * "mermaid-x" does not), closed by a fence of the same character at least
+ * as long — including fences indented in lists and fences written inside a
+ * blockquote with uniform `>` markers. Prose that merely mentions
+ * ```mermaid mid-line is left alone.
  */
-const MERMAID_OPEN = /^([ \t]*)```mermaid(?:[ \t][^\n]*)?\r?$/;
-const MERMAID_CLOSE = /^[ \t]*```[ \t]*\r?$/;
-/** Any other fence opener (longer backtick runs, tildes, other languages). */
-const FENCE_OPEN = /^[ \t]*(`{3,}|~{3,})/;
+interface FenceLine {
+  /** Leading blockquote markers and indentation, verbatim. */
+  prefix: string;
+  /** Number of `>` markers in the prefix. */
+  depth: number;
+  marker: "`" | "~";
+  length: number;
+  /** The info string (text after the fence characters), trimmed. */
+  info: string;
+}
+
+const MERMAID_INFO = /^mermaid(?:[ \t].*)?$/;
+const QUOTE_MARKERS = /^(?:[ \t]*>)+[ \t]?/;
+
+function parseFenceLine(line: string): FenceLine | null {
+  const m = /^((?:[ \t]*>)*[ \t]*)(`{3,}|~{3,})(.*?)\r?$/.exec(line);
+  if (m === null) return null;
+  const prefix = m[1]!;
+  return {
+    prefix,
+    depth: (prefix.match(/>/g) ?? []).length,
+    marker: m[2]![0] as "`" | "~",
+    length: m[2]!.length,
+    info: m[3]!.trim(),
+  };
+}
+
+function closesFence(line: string, open: FenceLine): boolean {
+  const f = parseFenceLine(line);
+  return (
+    f !== null &&
+    f.info === "" &&
+    f.marker === open.marker &&
+    f.length >= open.length &&
+    f.depth === open.depth
+  );
+}
+
+/** `>` markers at the start of the line (0 when not blockquoted). */
+function quoteDepth(line: string): number {
+  const markers = line.match(/^(?:[ \t]*>)+/)?.[0] ?? "";
+  return (markers.match(/>/g) ?? []).length;
+}
 
 export function extractMermaidBlocks(markdown: string): MermaidExtraction {
   const blocks: MermaidBlock[] = [];
@@ -50,47 +91,56 @@ export function extractMermaidBlocks(markdown: string): MermaidExtraction {
   let i = 0;
   while (i < lines.length) {
     const line = lines[i]!;
-    const mermaid = MERMAID_OPEN.exec(line);
-    if (mermaid) {
+    const open = parseFenceLine(line);
+    // A backtick fence cannot carry backticks in its info string (such a
+    // line is inline code, not a fence) — same rule as the preview's parser.
+    const isFence = open !== null && !(open.marker === "`" && open.info.includes("`"));
+    if (isFence && MERMAID_INFO.test(open.info)) {
       let close = i + 1;
-      while (close < lines.length && !MERMAID_CLOSE.test(lines[close]!)) close++;
-      if (close < lines.length) {
-        // Normalize line endings before hashing so CRLF and LF checkouts of
-        // the same diagram map to the same rendered SVG file.
-        const code = lines.slice(i + 1, close).join("\n").replace(/\r\n?/g, "\n").trim();
+      while (close < lines.length && !closesFence(lines[close]!, open)) close++;
+      const content = lines.slice(i + 1, close);
+      // A blockquoted fence is only extracted when every diagram line keeps
+      // the quote markers — anything lazier parses unpredictably and is
+      // safer left alone.
+      const uniformQuote =
+        open.depth === 0 || content.every((l) => quoteDepth(l) === open.depth);
+      if (close < lines.length && uniformQuote) {
+        // Strip quote markers like the preview's parser does, and normalize
+        // line endings before hashing so CRLF and LF checkouts of the same
+        // diagram map to the same rendered SVG file.
+        const stripped =
+          open.depth === 0 ? content : content.map((l) => l.replace(QUOTE_MARKERS, ""));
+        const code = stripped.join("\n").replace(/\r\n?/g, "\n").trim();
         const hash = hashDiagram(code);
         const renderedPath = `diagrams/rendered/${hash}.svg`;
         blocks.push({ code, hash, renderedPath });
         // Root-absolute path; empty alt text = plain image, no forced
-        // caption. Keep the fence's indentation so a diagram in a list stays
-        // in the list. The replacement fills the fence's exact line count
-        // with blank padding: a fence interrupts a paragraph but an image
-        // line does not (it would render inline mid-sentence), and the
-        // unchanged line count keeps converter "line N" errors pointing at
-        // the author's real file.
+        // caption. Keep the fence's prefix so a diagram in a list stays in
+        // the list and one in a quote stays in the quote. The replacement
+        // fills the fence's exact line count with blank padding (bare quote
+        // markers inside a quote): a fence interrupts a paragraph but an
+        // image line does not (it would render inline mid-sentence), and
+        // the unchanged line count keeps converter "line N" errors pointing
+        // at the author's real file.
         const fenceLines = close - i + 1;
+        const blankLine = open.depth === 0 ? "" : open.prefix.replace(/[ \t]+$/, "");
         const replacement: string[] = [];
         const prev = out.length > 0 ? out[out.length - 1]! : "";
-        if (/\S/.test(prev) && fenceLines >= 2) replacement.push("");
-        replacement.push(`${mermaid[1]!}![](/${renderedPath})`);
-        while (replacement.length < fenceLines) replacement.push("");
+        if (/\S/.test(prev) && fenceLines >= 2) replacement.push(blankLine);
+        replacement.push(`${open.prefix}![](/${renderedPath})`);
+        while (replacement.length < fenceLines) replacement.push(blankLine);
         out.push(...replacement);
         i = close + 1;
         continue;
       }
-      // Unclosed mermaid fence: leave it alone, like the rest of the line.
-    }
-    const fence = !mermaid && FENCE_OPEN.exec(line);
-    if (fence) {
+      // Unclosed (or unevenly quoted) mermaid fence: leave it alone.
+    } else if (isFence) {
       // A non-mermaid fence: copy it through verbatim up to its closing line,
       // so a ```mermaid example *shown inside* another code block is never
       // extracted (matching how the preview's CommonMark parser reads it).
-      const marker = fence[1]![0]!;
-      const minLen = fence[1]!.length;
-      const closeRe = new RegExp(`^[ \\t]*\\${marker}{${minLen},}[ \\t]*\\r?$`);
       out.push(line);
       i++;
-      while (i < lines.length && !closeRe.test(lines[i]!)) {
+      while (i < lines.length && !closesFence(lines[i]!, open)) {
         out.push(lines[i]!);
         i++;
       }

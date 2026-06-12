@@ -77,6 +77,40 @@ describe("extractMermaidBlocks", () => {
     expect(replaced).toContain("shown, not drawn");
   });
 
+  it("extracts four-backtick and tilde fences like the preview does", () => {
+    // The preview renders any code block whose language is mermaid — fence
+    // length and character must not silently diverge into a code listing.
+    const four = "````mermaid\nA --> B\n````\n";
+    expect(extractMermaidBlocks(four).blocks[0]?.code).toBe("A --> B");
+
+    const tilde = "~~~mermaid\nA --> B\n~~~\n";
+    expect(extractMermaidBlocks(tilde).blocks[0]?.code).toBe("A --> B");
+
+    // a longer close also closes (CommonMark), and ``` lines survive inside
+    const nested = "````mermaid\nA --> B\n```\nB --> C\n`````\n";
+    expect(extractMermaidBlocks(nested).blocks[0]?.code).toBe("A --> B\n```\nB --> C");
+  });
+
+  it("extracts a uniformly quoted fence, keeping the diagram in the quote", () => {
+    const markdown = "> intro\n> ```mermaid\n> A --> B\n> ```\n";
+    const { markdown: replaced, blocks } = extractMermaidBlocks(markdown);
+    expect(blocks).toHaveLength(1);
+    expect(blocks[0]?.code).toBe("A --> B"); // markers stripped, like the preview
+    const lines = replaced.split("\n");
+    expect(lines).toHaveLength(markdown.split("\n").length); // line count kept
+    expect(lines[0]).toBe("> intro");
+    expect(lines[1]).toBe(">"); // block separation inside the quote
+    expect(lines[2]).toBe(`> ![](/diagrams/rendered/${blocks[0]?.hash}.svg)`);
+    expect(lines[3]).toBe(">"); // padding stays a quote line
+  });
+
+  it("leaves a lazily quoted fence alone (preview may differ; never silently)", () => {
+    const markdown = "> ```mermaid\nA --> B\n> ```\n";
+    const { markdown: replaced, blocks } = extractMermaidBlocks(markdown);
+    expect(blocks).toHaveLength(0);
+    expect(replaced).toBe(markdown);
+  });
+
   it("keeps the replacement a block of its own next to unpadded text", () => {
     // A fence interrupts a paragraph (no blank lines needed); the image
     // replacement must not merge into the neighbouring text as an inline
