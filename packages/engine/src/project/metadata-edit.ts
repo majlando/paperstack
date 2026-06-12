@@ -7,6 +7,7 @@
 import { parseDocument, Scalar, YAMLMap, type Document } from "yaml";
 import { PaperstackError } from "../errors.ts";
 import { documentSchema, type Author } from "./schema.ts";
+import { emitOptions } from "./yaml-style.ts";
 
 export interface MetadataEdit {
   title?: string;
@@ -150,7 +151,8 @@ export function editMetadataInYaml(yamlText: string, edit: MetadataEdit): string
     );
   }
 
-  // lineWidth: 0 disables re-wrapping, so hand-written long lines survive a
-  // form save byte-for-byte — the file is shared over Git and must not churn.
-  return doc.toString({ lineWidth: 0 });
+  // No re-wrapping, and the file's own indent style — hand-written long
+  // lines and a 4-space layout survive a form save byte-for-byte; the file
+  // is shared over Git and must not churn.
+  return doc.toString(emitOptions(yamlText));
 }

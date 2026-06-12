@@ -136,6 +136,18 @@ describe("editMetadataInYaml", () => {
     expect(out).toContain("course: SEA");
   });
 
+  it("keeps a hand-written 4-space sections block intact on a form save", () => {
+    const four = [
+      "title: T",
+      "sections:",
+      "    - { file: sections/a.md, role: body }",
+      "",
+    ].join("\n");
+    const out = editMetadataInYaml(four, { course: "SEA" });
+    expect(out).toContain("    - { file: sections/a.md, role: body }");
+    expect(out).toContain("course: SEA");
+  });
+
   it("never rewraps hand-written long lines (Git no-churn rule)", () => {
     const long = [
       "title: Demo",

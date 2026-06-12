@@ -8,13 +8,7 @@
 import { parseDocument, YAMLMap, YAMLSeq } from "yaml";
 import { PaperstackError } from "../errors.ts";
 import { sectionFileSchema, SECTION_ROLES, type SectionRole } from "./schema.ts";
-
-/**
- * lineWidth: 0 disables re-wrapping, so hand-written long lines (and one-line
- * flow entries past 80 columns) survive a structure edit byte-for-byte — the
- * file is shared over Git and must not churn.
- */
-const EMIT_OPTIONS = { lineWidth: 0 } as const;
+import { emitOptions } from "./yaml-style.ts";
 
 function loadSections(yamlText: string): { doc: ReturnType<typeof parseDocument>; seq: YAMLSeq } {
   const doc = parseDocument(yamlText);
@@ -105,7 +99,7 @@ export function addSectionToYaml(
   const node = doc.createNode({ file, role }) as YAMLMap;
   node.flow = true; // matches the one-line `- { file: ..., role: ... }` style
   seq.items.splice(insertAt, 0, node);
-  return doc.toString(EMIT_OPTIONS);
+  return doc.toString(emitOptions(yamlText));
 }
 
 /**
@@ -122,7 +116,7 @@ export function removeSectionFromYaml(yamlText: string, file: string): string {
     );
   }
   seq.items.splice(index, 1);
-  return doc.toString(EMIT_OPTIONS);
+  return doc.toString(emitOptions(yamlText));
 }
 
 /**
@@ -144,7 +138,7 @@ export function moveSectionInYaml(
       const tmp = seq.items[index]!;
       seq.items[index] = seq.items[j]!;
       seq.items[j] = tmp;
-      return doc.toString(EMIT_OPTIONS);
+      return doc.toString(emitOptions(yamlText));
     }
   }
   return yamlText;
@@ -161,5 +155,5 @@ export function renameSectionInYaml(
   assertNotListed(seq, newFile);
   const index = mustFind(seq, oldFile);
   (seq.items[index] as YAMLMap).set("file", newFile);
-  return doc.toString(EMIT_OPTIONS);
+  return doc.toString(emitOptions(yamlText));
 }

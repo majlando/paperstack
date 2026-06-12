@@ -60,6 +60,30 @@ describe("addSectionToYaml", () => {
     const out = addSectionToYaml(yaml, "b.md", "body");
     expect(out).toContain(longEntry);
   });
+
+  it("keeps a hand-written 4-space indent (Git no-churn rule)", () => {
+    const four = [
+      "title: T",
+      "sections:",
+      "    - { file: sections/a.md, role: body }",
+      "",
+    ].join("\n");
+    const out = addSectionToYaml(four, "sections/b.md", "body");
+    expect(out).toContain("    - { file: sections/a.md, role: body }");
+    expect(out).toContain("    - { file: sections/b.md, role: body }");
+  });
+
+  it("keeps sequence items the author wrote flush with their key", () => {
+    const flush = [
+      "title: T",
+      "sections:",
+      "- { file: sections/a.md, role: body }",
+      "",
+    ].join("\n");
+    const out = addSectionToYaml(flush, "sections/b.md", "body");
+    expect(out).toContain("\n- { file: sections/a.md, role: body }");
+    expect(out).toContain("\n- { file: sections/b.md, role: body }");
+  });
 });
 
 describe("removeSectionFromYaml", () => {
