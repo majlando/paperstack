@@ -16,7 +16,7 @@ vi.mock("./platform/tauri-platform.ts", async () => {
   const { GatedPlatform } = await import("./test/gated-platform.ts");
   return {
     platform: new GatedPlatform(),
-    SIDECARS: { typst: "binaries/typst", pandoc: "binaries/pandoc" },
+    SIDECARS: { typst: "binaries/typst" },
     allowExistingProjectScope: (dir: string) => mocks.allowExisting(dir),
     allowNewProjectScope: async (dir: string) => dir,
   };

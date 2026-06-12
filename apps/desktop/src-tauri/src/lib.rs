@@ -78,7 +78,8 @@ async fn run_sidecar(
     binary: String,
     args: Vec<String>,
 ) -> Result<SidecarOutput, String> {
-    validate_sidecar_invocation(&binary, &args, &roots)?;
+    let allowed = roots.0.lock().map_err(|e| e.to_string())?.clone();
+    validate_sidecar_invocation(&binary, &args, &allowed)?;
     // The webview names sidecars by their tauri.conf.json externalBin path
     // ("binaries/typst"), but the Rust shell API resolves the program file
     // next to the app executable — it needs the bare name ("typst").
@@ -138,22 +139,24 @@ fn normalize_path(path: &std::path::Path) -> String {
     s
 }
 
+// The validators below take plain slices (no tauri types) so they are unit
+// tested in this file — this is the layer where a bug is a sandbox escape.
+
 fn validate_sidecar_invocation(
     binary: &str,
     args: &[String],
-    roots: &tauri::State<'_, ProjectRoots>,
+    roots: &[std::path::PathBuf],
 ) -> Result<(), String> {
     match binary {
         "binaries/typst" => validate_typst_args(args, roots),
-        "binaries/pandoc" => validate_pandoc_args(args, roots),
+        // pandoc is bundled (CLI fallback converter) but the webview never
+        // invokes it — the app's only converter is the in-process emitter,
+        // so the reachable sidecar surface is typst alone.
         _ => Err("That sidecar is not allowed.".into()),
     }
 }
 
-fn validate_typst_args(
-    args: &[String],
-    roots: &tauri::State<'_, ProjectRoots>,
-) -> Result<(), String> {
+fn validate_typst_args(args: &[String], roots: &[std::path::PathBuf]) -> Result<(), String> {
     if args == ["--version"] {
         return Ok(());
     }
@@ -181,56 +184,15 @@ fn validate_typst_args(
     Ok(())
 }
 
-fn validate_pandoc_args(
-    args: &[String],
-    roots: &tauri::State<'_, ProjectRoots>,
-) -> Result<(), String> {
-    if args == ["--version"] {
-        return Ok(());
-    }
-    let expected_prefix = [
-        "-f",
-        "gfm+implicit_figures+attributes",
-        "-t",
-        "typst",
-        "--wrap=none",
-    ];
-    if args.len() == 6
-        && expected_prefix
-            .iter()
-            .zip(args.iter())
-            .all(|(expected, actual)| expected == actual)
-    {
-        require_inside_any_root(&args[5], roots, true)?;
-        return Ok(());
-    }
-    Err("Unsupported Pandoc invocation.".into())
-}
-
 fn canonical_allowed_dir(
     path: &str,
-    roots: &tauri::State<'_, ProjectRoots>,
+    roots: &[std::path::PathBuf],
 ) -> Result<std::path::PathBuf, String> {
     let candidate = canonical_dir(path)?;
-    let roots = roots.0.lock().map_err(|e| e.to_string())?;
     if roots.iter().any(|root| root == &candidate) {
         Ok(candidate)
     } else {
         Err("Sidecar root is not an opened Paperstack project.".into())
-    }
-}
-
-fn require_inside_any_root(
-    path: &str,
-    roots: &tauri::State<'_, ProjectRoots>,
-    must_exist: bool,
-) -> Result<(), String> {
-    let candidate = canonical_for_check(path, must_exist)?;
-    let roots = roots.0.lock().map_err(|e| e.to_string())?;
-    if roots.iter().any(|root| candidate.starts_with(root)) {
-        Ok(())
-    } else {
-        Err("Sidecar path is outside the opened project.".into())
     }
 }
 
@@ -272,6 +234,126 @@ fn canonical_for_check(path: &str, must_exist: bool) -> Result<std::path::PathBu
         return Err("Sidecar output path is a symbolic link.".into());
     }
     Ok(candidate)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::fs;
+    use std::path::PathBuf;
+
+    /// A real (canonicalized) scratch project folder with output/ inside.
+    fn scratch_project(name: &str) -> PathBuf {
+        let dir = std::env::temp_dir().join(format!(
+            "paperstack-validator-{}-{name}",
+            std::process::id()
+        ));
+        fs::create_dir_all(dir.join("output")).unwrap();
+        dir.canonicalize().unwrap()
+    }
+
+    fn p(path: &PathBuf) -> String {
+        path.to_string_lossy().into_owned()
+    }
+
+    fn compile_args(root: &PathBuf, input: &str, output: &str) -> Vec<String> {
+        vec![
+            "compile".into(),
+            "--root".into(),
+            p(root),
+            "--ignore-system-fonts".into(),
+            input.into(),
+            output.into(),
+        ]
+    }
+
+    #[test]
+    fn version_probe_is_allowed_without_roots() {
+        assert!(validate_sidecar_invocation("binaries/typst", &["--version".into()], &[]).is_ok());
+    }
+
+    #[test]
+    fn only_typst_is_reachable() {
+        let err = validate_sidecar_invocation("binaries/pandoc", &["--version".into()], &[]);
+        assert!(err.is_err());
+        assert!(validate_sidecar_invocation("binaries/sh", &[], &[]).is_err());
+    }
+
+    #[test]
+    fn compile_inside_an_opened_project_is_allowed() {
+        let root = scratch_project("ok");
+        fs::write(root.join("output").join("main.typ"), "x").unwrap();
+        let input = p(&root.join("output").join("main.typ"));
+        let output = p(&root.join("output").join("report.pdf"));
+        let args = compile_args(&root, &input, &output);
+        assert!(validate_typst_args(&args, &[root]).is_ok());
+    }
+
+    #[test]
+    fn compile_with_an_unopened_root_is_rejected() {
+        let root = scratch_project("unopened");
+        fs::write(root.join("output").join("main.typ"), "x").unwrap();
+        let input = p(&root.join("output").join("main.typ"));
+        let output = p(&root.join("output").join("report.pdf"));
+        let args = compile_args(&root, &input, &output);
+        assert!(validate_typst_args(&args, &[]).is_err());
+    }
+
+    #[test]
+    fn unknown_flags_are_rejected() {
+        let root = scratch_project("flags");
+        let mut args = compile_args(&root, "a", "b");
+        args[3] = "--font-path".into(); // not the pinned invocation shape
+        assert!(validate_typst_args(&args, &[root]).is_err());
+    }
+
+    #[test]
+    fn input_outside_the_project_is_rejected() {
+        let root = scratch_project("inside");
+        let other = scratch_project("outside");
+        fs::write(other.join("main.typ"), "x").unwrap();
+        let input = p(&other.join("main.typ"));
+        let output = p(&root.join("output").join("report.pdf"));
+        let args = compile_args(&root, &input, &output);
+        assert!(validate_typst_args(&args, &[root]).is_err());
+    }
+
+    #[test]
+    fn output_escaping_via_dotdot_is_rejected() {
+        let root = scratch_project("dotdot");
+        fs::write(root.join("output").join("main.typ"), "x").unwrap();
+        let input = p(&root.join("output").join("main.typ"));
+        let output = p(&root.join("output")) + "/../../escape.pdf";
+        let args = compile_args(&root, &input, &output);
+        assert!(validate_typst_args(&args, &[root]).is_err());
+    }
+
+    #[test]
+    fn sibling_prefix_folders_do_not_pass_containment() {
+        // C:\proj-evil must not count as inside C:\proj (component-wise check).
+        let root = scratch_project("prefix");
+        let evil = PathBuf::from(format!("{}-evil", p(&root)));
+        fs::create_dir_all(&evil).unwrap();
+        assert!(require_inside(&format!("{}/x.pdf", p(&evil)), &root, false).is_err());
+    }
+
+    #[test]
+    fn symlink_at_the_output_name_is_rejected() {
+        let root = scratch_project("symlink");
+        let target = root.join("outside-target.pdf");
+        fs::write(&target, "x").unwrap();
+        let link = root.join("output").join("report.pdf");
+        #[cfg(windows)]
+        let made = std::os::windows::fs::symlink_file(&target, &link).is_ok();
+        #[cfg(unix)]
+        let made = std::os::unix::fs::symlink(&target, &link).is_ok();
+        if !made {
+            return; // symlink creation needs privileges this runner lacks
+        }
+        let err = canonical_for_check(&p(&link), false);
+        assert!(err.is_err());
+        assert!(err.unwrap_err().contains("symbolic link"));
+    }
 }
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]

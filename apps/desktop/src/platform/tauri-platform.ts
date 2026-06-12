@@ -26,13 +26,18 @@ export async function allowNewProjectScope(dir: string): Promise<string> {
   return await invoke<string>("allow_new_project_scope", { dir });
 }
 
-/** Sidecar names as configured in tauri.conf.json `bundle.externalBin`. */
-export const SIDECARS = { typst: "binaries/typst", pandoc: "binaries/pandoc" } as const;
+/**
+ * Sidecar names as configured in tauri.conf.json `bundle.externalBin`.
+ * pandoc is bundled for the CLI fallback converter but deliberately absent
+ * here — the app converts in-process, and the Rust allowlist only accepts
+ * typst, so the webview's reachable sidecar surface stays minimal.
+ */
+export const SIDECARS = { typst: "binaries/typst" } as const;
 
 /**
  * Platform implementation backed by Tauri's fs plugin, so the engine runs
  * unchanged inside the webview. Binaries run as bundled sidecars via the
- * shell plugin, scoped in capabilities/default.json to exactly typst+pandoc.
+ * run_sidecar command, validated against a per-invocation allowlist in Rust.
  */
 export class TauriPlatform implements Platform {
   readTextFile(path: string): Promise<string> {

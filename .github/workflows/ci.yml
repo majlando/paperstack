@@ -34,3 +34,31 @@ jobs:
       - run: pnpm typecheck
       - run: pnpm test
       - run: pnpm --filter @paperstack/desktop build
+
+  # The sidecar allowlist and fs-scope validators live in Rust — the one
+  # layer where a bug is a sandbox escape. Compile and unit-test them on
+  # every push; webkit dev packages are what tauri needs to build on Linux.
+  rust:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - uses: actions/cache@v5
+        with:
+          path: bin
+          key: binaries-${{ runner.os }}-${{ hashFiles('scripts/fetch-binaries.ts') }}
+      # tauri's build script refuses to compile without the sidecar binaries
+      - run: pnpm fetch-binaries
+      - name: Install tauri system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libwebkit2gtk-4.1-dev libgtk-3-dev libayatana-appindicator3-dev librsvg2-dev
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: apps/desktop/src-tauri
+      - run: cargo test --manifest-path apps/desktop/src-tauri/Cargo.toml
