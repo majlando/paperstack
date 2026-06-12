@@ -170,6 +170,11 @@ class Translator {
       this.pos++;
       return c;
     }
+    // `#` starts code mode in Typst math (raw parse error at export) and `%`
+    // is a LaTeX comment in the KaTeX preview (the PDF would silently print
+    // what the preview hides) — both fail here with the escaped form named.
+    if (c === "#") this.fail('"#" is not supported in math — write \\# for a literal #');
+    if (c === "%") this.fail('"%" starts a LaTeX comment — write \\% for a percent sign');
     // Anything else (typed Unicode like ε or →) passes through to Typst.
     this.pos++;
     return c;
