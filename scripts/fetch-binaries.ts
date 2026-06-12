@@ -119,6 +119,9 @@ const root = resolve(import.meta.dirname, "..");
 const bin = join(root, "bin");
 const tmp = join(bin, "tmp");
 mkdirSync(bin, { recursive: true });
+// A crashed earlier run can leave stale extracted files here — extracting a
+// new archive over them must never mix two versions' files.
+rmSync(tmp, { recursive: true, force: true });
 
 /**
  * Asks the binary itself which version it is: a plain existence check would
