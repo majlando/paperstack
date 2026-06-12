@@ -22,6 +22,7 @@ import type {
   FootnoteDefinition,
   Heading,
   Image,
+  ImageReference,
   List,
   ListItem,
   Paragraph,
@@ -416,7 +417,7 @@ function renderLink(
  * (no position, unbalanced label, or it parses as anything but one
  * paragraph); callers fall back to the plain alt text.
  */
-function altInlines(node: Image, ctx: Ctx): readonly PhrasingContent[] | null {
+function altInlines(node: Image | ImageReference, ctx: Ctx): readonly PhrasingContent[] | null {
   const start = node.position?.start.offset;
   if (start === undefined || ctx.source.slice(start, start + 2) !== "![") return null;
   let depth = 0;
@@ -530,32 +531,52 @@ function renderParagraph(node: Paragraph, ctx: Ctx): BlockPart | null {
 
   // implicit_figures: an image alone in a paragraph becomes a figure with the
   // alt text as caption (the Paperstack figure convention); an alt-less image
-  // stays a plain #box image.
-  if (visible.length === 1 && visible[0]!.node.type === "image") {
-    const image = visible[0]!.node as Image;
-    const attrs = visible[0]!.attrs;
-    const call = imageCall(image.url, attrs, ctx);
-    if (image.alt !== null && image.alt !== undefined && image.alt !== "") {
-      const inlines = altInlines(image, ctx);
-      // No `;` after a trailing hash call: the caption's `]` sits on its own
-      // line, and pandoc only terminates calls before non-whitespace.
-      const caption =
-        inlines === null ? escapeTypstText(image.alt) : renderInlines(inlines, ctx).text;
-      const label = attrs?.id === undefined ? "" : `\n<${attrs.id}>`;
-      return {
-        text: `#figure(${call},\n  caption: [\n    ${caption}\n  ]\n)${label}`,
-      };
+  // stays a plain #box image. Reference-style images (`![caption][ref]`)
+  // resolve their definition and get the same treatment, like pandoc — the
+  // caption must not silently vanish because of the link style used.
+  const single = visible.length === 1 ? visible[0]! : undefined;
+  if (single?.node.type === "image" || single?.node.type === "imageReference") {
+    const image = single.node;
+    const url =
+      image.type === "image" ? image.url : ctx.definitions.get(image.identifier)?.url;
+    if (url !== undefined) {
+      const attrs = single.attrs;
+      const call = imageCall(url, attrs, ctx);
+      if (image.alt !== null && image.alt !== undefined && image.alt !== "") {
+        const inlines = altInlines(image, ctx);
+        // No `;` after a trailing hash call: the caption's `]` sits on its own
+        // line, and pandoc only terminates calls before non-whitespace.
+        const caption = escapeLineStarts(
+          inlines === null ? escapeTypstText(image.alt) : renderInlines(inlines, ctx).text,
+        );
+        const label = attrs?.id === undefined ? "" : `\n<${attrs.id}>`;
+        return {
+          text: `#figure(${call},\n  caption: [\n    ${caption}\n  ]\n)${label}`,
+        };
+      }
+      return { text: `#box(${call})` };
     }
-    return { text: `#box(${call})` };
+    // no definition for the reference — falls through to inline rendering
   }
 
   const inline = joinParts(prepared.map((p) => renderInline(p, ctx)));
-  let text = inline.text;
+  const text = inline.text;
   if (text.trim() === "") return null; // e.g. a paragraph that was only a comment
-  // At the start of a line these would be Typst markup (heading, term list,
-  // list items) — pandoc escapes `=` and `/` here; `-`/`+` added for safety.
-  if (/^[=/+-]/.test(text)) text = `\\${text}`;
-  return { text, trailingHashCall: inline.hashCall };
+  return { text: escapeLineStarts(text), trailingHashCall: inline.hashCall };
+}
+
+/**
+ * At the start of a line, `=` `/` `-` `+` and `1.` are Typst markup (heading,
+ * term list, list and enum items) — pandoc escapes them in line-start
+ * position. The paragraph's first character is one such position, and every
+ * hard break manufactures another one mid-paragraph; a heading spliced into
+ * a caption or blockquote is even a compile error (the template's heading
+ * pagebreak rule cannot run inside a container).
+ */
+function escapeLineStarts(text: string): string {
+  return text
+    .replace(/(^|\n)([=/+-])/g, "$1\\$2")
+    .replace(/(^|\n)(\d+)\.(\s|$)/g, "$1$2\\.$3");
 }
 
 function renderHeading(node: Heading, ctx: Ctx): string {

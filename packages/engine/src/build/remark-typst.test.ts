@@ -312,6 +312,35 @@ describe("images and figures", () => {
   it("rejects image paths escaping the project, with a readable error", () => {
     expect(() => t("![a](../../etc/passwd)")).toThrow(PaperstackError);
   });
+
+  it("a reference-style image alone in a paragraph becomes a figure with its caption", () => {
+    expect(t("![My caption][shot]\n\n[shot]: figures/x.png")).toBe(
+      '#figure(image("/sections/figures/x.png"),\n  caption: [\n    My caption\n  ]\n)',
+    );
+    // alt-less reference image stays a plain block image
+    expect(t("![][shot]\n\n[shot]: x.png")).toBe('#box(image("/sections/x.png"))');
+    // caption markup is recovered from the source, like inline images
+    expect(t("![uses `code`][shot]\n\n[shot]: x.png")).toContain("caption: [\n    uses `code`\n  ]");
+  });
+});
+
+describe("line starts the emitter creates", () => {
+  it("escapes Typst markup after hard breaks", () => {
+    expect(t("total  \n= 400 kr")).toBe("total \\\n\\= 400 kr");
+    expect(t("price  \n/ unit")).toBe("price \\\n\\/ unit");
+    // markdown-escaped markers reach the emitter as literal text
+    expect(t("a  \n\\- dash")).toBe("a \\\n\\- dash");
+    expect(t("year  \n1\\. half")).toBe("year \\\n1\\. half");
+  });
+
+  it("escapes Typst markup at the start of figure captions", () => {
+    expect(t("![= results for 2026](img.png)")).toContain("caption: [\n    \\= results");
+    expect(t("![\\- first bullet](img.png)")).toContain("caption: [\n    \\- first");
+  });
+
+  it("escapes line starts inside blockquotes and list items too", () => {
+    expect(t("> quote  \n> = two")).toBe("#quote(block: true)[\nquote \\\n\\= two\n]");
+  });
 });
 
 describe("math", () => {
@@ -367,6 +396,15 @@ describe("math", () => {
     expect(() => t("$\\foobar{x}$")).toThrow(/\\foobar/);
     expect(() => t("$\\begin{matrix}a\\end{matrix}$")).toThrow(/matrix/);
     expect(() => t("$a & b$")).toThrow(/not supported/);
+  });
+
+  it("bare # and % fail readably, naming the escaped form", () => {
+    // `#` would reach Typst code mode (raw parse error at export); `%` is a
+    // KaTeX comment (the PDF would print what the preview hides).
+    expect(() => t("$x # y$")).toThrow(/\\#/);
+    expect(() => t("$x % comment$")).toThrow(/\\%/);
+    expect(t("$50\\%$")).toBe("$50 %$"); // the escaped forms still translate
+    expect(t("$x \\# y$")).toBe("$x \\# y$");
   });
 });
 
