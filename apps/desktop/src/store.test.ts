@@ -185,6 +185,28 @@ describe("metadata form", () => {
     expect(fake.files.get("/p/document.yaml")).toBe(pulled); // pull never overwritten
   });
 
+  it("opening a section closes a clean form — the click must never be invisible", async () => {
+    await openProject();
+    await useStore.getState().openMetadata();
+
+    await useStore.getState().openSection("sections/b.md");
+    const s = useStore.getState();
+    expect(s.metadataOpen).toBe(false);
+    expect(s.activeFile).toBe("sections/b.md");
+  });
+
+  it("a dirty form blocks section switching instead of switching underneath it", async () => {
+    await openProject();
+    await useStore.getState().openMetadata();
+    useStore.getState().setMetadataDirty(true);
+
+    await useStore.getState().openSection("sections/b.md");
+    const s = useStore.getState();
+    expect(s.metadataOpen).toBe(true);
+    expect(s.activeFile).toBe("sections/a.md"); // not switched
+    expect(s.error?.message).toMatch(/save or cancel the form/);
+  });
+
   it("saves normally when nothing changed underneath the form", async () => {
     await openProject();
     await useStore.getState().openMetadata();

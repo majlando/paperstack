@@ -647,6 +647,22 @@ export const useStore = create<AppState>((set, get) => {
   async openSection(file: string) {
     const { projectDir, dirty, saveActive } = get();
     if (!projectDir) return;
+    // The report-details form replaces the editor area, so switching sections
+    // under it would be invisible — the sidebar click would appear dead. A
+    // clean form just closes; a dirty one blocks, like every other way of
+    // leaving it, so its edits are never silently dropped.
+    if (get().metadataOpen) {
+      if (get().metadataDirty) {
+        set({
+          error: {
+            message:
+              "Report details have unsaved changes — save or cancel the form before opening a section.",
+          },
+        });
+        return;
+      }
+      get().closeMetadata();
+    }
     // A failed save must not be papered over: stay on the current section so
     // the unsaved edits and the error stay visible.
     if (dirty && !(await saveActive())) return;
