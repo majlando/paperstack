@@ -1,0 +1,18 @@
+# Pins what the codebase already does — matters once outside contributors
+# arrive. Line endings are handled by .gitattributes (LF in the repo).
+root = true
+
+[*]
+charset = utf-8
+end_of_line = lf
+insert_final_newline = true
+trim_trailing_whitespace = true
+indent_style = space
+indent_size = 2
+
+[*.rs]
+indent_size = 4
+
+[*.md]
+# trailing double-space is a Markdown hard break
+trim_trailing_whitespace = false

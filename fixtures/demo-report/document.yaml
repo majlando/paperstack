@@ -1,3 +1,6 @@
+# No references.bib in this fixture, deliberately: a bib file would activate
+# citations and change the emitter's output, invalidating the committed pandoc
+# parity goldens in fixtures/golden-typst/. Citation tests use inline fixtures.
 title: "Demo Project Report"
 subtitle: "A small fixture for Paperstack tests"
 course: "SEA"
