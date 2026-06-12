@@ -7,6 +7,7 @@ import { Sidebar } from "./components/Sidebar.tsx";
 import { Editor } from "./components/Editor.tsx";
 import { Preview } from "./components/Preview.tsx";
 import { MetadataForm } from "./components/MetadataForm.tsx";
+import { SplitPane } from "./components/SplitPane.tsx";
 import { StatusBar } from "./components/StatusBar.tsx";
 
 // Dev convenience: VITE_OPEN_PROJECT=<path> auto-opens a project on launch,
@@ -283,9 +284,8 @@ export default function App() {
                 CodeMirror instance owns every section's parked undo history,
                 and unmounting it made a Report-details visit erase undo for
                 the whole project. */}
-            <div className={metadataOpen ? "hidden" : "flex min-h-0 flex-1"}>
-              <Editor />
-              <Preview />
+            <div className={metadataOpen ? "hidden" : "flex min-h-0 min-w-0 flex-1"}>
+              <SplitPane left={<Editor />} right={<Preview />} />
             </div>
           </div>
           <StatusBar />
