@@ -11,6 +11,7 @@ export type ErrorCode =
   | "math-invalid"
   | "citation-unknown"
   | "image-missing"
+  | "figure-unsupported"
   | "output-locked"
   | "export-failed";
 

@@ -68,9 +68,13 @@ export const documentSchema = z.object({
     .optional()
     .transform((v) => {
       if (v == null) return undefined;
-      const cleaned = v
-        .trim()
-        .replaceAll("\\", "/")
+      const slashes = v.trim().replaceAll("\\", "/");
+      // A UNC path (\\server\share\…) is absolute: keep its double slash so
+      // the relative-path check below rejects it readably — stripping it
+      // would fabricate a bogus project-relative path that fails much later
+      // as a missing image.
+      if (slashes.startsWith("//")) return slashes;
+      const cleaned = slashes
         .split("/")
         .filter((segment) => segment !== "" && segment !== ".")
         .join("/");

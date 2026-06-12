@@ -71,10 +71,37 @@ describe("importFigureBytes (pasted images)", () => {
     expect(platform.files.get(`${PROJECT}/figures/image.png`)).toBe("committed");
   });
 
-  it("defaults to .png when the clipboard offers no extension", async () => {
+  it("sniffs the image type from the bytes when the name has no extension", async () => {
     const platform = platformWith({});
-    expect(await importFigureBytes(platform, PROJECT, "pasted", new Uint8Array(1))).toBe(
+    const png = new Uint8Array([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
+    expect(await importFigureBytes(platform, PROJECT, "pasted", png)).toBe(
       "figures/pasted.png",
+    );
+    const jpeg = new Uint8Array([0xff, 0xd8, 0xff, 0xe0]);
+    expect(await importFigureBytes(platform, PROJECT, "shot", jpeg)).toBe(
+      "figures/shot.jpg",
+    );
+    const svg = new TextEncoder().encode(`<svg xmlns="http://www.w3.org/2000/svg"/>`);
+    expect(await importFigureBytes(platform, PROJECT, "diagram", svg)).toBe(
+      "figures/diagram.svg",
+    );
+  });
+
+  it("refuses unrecognizable extensionless bytes instead of mislabeling them .png", async () => {
+    // Typst decodes by extension — a mislabeled file breaks the export with
+    // no hint back at the paste that caused it.
+    const platform = platformWith({});
+    await expect(
+      importFigureBytes(platform, PROJECT, "pasted", new Uint8Array([1, 2, 3])),
+    ).rejects.toThrow(/PNG, JPEG, GIF, or SVG/);
+  });
+});
+
+describe("importFigure with an extensionless source file", () => {
+  it("asks for an extension instead of guessing .png", async () => {
+    const platform = platformWith({ "/pics/photo": "img" });
+    await expect(importFigure(platform, PROJECT, "/pics/photo")).rejects.toThrow(
+      /no file extension/,
     );
   });
 });

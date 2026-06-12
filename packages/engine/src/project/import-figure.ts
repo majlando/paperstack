@@ -1,4 +1,5 @@
 import type { Platform } from "../platform/platform.ts";
+import { PaperstackError } from "../errors.ts";
 import { baseOf, extOf, humanize, normalizeSlashes, slugify, stemOf } from "./paths.ts";
 
 /** Folders scanned (in order) for where the project keeps its images. */
@@ -16,7 +17,19 @@ export async function importFigure(
   projectDir: string,
   sourcePath: string,
 ): Promise<string> {
-  const dest = await figureDestination(platform, projectDir, baseOf(normalizeSlashes(sourcePath)));
+  const name = baseOf(normalizeSlashes(sourcePath));
+  // Typst decodes images by their extension — copying "photo" to
+  // "photo.png" when it is really a JPEG breaks the export with no hint
+  // back at the import that caused it.
+  const ext = extOf(name).toLowerCase();
+  if (ext === "") {
+    throw new PaperstackError(
+      "figure-unsupported",
+      `"${name}" has no file extension, so the image type is unknown. ` +
+        `Rename it (for example to ${name}.png) and insert it again.`,
+    );
+  }
+  const dest = await figureDestination(platform, projectDir, name, ext);
   await platform.copyFile(sourcePath, `${projectDir}/${dest}`);
   return dest;
 }
@@ -33,9 +46,31 @@ export async function importFigureBytes(
   suggestedName: string,
   bytes: Uint8Array,
 ): Promise<string> {
-  const dest = await figureDestination(platform, projectDir, baseOf(normalizeSlashes(suggestedName)));
+  const name = baseOf(normalizeSlashes(suggestedName));
+  // Clipboards usually offer a name with an extension; when they don't,
+  // the bytes themselves say what the image is.
+  const ext = extOf(name).toLowerCase() || sniffImageExt(bytes);
+  if (ext === null) {
+    throw new PaperstackError(
+      "figure-unsupported",
+      "The pasted image is not a format the report can embed (PNG, JPEG, GIF, or SVG). " +
+        "Save it as PNG and insert it again.",
+    );
+  }
+  const dest = await figureDestination(platform, projectDir, name, ext);
   await platform.writeBinaryFile(`${projectDir}/${dest}`, bytes);
   return dest;
+}
+
+/** What the bytes say the image is — null when unrecognized (or unsupported by Typst). */
+function sniffImageExt(bytes: Uint8Array): string | null {
+  const at = (i: number) => bytes[i] ?? 0;
+  if (at(0) === 0x89 && at(1) === 0x50 && at(2) === 0x4e && at(3) === 0x47) return ".png";
+  if (at(0) === 0xff && at(1) === 0xd8 && at(2) === 0xff) return ".jpg";
+  if (at(0) === 0x47 && at(1) === 0x49 && at(2) === 0x46 && at(3) === 0x38) return ".gif";
+  const head = new TextDecoder().decode(bytes.slice(0, 256)).trimStart();
+  if (head.startsWith("<svg") || head.startsWith("<?xml")) return ".svg";
+  return null;
 }
 
 /** Slugified, collision-safe destination inside the project's images folder. */
@@ -43,9 +78,9 @@ async function figureDestination(
   platform: Platform,
   projectDir: string,
   sourceName: string,
+  ext: string,
 ): Promise<string> {
   const stem = slugify(stemOf(sourceName), "figure");
-  const ext = extOf(sourceName).toLowerCase() || ".png";
 
   // Follow the project's own convention for where images live.
   let dir: string | undefined;

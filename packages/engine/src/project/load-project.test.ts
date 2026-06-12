@@ -164,6 +164,11 @@ describe("loadProject error messages", () => {
     expect((await load("logo: ./logo.png")).meta.logo).toBe("logo.png");
     expect((await load("logo:")).meta.logo).toBeUndefined();
     expect((await load("logo: ''")).meta.logo).toBeUndefined();
+    // a UNC path is absolute — rejected readably, never silently mangled
+    // into a bogus project-relative path that fails later as missing
+    const unc = await load("logo: \\\\server\\share\\logo.png").catch((e) => e);
+    expect(unc.code).toBe("metadata-invalid");
+    expect(unc.userMessage).toContain("relative to the project folder");
     // genuinely unusable values still fail with the field named
     const error = await load("logo: ../logo.png").catch((e) => e);
     expect(error.code).toBe("metadata-invalid");

@@ -37,6 +37,15 @@ describe("newSectionFile", () => {
     );
   });
 
+  it("continues past z with aa, ab — letters never clamp", () => {
+    expect(
+      newSectionFile([s("appendices/appendix-z-last.md", "appendix")], "appendix", "More"),
+    ).toBe("appendices/appendix-aa-more.md");
+    expect(
+      newSectionFile([s("appendices/appendix-aa-more.md", "appendix")], "appendix", "Extra"),
+    ).toBe("appendices/appendix-ab-extra.md");
+  });
+
   it("ignores appendix-like filenames in other roles when lettering", () => {
     // A body section named appendix-b-… must not consume the letter "b".
     const sections = [

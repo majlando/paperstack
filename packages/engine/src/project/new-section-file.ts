@@ -22,14 +22,20 @@ export function newSectionFile(
     // Next letter after the highest in use — counting would repeat letters
     // after a removal (remove appendix-a, add → "a" again beside appendix-b).
     // Only real appendices are scanned: a body section that happens to be
-    // named appendix-b-… must not consume a letter.
+    // named appendix-b-… must not consume a letter. Letters continue past z
+    // as aa, ab, … — the filename letter is purely cosmetic (the PDF letters
+    // appendices by document.yaml order), so a hand-named appendix-ab-… at
+    // worst nudges the next generated name, never the report.
     let used = 0;
     for (const s of sameRole) {
-      const m = baseOf(s.file).match(/^appendix-([a-z])[-_.]/);
-      if (m) used = Math.max(used, m[1]!.charCodeAt(0) - 96);
+      const m = baseOf(s.file).match(/^appendix-([a-z]{1,2})[-_.]/);
+      if (m) {
+        let value = 0;
+        for (const ch of m[1]!) value = value * 26 + (ch.charCodeAt(0) - 96);
+        used = Math.max(used, value);
+      }
     }
-    const letter = String.fromCharCode(97 + Math.min(used, 25));
-    return `${prefix}appendix-${letter}-${slug}.md`;
+    return `${prefix}appendix-${appendixLetters(used + 1)}-${slug}.md`;
   }
   // Numbered prefixes share one sequence per folder, whatever the role.
   let max = 0;
@@ -39,4 +45,14 @@ export function newSectionFile(
     if (m) max = Math.max(max, Number(m[1]));
   }
   return `${prefix}${String(max + 1).padStart(2, "0")}-${slug}.md`;
+}
+
+/** 1 → "a", 26 → "z", 27 → "aa" — bijective base-26, so letters never clamp. */
+function appendixLetters(n: number): string {
+  let out = "";
+  while (n > 0) {
+    out = String.fromCharCode(97 + ((n - 1) % 26)) + out;
+    n = Math.floor((n - 1) / 26);
+  }
+  return out;
 }
