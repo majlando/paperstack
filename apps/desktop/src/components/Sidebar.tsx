@@ -26,6 +26,7 @@ function ActionButton(props: { title: string; onClick: () => void; children: Rea
   return (
     <button
       title={props.title}
+      aria-label={props.title}
       onClick={props.onClick}
       className="rounded px-1 py-0.5 hover:bg-zinc-700 hover:text-zinc-100"
     >
@@ -33,6 +34,52 @@ function ActionButton(props: { title: string; onClick: () => void; children: Rea
     </button>
   );
 }
+
+/**
+ * 24×24 stroke icon (Lucide outlines, vendored as paths — no icon package;
+ * see "React, used thin"). Emoji glyphs rendered inconsistently here: the
+ * magnifier came out in color while its neighbors stayed monochrome.
+ */
+function Icon(props: { children: ReactNode }) {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      className="h-4 w-4"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+    >
+      {props.children}
+    </svg>
+  );
+}
+
+const searchIcon = (
+  <Icon>
+    <circle cx="11" cy="11" r="8" />
+    <path d="m21 21-4.3-4.3" />
+  </Icon>
+);
+const detailsIcon = (
+  <Icon>
+    <path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z" />
+    <circle cx="12" cy="12" r="3" />
+  </Icon>
+);
+const reloadIcon = (
+  <Icon>
+    <path d="M21 12a9 9 0 1 1-9-9c2.52 0 4.93 1 6.74 2.74L21 8" />
+    <path d="M21 3v5h-5" />
+  </Icon>
+);
+const switchIcon = (
+  <Icon>
+    <path d="M20 20a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.69-.9L9.6 3.9A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2Z" />
+  </Icon>
+);
 
 /**
  * Uncontrolled one-line input: Enter or leaving the field commits (clicking
@@ -199,8 +246,10 @@ export function Sidebar() {
   const counts = useStore((s) => s.counts);
   const activeFile = useStore((s) => s.activeFile);
   const changedOnDisk = useStore((s) => s.changedOnDisk);
+  const building = useStore((s) => s.building);
   const openSection = useStore((s) => s.openSection);
   const reloadProject = useStore((s) => s.reloadProject);
+  const closeProject = useStore((s) => s.closeProject);
   const openMetadata = useStore((s) => s.openMetadata);
   const addSection = useStore((s) => s.addSection);
   const removeSection = useStore((s) => s.removeSection);
@@ -239,25 +288,37 @@ export function Sidebar() {
           <button
             onClick={() => setSearching((s) => !s)}
             title="Search all sections (Ctrl+Shift+F)"
-            className={`rounded px-1.5 py-0.5 hover:bg-zinc-800 hover:text-zinc-200 ${
+            aria-label="Search all sections"
+            className={`rounded px-1.5 py-1 hover:bg-zinc-800 hover:text-zinc-200 ${
               searching ? "text-zinc-200" : "text-zinc-500"
             }`}
           >
-            🔍
+            {searchIcon}
           </button>
           <button
             onClick={() => void openMetadata()}
             title="Report details — title, authors, language, length cap"
-            className="rounded px-1.5 py-0.5 text-zinc-500 hover:bg-zinc-800 hover:text-zinc-200"
+            aria-label="Report details"
+            className="rounded px-1.5 py-1 text-zinc-500 hover:bg-zinc-800 hover:text-zinc-200"
           >
-            ⚙
+            {detailsIcon}
           </button>
           <button
             onClick={() => void reloadProject()}
             title="Reload project — pick up changes made outside Paperstack (e.g. after a git pull)"
-            className="rounded px-1.5 py-0.5 text-zinc-500 hover:bg-zinc-800 hover:text-zinc-200"
+            aria-label="Reload project"
+            className="rounded px-1.5 py-1 text-zinc-500 hover:bg-zinc-800 hover:text-zinc-200"
           >
-            ⟳
+            {reloadIcon}
+          </button>
+          <button
+            onClick={() => void closeProject()}
+            disabled={building}
+            title="Switch report — back to the start screen to open or create another"
+            aria-label="Switch report"
+            className="rounded px-1.5 py-1 text-zinc-500 hover:bg-zinc-800 hover:text-zinc-200 disabled:opacity-40"
+          >
+            {switchIcon}
           </button>
         </span>
       </div>

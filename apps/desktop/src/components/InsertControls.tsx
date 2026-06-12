@@ -122,6 +122,9 @@ export function InsertControls() {
           onClick={() => setTableShape(null)}
         >
           <div
+            role="dialog"
+            aria-modal="true"
+            aria-label="Insert Table"
             className="w-full max-w-xs rounded-lg border border-zinc-700 bg-zinc-900 p-4 shadow-xl"
             onClick={(e) => e.stopPropagation()}
             onKeyDown={(e) => {
@@ -178,6 +181,9 @@ export function InsertControls() {
           }}
         >
           <div
+            role="dialog"
+            aria-modal="true"
+            aria-label="Insert Citation"
             className="w-full max-w-lg rounded-lg border border-zinc-700 bg-zinc-900 p-4 shadow-xl"
             onClick={(e) => e.stopPropagation()}
           >
@@ -221,7 +227,12 @@ export function InsertControls() {
 
       {pendingFigure !== null && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60">
-          <div className="w-full max-w-md rounded-lg border border-zinc-700 bg-zinc-900 p-4 shadow-xl">
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-label="Figure caption"
+            className="w-full max-w-md rounded-lg border border-zinc-700 bg-zinc-900 p-4 shadow-xl"
+          >
             <div className="pb-1 text-sm font-semibold text-zinc-100">Figure caption</div>
             <div className="pb-3 text-xs text-zinc-500">
               Shown under the figure as “Figure N: …” in the report.

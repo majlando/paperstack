@@ -54,7 +54,7 @@ export async function runScriptedSmoke(projectDir: string): Promise<void> {
     await state().exportPdf(true);
     check(
       "forced export compiles via the sidecars",
-      state().error === null && (state().notice?.startsWith("Report exported") ?? false),
+      state().error === null && (state().notice?.message.startsWith("Report exported") ?? false),
       // include the technical details — a failed export's headline alone
       // doesn't say which layer (validation, spawn, tool) refused
       [state().error?.message, state().error?.details].filter(Boolean).join(" | ") || undefined,

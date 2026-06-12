@@ -109,6 +109,45 @@ describe("opening", () => {
   });
 });
 
+describe("closing the project (switch report)", () => {
+  it("flushes pending edits to disk before leaving", async () => {
+    await openProject();
+    useStore.getState().setContent("# A\n\nedited before switch\n");
+    await useStore.getState().closeProject();
+    const s = useStore.getState();
+    expect(s.project).toBeNull();
+    expect(s.projectDir).toBeNull();
+    expect(fake.files.get(A)).toBe("# A\n\nedited before switch\n");
+  });
+
+  it("a conflict-blocked save keeps the project open with the edits intact", async () => {
+    await openProject();
+    useStore.getState().setContent("# A\n\nmine\n");
+    fake.files.set(A, "# A\n\ntheirs\n"); // a git pull lands while editing
+
+    await useStore.getState().closeProject();
+    const s = useStore.getState();
+    expect(s.project).not.toBeNull(); // still on the project, banner showing
+    expect(s.conflict).not.toBeNull();
+    expect(s.content).toBe("# A\n\nmine\n"); // nothing discarded
+    expect(fake.files.get(A)).toBe("# A\n\ntheirs\n"); // pull never overwritten
+  });
+
+  it("unsaved report details block leaving until saved or cancelled", async () => {
+    await openProject();
+    await useStore.getState().openMetadata();
+    useStore.getState().setMetadataDirty(true);
+
+    await useStore.getState().closeProject();
+    expect(useStore.getState().project).not.toBeNull();
+    expect(useStore.getState().error?.message).toMatch(/save or cancel the form/);
+
+    useStore.getState().closeMetadata();
+    await useStore.getState().closeProject();
+    expect(useStore.getState().project).toBeNull();
+  });
+});
+
 describe("metadata form", () => {
   it("blocks a form save when document.yaml changed on disk while it was open", async () => {
     await openProject();
@@ -165,7 +204,7 @@ describe("template update offer", () => {
     await useStore.getState().updateTemplate();
     const s = useStore.getState();
     expect(s.templateOffer).toBe(false);
-    expect(s.notice).toMatch(/layout was updated/);
+    expect(s.notice?.message).toMatch(/layout was updated/);
     expect(fake.files.get("/p/paperstack-template.typ")).toContain("Paperstack SEA report template");
   });
 
@@ -565,6 +604,30 @@ describe("group workflow", () => {
     const svg = fake.files.get(`/p/diagrams/rendered/${hashDiagram("A --> B")}.svg`);
     expect(svg).toBe("<svg/>");
     expect(useStore.getState().error).not.toBeNull();
+  });
+
+  it("re-renders a stale foreignObject render in place (same hash, pre-fix file)", async () => {
+    await openProject();
+    fake.files.set("/p/sections/b.md", "```mermaid\nA --> B\n```\n");
+    // Rendered before htmlLabels was forced off: labels live in
+    // <foreignObject>, which the PDF's SVG renderer skips. The hash covers
+    // the diagram source, not the file, so only the content betrays it.
+    const path = `/p/diagrams/rendered/${hashDiagram("A --> B")}.svg`;
+    fake.files.set(path, '<svg><foreignObject><div>Input</div></foreignObject></svg>');
+
+    await useStore.getState().exportPdf(true);
+    expect(fake.files.get(path)).toBe("<svg/>");
+  });
+
+  it("leaves a usable render untouched — no churn on re-saves", async () => {
+    await openProject();
+    fake.files.set("/p/sections/b.md", "```mermaid\nA --> B\n```\n");
+    const path = `/p/diagrams/rendered/${hashDiagram("A --> B")}.svg`;
+    fake.files.set(path, "<svg><text>Input</text></svg>");
+
+    await useStore.getState().exportPdf(true);
+    expect(fake.files.get(path)).toBe("<svg><text>Input</text></svg>");
+    expect(writesTo(path)).toBe(0);
   });
 });
 

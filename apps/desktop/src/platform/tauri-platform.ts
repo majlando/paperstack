@@ -27,6 +27,14 @@ export async function allowNewProjectScope(dir: string): Promise<string> {
 }
 
 /**
+ * Shows a file in the system file manager (Explorer/Finder). Rust validates
+ * that the file lives inside an opened project before launching anything.
+ */
+export async function revealInFolder(path: string): Promise<void> {
+  await invoke("reveal_in_folder", { path });
+}
+
+/**
  * Sidecar names as configured in tauri.conf.json `bundle.externalBin`.
  * pandoc is bundled for the CLI fallback converter but deliberately absent
  * here — the app converts in-process, and the Rust allowlist only accepts

@@ -100,6 +100,13 @@ export class MarkdownEditor {
    */
   private readonly states = new Map<string, EditorState>();
   private currentKey: string | null = null;
+  /**
+   * The user has actually put the cursor somewhere in this document — a
+   * click, arrow key, typing, or a programmatic jump. Until then the
+   * selection is just CodeMirror's default offset 0, and a toolbar insert
+   * would land above the section's `# Title` heading.
+   */
+  private cursorPlaced = false;
 
   constructor(
     parent: HTMLElement,
@@ -125,6 +132,16 @@ export class MarkdownEditor {
         theme,
         EditorView.updateListener.of((update) => {
           if (update.docChanged) this.options.onChange(update.state.doc.toString());
+          // Only user-driven events count — the auto-focus on section switch
+          // and programmatic setState must not make offset 0 look chosen.
+          if (
+            update.transactions.some(
+              (tr) =>
+                tr.isUserEvent("select") || tr.isUserEvent("input") || tr.isUserEvent("delete"),
+            )
+          ) {
+            this.cursorPlaced = true;
+          }
         }),
         EditorView.domEventHandlers({
           blur: () => this.options.onBlur(),
@@ -152,6 +169,7 @@ export class MarkdownEditor {
   setDoc(doc: string): void {
     this.view.setState(this.createState(doc));
     if (this.currentKey !== null) this.states.delete(this.currentKey);
+    this.cursorPlaced = false;
   }
 
   /**
@@ -164,9 +182,11 @@ export class MarkdownEditor {
     if (this.currentKey !== null) this.states.set(this.currentKey, this.view.state);
     if (this.states.size > 64) this.states.clear(); // bound long-session growth
     const parked = key === null ? undefined : this.states.get(key);
-    this.view.setState(
-      parked !== undefined && parked.doc.toString() === doc ? parked : this.createState(doc),
-    );
+    const restored = parked !== undefined && parked.doc.toString() === doc;
+    this.view.setState(restored ? parked : this.createState(doc));
+    // A restored park carries the cursor the user left there; a fresh state
+    // sits at CodeMirror's default offset 0, which nobody chose.
+    this.cursorPlaced = restored;
     this.currentKey = key;
   }
 
@@ -188,7 +208,7 @@ export class MarkdownEditor {
    */
   insertBlock(text: string, cursorAt?: number): void {
     const state = this.view.state;
-    const { from, to } = state.selection.main;
+    const { from, to } = this.insertRange();
     const doc = state.doc;
     const startLine = doc.lineAt(from);
     const endLine = doc.lineAt(to);
@@ -204,7 +224,21 @@ export class MarkdownEditor {
       selection: { anchor: from + prefix.length + (cursorAt ?? text.length) },
       effects: EditorView.scrollIntoView(from, { y: "center" }),
     });
+    this.cursorPlaced = true; // the cursor now sits meaningfully after the insert
     this.view.focus();
+  }
+
+  /**
+   * Where a toolbar insert goes: the selection once the user has placed a
+   * cursor, the end of the document before that (never above the heading).
+   */
+  private insertRange(): { from: number; to: number } {
+    const { selection, doc } = this.view.state;
+    const { from, to } = selection.main;
+    if (!this.cursorPlaced && from === 0 && to === 0) {
+      return { from: doc.length, to: doc.length };
+    }
+    return { from, to };
   }
 
   /** Replace a document range (e.g. a re-formatted table) and focus. */
@@ -215,12 +249,13 @@ export class MarkdownEditor {
 
   /** Insert inline text at the cursor (replacing any selection) and focus. */
   insertInline(text: string): void {
-    const { from, to } = this.view.state.selection.main;
+    const { from, to } = this.insertRange();
     this.view.dispatch({
       changes: { from, to, insert: text },
       selection: { anchor: from + text.length },
       effects: EditorView.scrollIntoView(from, { y: "center" }),
     });
+    this.cursorPlaced = true;
     this.view.focus();
   }
 
@@ -233,6 +268,7 @@ export class MarkdownEditor {
       selection: { anchor, head },
       effects: EditorView.scrollIntoView(anchor, { y: "center" }),
     });
+    this.cursorPlaced = true; // a TODO/search jump is a deliberate position
     this.view.focus();
   }
 

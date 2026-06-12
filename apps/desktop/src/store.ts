@@ -32,6 +32,7 @@ import {
   type SectionRole,
   type SearchMatch,
 } from "@paperstack/engine";
+import { getCurrentWindow } from "@tauri-apps/api/window";
 import {
   platform,
   SIDECARS,
@@ -82,8 +83,12 @@ interface AppState {
   changedOnDisk: string[];
   /** `message` is the readable headline; `details` is raw tool output for diagnostics. */
   error: { message: string; details?: string } | null;
-  /** Success message (e.g. after export) — the friendly counterpart of `error`. */
-  notice: string | null;
+  /**
+   * Success message (e.g. after export) — the friendly counterpart of `error`.
+   * `revealPath` is a file the message mentions; when set, the banner offers
+   * a "Show in folder" action for it.
+   */
+  notice: { message: string; revealPath?: string } | null;
   /** A report compile is running (View Report / Export PDF). */
   building: boolean;
   /**
@@ -125,6 +130,12 @@ interface AppState {
   openProject(dir: string): Promise<void>;
   /** Scaffolds a new SEA report in `dir` (or just opens it if it already is one). */
   createProject(dir: string): Promise<void>;
+  /**
+   * Saves pending edits and returns to the start screen (create / open /
+   * recents — the only place projects open from). A blocked save or unsaved
+   * report-details form keeps the project open with its banner visible.
+   */
+  closeProject(): Promise<void>;
   reloadProject(): Promise<void>;
   openSection(file: string): Promise<void>;
   /** Creates the section file (heading stub) and adds it to document.yaml. */
@@ -246,8 +257,17 @@ function titleFromDir(dir: string): string {
 }
 
 /** The window chrome shows the report title wherever the project (re)loads. */
-function setWindowTitle(reportTitle: string): void {
-  document.title = `${reportTitle} — Paperstack`;
+function setWindowTitle(reportTitle: string | null): void {
+  const title = reportTitle === null ? "Paperstack" : `${reportTitle} — Paperstack`;
+  document.title = title;
+  // document.title only renames the webview document — the native title bar
+  // needs an explicit setTitle. Best-effort: window chrome must never fail a
+  // project load (and unit tests run outside a Tauri webview).
+  try {
+    void getCurrentWindow().setTitle(title).catch(() => {});
+  } catch {
+    // not running inside Tauri
+  }
 }
 
 /** Citations are active only when references.bib holds at least one real entry. */
@@ -310,7 +330,7 @@ async function renderDiagramsToDisk(projectDir: string, content: string): Promis
     await platform.mkdir(`${projectDir}/diagrams/rendered`);
     for (const block of blocks) {
       const path = `${projectDir}/${block.renderedPath}`;
-      if (await platform.fileExists(path)) continue;
+      if (await isUsableRender(path)) continue;
       try {
         const svg = await renderMermaidSvg(`save-${block.hash}`, block.code);
         await platform.writeTextFile(path, svg);
@@ -320,6 +340,22 @@ async function renderDiagramsToDisk(projectDir: string, content: string): Promis
     }
   } catch {
     // best-effort: rendering must never block a save; export reports missing renders readably
+  }
+}
+
+/**
+ * An existing render is reused only if the PDF can actually show it. Renders
+ * from before htmlLabels was forced off wrap their labels in <foreignObject>,
+ * which Typst's SVG renderer skips — node boxes without words — and the
+ * file's hash name covers the diagram source, not the file, so only the
+ * content betrays a stale one. Those re-render in place under the same name.
+ */
+async function isUsableRender(path: string): Promise<boolean> {
+  try {
+    const svg = await platform.readTextFile(path);
+    return !svg.includes("<foreignObject");
+  } catch {
+    return false; // missing or unreadable — render fresh
   }
 }
 
@@ -505,6 +541,50 @@ export const useStore = create<AppState>((set, get) => {
     } catch (e) {
       set({ error: toError(e) });
     }
+  },
+
+  async closeProject() {
+    // Closing mid-build would let the finishing build write its counts and
+    // report into the start screen's state.
+    if (!get().projectDir || get().building) return;
+    // The form's values live only in the form — leaving the project now
+    // would silently drop them (same guard as the window-close handler).
+    if (get().metadataOpen && get().metadataDirty) {
+      set({
+        error: {
+          message:
+            "Report details have unsaved changes — save or cancel the form before switching reports.",
+        },
+      });
+      return;
+    }
+    // A failed or conflicted save keeps the project open so its banner can
+    // be resolved — leaving would discard the unsaved writing.
+    if (!(await get().saveActive())) return;
+    set({
+      projectDir: null,
+      project: null,
+      counts: null,
+      activeFile: null,
+      content: "",
+      baseline: "",
+      conflict: null,
+      contentVersion: get().contentVersion + 1,
+      dirty: false,
+      changedOnDisk: [],
+      error: null,
+      notice: null,
+      hasReferences: false,
+      metadataBaselineHash: null,
+      templateOffer: false,
+      report: null,
+      confirmExport: null,
+      pane: "preview",
+      metadataOpen: false,
+      metadataDirty: false,
+      pendingFigure: null,
+    });
+    setWindowTitle(null);
   },
 
   async reloadProject() {
@@ -763,15 +843,21 @@ export const useStore = create<AppState>((set, get) => {
     const { projectDir } = get();
     if (!result || !projectDir) return;
     const relPath = result.pdfPath.replace(`${projectDir}/`, "");
-    const warningText = result.warnings.length > 0 ? ` ${result.warnings.join(" ")}` : "";
+    // The Report pane is the warnings' home while it is showing — repeating
+    // them in the notice would say the same thing twice on one screen.
+    const warningText =
+      get().pane !== "report" && result.warnings.length > 0
+        ? ` ${result.warnings.join(" ")}`
+        : "";
     set({
-      notice: `Report exported to ${relPath}.${warningText}`,
-      // A previously compiled Report pane must show what was just exported
-      // (the path may also be the locked-file fallback), not the old PDF
-      // next to a notice claiming the export happened.
-      report: get().report
-        ? { pdfPath: result.pdfPath, warnings: result.warnings, builtAt: Date.now() }
-        : null,
+      notice: {
+        message: `Report exported to ${relPath}.${warningText}`,
+        revealPath: result.pdfPath,
+      },
+      // The Report pane — open now or opened later — must show what was just
+      // exported (the path may also be the locked-file fallback), never an
+      // older PDF next to a notice claiming the export happened.
+      report: { pdfPath: result.pdfPath, warnings: result.warnings, builtAt: Date.now() },
     });
   },
 
@@ -953,8 +1039,10 @@ export const useStore = create<AppState>((set, get) => {
       await platform.writeTextFile(`${projectDir}/paperstack-template.typ`, SEA_TEMPLATE);
       set({
         templateOffer: false,
-        notice:
-          "The report layout was updated to this Paperstack version. The next View Report or Export shows the new look.",
+        notice: {
+          message:
+            "The report layout was updated to this Paperstack version. The next View Report or Export shows the new look.",
+        },
       });
     } catch (e) {
       set({ error: toError(e) });

@@ -1,5 +1,6 @@
 import { useEffect, type ReactNode } from "react";
 import { getCurrentWindow } from "@tauri-apps/api/window";
+import { revealInFolder } from "./platform/tauri-platform.ts";
 import { useStore } from "./store.ts";
 import { Welcome } from "./components/Welcome.tsx";
 import { Sidebar } from "./components/Sidebar.tsx";
@@ -35,7 +36,10 @@ function WarningBanner(props: {
   onSecondary: () => void;
 }) {
   return (
-    <div className="flex items-center justify-between gap-4 border-b border-amber-900 bg-amber-950 px-4 py-2 text-sm text-amber-200">
+    <div
+      role="alert"
+      className="flex items-center justify-between gap-4 border-b border-amber-900 bg-amber-950 px-4 py-2 text-sm text-amber-200"
+    >
       <span>{props.message}</span>
       <span className="flex shrink-0 gap-2">
         <button
@@ -182,7 +186,10 @@ export default function App() {
   return (
     <div className="flex h-screen flex-col bg-zinc-950 text-zinc-200">
       {error && (
-        <div className="flex items-start justify-between gap-4 border-b border-red-900 bg-red-950 px-4 py-2 text-sm text-red-200">
+        <div
+          role="alert"
+          className="flex items-start justify-between gap-4 border-b border-red-900 bg-red-950 px-4 py-2 text-sm text-red-200"
+        >
           <div className="min-w-0">
             <pre className="whitespace-pre-wrap font-sans">{error.message}</pre>
             {error.details && (
@@ -200,11 +207,28 @@ export default function App() {
         </div>
       )}
       {notice && (
-        <div className="flex items-start justify-between gap-4 border-b border-emerald-900 bg-emerald-950 px-4 py-2 text-sm text-emerald-200">
-          <span>{notice}</span>
-          <button onClick={clearNotice} className="shrink-0 text-emerald-400 hover:text-emerald-200">
-            dismiss
-          </button>
+        <div
+          role="status"
+          className="flex items-start justify-between gap-4 border-b border-emerald-900 bg-emerald-950 px-4 py-2 text-sm text-emerald-200"
+        >
+          <span>{notice.message}</span>
+          <span className="flex shrink-0 items-center gap-3">
+            {notice.revealPath && (
+              <button
+                onClick={() =>
+                  void revealInFolder(notice.revealPath!).catch((e: unknown) =>
+                    useStore.setState({ error: { message: String(e) } }),
+                  )
+                }
+                className="rounded border border-emerald-700 px-2.5 py-0.5 font-medium hover:bg-emerald-900"
+              >
+                Show in folder
+              </button>
+            )}
+            <button onClick={clearNotice} className="text-emerald-400 hover:text-emerald-200">
+              dismiss
+            </button>
+          </span>
         </div>
       )}
       {confirmExport !== null && (

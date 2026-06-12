@@ -71,6 +71,52 @@ fn require_dedicated_folder(
     Ok(())
 }
 
+/// Shows a file in the system file manager — the export notice's
+/// "Show in folder". Validated like the sidecar paths: only files inside an
+/// opened project are revealable, so the webview cannot use this to probe or
+/// launch the file manager on arbitrary paths.
+#[tauri::command]
+fn reveal_in_folder(
+    roots: tauri::State<'_, ProjectRoots>,
+    path: String,
+) -> Result<(), String> {
+    let allowed = roots.0.lock().map_err(|e| e.to_string())?.clone();
+    let target = validate_reveal_target(&path, &allowed)?;
+    open_file_manager(&target)
+}
+
+fn open_file_manager(target: &std::path::Path) -> Result<(), String> {
+    // normalize_path strips the \\?\ canonicalization prefix, which the
+    // file managers below do not accept.
+    let plain = normalize_path(target);
+    #[cfg(target_os = "windows")]
+    let result = {
+        use std::os::windows::process::CommandExt;
+        // raw_arg: Command's automatic quoting wraps the whole
+        // `/select,C:\path with spaces` argument in quotes, which Explorer
+        // does not parse — it then opens Documents instead. Only the path
+        // itself may be quoted.
+        std::process::Command::new("explorer.exe")
+            .raw_arg(format!("/select,\"{}\"", plain.replace('/', "\\")))
+            .spawn()
+    };
+    #[cfg(target_os = "macos")]
+    let result = std::process::Command::new("open").arg("-R").arg(&plain).spawn();
+    #[cfg(all(unix, not(target_os = "macos")))]
+    let result = {
+        // no cross-desktop "select this file" verb — opening the parent
+        // folder is the dependable behavior
+        let parent = target
+            .parent()
+            .map(normalize_path)
+            .unwrap_or_else(|| plain.clone());
+        std::process::Command::new("xdg-open").arg(parent).spawn()
+    };
+    result
+        .map(|_| ())
+        .map_err(|e| format!("Could not open the file manager: {e}"))
+}
+
 #[tauri::command]
 async fn run_sidecar(
     app: tauri::AppHandle,
@@ -141,6 +187,22 @@ fn normalize_path(path: &std::path::Path) -> String {
 
 // The validators below take plain slices (no tauri types) so they are unit
 // tested in this file — this is the layer where a bug is a sandbox escape.
+
+/// The reveal target must exist and resolve inside an opened project —
+/// component-wise (starts_with), so sibling prefix folders never pass.
+fn validate_reveal_target(
+    path: &str,
+    roots: &[std::path::PathBuf],
+) -> Result<std::path::PathBuf, String> {
+    let candidate = std::path::PathBuf::from(path)
+        .canonicalize()
+        .map_err(|_| "That file no longer exists.".to_string())?;
+    if roots.iter().any(|root| candidate.starts_with(root)) {
+        Ok(candidate)
+    } else {
+        Err("That file is not inside an opened report project.".into())
+    }
+}
 
 fn validate_sidecar_invocation(
     binary: &str,
@@ -338,6 +400,29 @@ mod tests {
     }
 
     #[test]
+    fn reveal_inside_an_opened_project_is_allowed() {
+        let root = scratch_project("reveal-ok");
+        fs::write(root.join("output").join("report.pdf"), "x").unwrap();
+        let target = p(&root.join("output").join("report.pdf"));
+        assert!(validate_reveal_target(&target, &[root]).is_ok());
+    }
+
+    #[test]
+    fn reveal_outside_an_opened_project_is_rejected() {
+        let root = scratch_project("reveal-inside");
+        let other = scratch_project("reveal-outside");
+        fs::write(other.join("file.pdf"), "x").unwrap();
+        assert!(validate_reveal_target(&p(&other.join("file.pdf")), &[root]).is_err());
+    }
+
+    #[test]
+    fn reveal_of_a_missing_file_is_rejected() {
+        let root = scratch_project("reveal-missing");
+        let target = p(&root.join("output").join("missing.pdf"));
+        assert!(validate_reveal_target(&target, &[root]).is_err());
+    }
+
+    #[test]
     fn symlink_at_the_output_name_is_rejected() {
         let root = scratch_project("symlink");
         let target = root.join("outside-target.pdf");
@@ -367,6 +452,7 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             allow_existing_project_scope,
             allow_new_project_scope,
+            reveal_in_folder,
             run_sidecar
         ])
         .run(tauri::generate_context!())
