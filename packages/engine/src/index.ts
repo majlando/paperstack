@@ -22,8 +22,9 @@ export {
   findTodoOffsets,
   countProject,
   applySectionContent,
+  documentOutline,
   hashContent,
-  imageSources,
+  type OutlineItem,
   type SectionCount,
   type ProjectCounts,
 } from "./project/counters.ts";
@@ -59,6 +60,12 @@ export {
 export { searchContent, replaceContent, type SearchMatch } from "./project/search.ts";
 export { tableMarkdown, formatTableAt, type TableEdit } from "./project/format-table.ts";
 export { newSectionFile } from "./project/new-section-file.ts";
+export { buildFileTree, type FileNode } from "./project/file-tree.ts";
+export {
+  collectProblems,
+  type Problem,
+  type ProblemKind,
+} from "./project/problems.ts";
 export {
   importFigure,
   importFigureBytes,
@@ -72,4 +79,12 @@ export {
   type RemarkConverterOptions,
 } from "./build/remark-typst.ts";
 export { parseBibliography, bibliographyKeys, type BibEntry } from "./build/bibliography.ts";
+export {
+  readBibRecords,
+  formatBibEntry,
+  upsertBibEntry,
+  removeBibEntry,
+  type BibRecord,
+  type BibField,
+} from "./build/bibliography-edit.ts";
 export { SEA_TEMPLATE, templateStatus, type TemplateStatus } from "./build/template.ts";

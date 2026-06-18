@@ -347,19 +347,33 @@ const CITE_SCAN =
 
 function renderText(value: string, ctx: Ctx): InlinePart {
   const keys = ctx.citationKeys;
-  if (keys === null) return { text: escapeTypstText(value), hashCall: false };
   const parts: InlinePart[] = [];
   let last = 0;
   for (const m of value.matchAll(CITE_SCAN)) {
-    const cite =
-      m[1] !== undefined
-        ? renderCitationSpan(m[1], keys)
-        : renderNarrativeCite(m[2]!, m[3], keys);
-    if (cite === null) continue; // not a citation — stays prose
+    // Cross-references (`@fig:label`) resolve to a Typst `@label`, independent
+    // of citations — a project needs no references.bib to cross-reference a
+    // figure. Citations are only recognized when the project has one.
+    let rendered: InlinePart | null = null;
+    if (m[1] !== undefined) {
+      const ref = crossRefFromBracket(m[1]);
+      if (ref !== null) rendered = { text: ref, hashCall: false };
+      else if (keys !== null) {
+        const cite = renderCitationSpan(m[1], keys);
+        if (cite !== null) rendered = { text: cite, hashCall: true };
+      }
+    } else {
+      const ref = crossRef(m[2]!);
+      if (ref !== null) rendered = { text: ref, hashCall: false };
+      else if (keys !== null) {
+        const cite = renderNarrativeCite(m[2]!, m[3], keys);
+        if (cite !== null) rendered = { text: cite, hashCall: true };
+      }
+    }
+    if (rendered === null) continue; // neither a reference nor a citation — stays prose
     if (m.index > last) {
       parts.push({ text: escapeTypstText(value.slice(last, m.index)), hashCall: false });
     }
-    parts.push({ text: cite, hashCall: true });
+    parts.push(rendered);
     last = m.index + m[0].length;
   }
   if (parts.length === 0) return { text: escapeTypstText(value), hashCall: false };
@@ -367,6 +381,23 @@ function renderText(value: string, ctx: Ctx): InlinePart {
     parts.push({ text: escapeTypstText(value.slice(last)), hashCall: false });
   }
   return joinParts(parts);
+}
+
+/**
+ * A figure cross-reference key (`fig:label`) → a Typst `@fig:label` reference,
+ * which renders as "Figure N". Figures carry the matching label via the
+ * `{#fig:label}` image attribute. Other prefixes (sec/tbl) are not yet
+ * label-backed, so they are left to citation/prose handling.
+ */
+const CROSSREF_RE = /^fig:[A-Za-z0-9_-]+$/;
+
+function crossRef(key: string): string | null {
+  return CROSSREF_RE.test(key) ? `@${key}` : null;
+}
+
+function crossRefFromBracket(span: string): string | null {
+  const m = /^\[@(fig:[A-Za-z0-9_-]+)\]$/.exec(span);
+  return m === null ? null : `@${m[1]}`;
 }
 
 /**

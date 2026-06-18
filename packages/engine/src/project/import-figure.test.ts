@@ -142,4 +142,13 @@ describe("figureMarkdown", () => {
       "![Overview](/figures/chart.png)",
     );
   });
+
+  it("prefixes a cross-reference label with fig: when needed", () => {
+    expect(figureMarkdown("figures/c.png", "Cap", undefined, "center", "arch")).toBe(
+      "![Cap](/figures/c.png){#fig:arch}",
+    );
+    expect(figureMarkdown("figures/c.png", "Cap", "50%", "center", "fig:sys")).toBe(
+      "![Cap](/figures/c.png){#fig:sys width=50%}",
+    );
+  });
 });

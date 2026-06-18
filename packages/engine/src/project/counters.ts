@@ -103,36 +103,41 @@ export function firstHeading(markdown: string): string | null {
   return null;
 }
 
+export interface OutlineItem {
+  /** Heading level, 1–6. */
+  depth: number;
+  /** Plain-text heading, inline markup stripped. */
+  text: string;
+  /** Character offset of the heading line start — drives click-to-jump. */
+  offset: number;
+}
+
 /**
- * Image sources (`![alt](src)`) referenced outside code fences, in document
- * order and de-duplicated — drives the sidebar's per-section thumbnails. The
- * src is kept exactly as written (relative or root-absolute); the UI resolves
- * it the same way the preview does. Fenced code blocks are skipped so a path
- * shown inside a code sample is not mistaken for a real figure.
+ * Every ATX heading in document order, with its level and character offset —
+ * the section's outline for navigation. Fence-aware like firstHeading, and
+ * offsets count line endings verbatim so they line up with the editor's
+ * cursor positions.
  */
-export function imageSources(markdown: string): string[] {
-  const out: string[] = [];
-  const seen = new Set<string>();
+export function documentOutline(markdown: string): OutlineItem[] {
+  const items: OutlineItem[] = [];
   let fence: string | null = null;
+  let offset = 0;
   for (const line of markdown.split("\n")) {
     const fenceMatch = /^ {0,3}(`{3,}|~{3,})/.exec(line);
     if (fenceMatch) {
       const marker = fenceMatch[1]![0]!;
       if (fence === null) fence = marker;
       else if (marker === fence) fence = null;
-      continue;
-    }
-    if (fence !== null) continue;
-    // `![alt](src)` / `![alt](src "title")` / `![alt](<src with spaces>)`.
-    for (const m of line.matchAll(/!\[[^\]]*\]\(\s*(?:<([^>]*)>|([^)\s]+))[^)]*\)/g)) {
-      const src = (m[1] ?? m[2])!;
-      if (!seen.has(src)) {
-        seen.add(src);
-        out.push(src);
+    } else if (fence === null) {
+      const m = /^ {0,3}(#{1,6})\s+(.*?)(?:\s+#+)?\s*$/.exec(line);
+      if (m) {
+        const text = stripInlineMarkup(m[2]!).trim();
+        if (text !== "") items.push({ depth: m[1]!.length, text, offset });
       }
     }
+    offset += line.length + 1; // +1 for the "\n" split removed
   }
-  return out;
+  return items;
 }
 
 export interface SectionCount {
@@ -140,8 +145,6 @@ export interface SectionCount {
   role: SectionRole;
   /** First heading of the file, or null when it has none (display falls back to the file name). */
   title: string | null;
-  /** Image sources the section references, for the sidebar thumbnails. */
-  images: string[];
   chars: number;
   normalsider: number;
   todos: number;
@@ -187,7 +190,6 @@ export async function countProject(
       file: s.file,
       role: s.role,
       title: firstHeading(content),
-      images: imageSources(content),
       chars,
       normalsider: chars / CHARS_PER_NORMALSIDE,
       todos: countTodos(content),
@@ -213,7 +215,6 @@ export function applySectionContent(
       ? {
           ...s,
           title: firstHeading(content),
-          images: imageSources(content),
           chars,
           normalsider: chars / CHARS_PER_NORMALSIDE,
           todos: countTodos(content),

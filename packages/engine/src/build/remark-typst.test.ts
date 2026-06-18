@@ -483,6 +483,32 @@ describe("citations", () => {
   });
 });
 
+describe("cross-references", () => {
+  const tc = (md: string, keys: string[] = ["knuth84"]) =>
+    markdownToTypst(md, "sections", { citationKeys: new Set(keys) }).replace(/\n$/, "");
+
+  it("turns @fig:label into a Typst reference, with or without a references.bib", () => {
+    expect(t("see @fig:arch for details")).toBe("see @fig:arch for details");
+    expect(tc("see @fig:arch for details")).toBe("see @fig:arch for details");
+  });
+
+  it("supports the bracketed [@fig:label] form", () => {
+    expect(t("(see [@fig:arch])")).toBe("(see @fig:arch)");
+  });
+
+  it("labels a figure from {#fig:label} so the reference resolves", () => {
+    expect(t("![Architecture](x.png){#fig:arch}")).toBe(
+      '#figure(image("/sections/x.png"),\n  caption: [\n    Architecture\n  ]\n)\n<fig:arch>',
+    );
+  });
+
+  it("a cross-reference and a citation coexist in one sentence", () => {
+    expect(tc("@fig:arch as in @knuth84")).toBe(
+      '@fig:arch as in #cite(<knuth84>, form: "prose")',
+    );
+  });
+});
+
 describe("tables", () => {
   it("matches pandoc's #figure/#table layout exactly", () => {
     expect(t("| Case | Expected |\n| ---- | -------- |\n| Found | `1` |\n| Empty | `-1` |")).toBe(

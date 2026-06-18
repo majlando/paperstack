@@ -49,7 +49,7 @@ export function bibliographyKeys(text: string): Set<string> {
 }
 
 /** The content between the brace at `openBrace` and its balanced match. */
-function balancedBody(text: string, openBrace: number): string | null {
+export function balancedBody(text: string, openBrace: number): string | null {
   let depth = 0;
   for (let i = openBrace; i < text.length; i++) {
     const c = text[i];

@@ -120,9 +120,13 @@ export function figureMarkdown(
   caption: string,
   width?: string,
   align?: "left" | "center" | "right",
+  /** Cross-reference label; "fig:" is prefixed if absent, so `@fig:id` resolves. */
+  label?: string,
 ): string {
   const alt = caption.replace(/[[\]\\]/g, "\\$&");
   const parts: string[] = [];
+  const id = label?.trim().replace(/[^A-Za-z0-9:_-]/g, "");
+  if (id) parts.push(`#${/^[a-z]+:/.test(id) ? id : `fig:${id}`}`);
   const w = width?.trim();
   if (w) parts.push(`width=${/\s/.test(w) ? `"${w}"` : w}`);
   if (align && align !== "center") parts.push(`align=${align}`);
