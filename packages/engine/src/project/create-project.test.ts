@@ -16,7 +16,9 @@ describe("createProject", () => {
     expect(project.meta.title).toBe('Smart "Home" \\ Hub');
     expect(project.meta.language).toBe("en");
     expect(project.meta.body_cap_normalsider).toBe(40);
-    expect(project.meta.sections.map((s) => s.role)).toEqual(["body"]);
+    // A front-matter abstract scaffolded before the body section.
+    expect(project.meta.sections.map((s) => s.role)).toEqual(["front-matter", "body"]);
+    expect(platform.files.get("/proj/sections/00-abstract.md")).toContain("# Abstract");
   });
 
   it("scaffolds an inert references.bib that documents the citation workflow", async () => {
@@ -98,6 +100,7 @@ describe("createProject", () => {
     const platform = new FakePlatform();
     await createProject(platform, "/proj", { title: "T", language: "da" });
 
+    expect(platform.files.get("/proj/sections/00-abstract.md")).toContain("# Resumé");
     expect(platform.files.get("/proj/sections/01-introduction.md")).toContain("# Indledning");
     expect(platform.files.get("/proj/references.bib")).toContain("Referencer til rapporten");
     expect(platform.files.get("/proj/document.yaml")).toContain("language: da");

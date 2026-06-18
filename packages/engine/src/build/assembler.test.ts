@@ -139,7 +139,7 @@ describe("generateMainTypst", () => {
     );
     const bib = main.indexOf("#bibliography(");
     expect(main).toContain(
-      `#bibliography("/references.bib", title: "References", style: "ieee")`,
+      `#bibliography("/references.bib", title: "References", style: "apa")`,
     );
     expect(bib).toBeGreaterThan(main.indexOf(`#include "/o/a.typ"`));
     expect(bib).toBeLessThan(main.indexOf(`#include "/o/x.typ"`));

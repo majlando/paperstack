@@ -215,6 +215,69 @@ describe("metadata form", () => {
     expect(fake.files.get("/p/document.yaml")).toContain("New Title");
     expect(useStore.getState().metadataOpen).toBe(false);
   });
+
+  it("adding a section while a dirty form is open is blocked, not half-created", async () => {
+    await openProject();
+    const before = useStore.getState().project?.meta.sections.length;
+    await useStore.getState().openMetadata();
+    useStore.getState().setMetadataDirty(true);
+
+    await useStore.getState().addSection("body", "New One");
+    const s = useStore.getState();
+    expect(s.metadataOpen).toBe(true); // form still up
+    expect(s.error?.message).toMatch(/save or cancel the form/);
+    expect(s.project?.meta.sections.length).toBe(before); // nothing added to the report
+  });
+
+  it("a build is blocked while the form is dirty, so it can't compile stale details", async () => {
+    await openProject();
+    await useStore.getState().openMetadata();
+    useStore.getState().setMetadataDirty(true);
+
+    await useStore.getState().viewReport();
+    const s = useStore.getState();
+    expect(s.metadataOpen).toBe(true);
+    expect(s.report).toBeNull(); // never compiled
+    expect(s.error?.message).toMatch(/save or cancel the form/);
+  });
+});
+
+describe("section navigation (Ctrl+PageUp/PageDown)", () => {
+  it("steps to the next and previous section, and stops at the ends", async () => {
+    await openProject(); // opens sections/a.md
+    await useStore.getState().gotoAdjacentSection("next");
+    expect(useStore.getState().activeFile).toBe("sections/b.md");
+    await useStore.getState().gotoAdjacentSection("prev");
+    expect(useStore.getState().activeFile).toBe("sections/a.md");
+    await useStore.getState().gotoAdjacentSection("prev"); // already first
+    expect(useStore.getState().activeFile).toBe("sections/a.md");
+  });
+
+  it("with no active section, prev opens the last and next opens the first", async () => {
+    await openProject();
+    useStore.setState({ activeFile: null });
+    await useStore.getState().gotoAdjacentSection("prev");
+    expect(useStore.getState().activeFile).toBe("sections/c.md");
+    useStore.setState({ activeFile: null });
+    await useStore.getState().gotoAdjacentSection("next");
+    expect(useStore.getState().activeFile).toBe("sections/a.md");
+  });
+
+  it("walks the role-grouped order the sidebar shows, not the raw document.yaml order", async () => {
+    fake.reset({
+      "/p/document.yaml":
+        'title: "T"\nsections:\n  - { file: app.md, role: appendix }\n  - { file: intro.md, role: body }\n',
+      "/p/app.md": "# App\n",
+      "/p/intro.md": "# Intro\n",
+    });
+    await useStore.getState().openProject("/p");
+    expect(useStore.getState().activeFile).toBe("intro.md"); // first body section
+    // body comes before appendix on screen, even though app.md is listed first.
+    await useStore.getState().gotoAdjacentSection("next");
+    expect(useStore.getState().activeFile).toBe("app.md");
+    await useStore.getState().gotoAdjacentSection("next"); // appendix is last
+    expect(useStore.getState().activeFile).toBe("app.md");
+  });
 });
 
 describe("template update offer", () => {

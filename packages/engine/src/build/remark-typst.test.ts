@@ -283,6 +283,19 @@ describe("images and figures", () => {
     expect(t("![](x.png){width=10%}")).toBe('#box(image("/sections/x.png", width: 10.0%))');
   });
 
+  it("aligns the image inside the figure for {align=left|right}, leaving center bare", () => {
+    expect(t("![Sized](shot.png){width=40% align=left}")).toBe(
+      '#figure(align(left, image("/sections/shot.png", width: 40.0%)),\n  caption: [\n    Sized\n  ]\n)',
+    );
+    expect(t("![Sized](shot.png){align=right}")).toBe(
+      '#figure(align(right, image("/sections/shot.png")),\n  caption: [\n    Sized\n  ]\n)',
+    );
+    // center is the figure default, so no align() wrapper is emitted
+    expect(t("![Sized](shot.png){align=center}")).toBe(
+      '#figure(image("/sections/shot.png"),\n  caption: [\n    Sized\n  ]\n)',
+    );
+  });
+
   it("emits a figure label for an {#id} attribute and ignores unknown attributes", () => {
     expect(t("![g](x.png){#fig-g width=10%}")).toBe(
       '#figure(image("/sections/x.png", width: 10.0%),\n  caption: [\n    g\n  ]\n)\n<fig-g>',
@@ -436,6 +449,28 @@ describe("citations", () => {
       "an array \\[\\@ index zero\\] of things",
     );
     expect(tc("mail me @home")).toBe("mail me \\@home");
+  });
+
+  it("turns a bare @key into a narrative (prose) cite", () => {
+    expect(tc("As @knuth84 showed, ...")).toBe('As #cite(<knuth84>, form: "prose") showed, ...');
+    expect(tc("see @knuth84.")).toBe('see #cite(<knuth84>, form: "prose");.');
+  });
+
+  it("attaches an optional [locator] suffix to a narrative cite", () => {
+    expect(tc("see @knuth84 [p. 12] for more")).toBe(
+      'see #cite(<knuth84>, form: "prose", supplement: [p. 12]) for more',
+    );
+    // a following bracketed citation is not swallowed as a locator
+    expect(tc("@knuth84 [@lamport94]")).toBe(
+      '#cite(<knuth84>, form: "prose") #cite(<lamport94>)',
+    );
+  });
+
+  it("leaves a bare @ joined to a word (e.g. a handle) or an unknown @word as prose", () => {
+    // The @ is preceded by a word char, so it is not a citation — even though
+    // "knuth84" is a known key. (A real email is GFM-autolinked before this.)
+    expect(tc("the user@knuth84 build")).toBe("the user\\@knuth84 build");
+    expect(tc("ping @everyone now")).toBe("ping \\@everyone now");
   });
 
   it("stays prose entirely when the project has no references.bib", () => {

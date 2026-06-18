@@ -164,6 +164,7 @@ interface ImageAttrs {
   id?: string;
   width?: string;
   height?: string;
+  align?: "left" | "center" | "right";
 }
 
 /**
@@ -208,6 +209,9 @@ function parseImageAttrs(source: string): ImageAttrs {
     const value = token.slice(eq + 1).replace(/^"(.*)"$/, "$1");
     if (key === "width") attrs.width = value;
     else if (key === "height") attrs.height = value;
+    else if (key === "align" && (value === "left" || value === "center" || value === "right")) {
+      attrs.align = value;
+    }
   }
   return attrs;
 }
@@ -330,18 +334,28 @@ function withLine<T>(node: { position?: { start: { line: number } } }, fn: () =>
 const CITE_ITEM = /^@([A-Za-z0-9_][A-Za-z0-9_.:-]*)(?:\s*,\s*(.+))?$/;
 
 /**
- * Plain text, with `[@key]` / `[@a; @b]` / `[@key, p. 12]` citation spans
- * turned into Typst #cite calls when the project has a references.bib.
- * Adjacent calls collapse into one bracket group ("[1, 2]") in the PDF.
+ * Plain text, with citations turned into Typst #cite calls when the project
+ * has a references.bib. Two forms, following pandoc:
+ *  - bracketed `[@key]` / `[@a; @b]` / `[@key, p. 12]` → parenthetical
+ *    "(Author, year)"; adjacent calls collapse into one group in the PDF.
+ *  - bare `@key` → narrative "Author (year)" via `form: "prose"`, with an
+ *    optional `@key [p. 12]` locator suffix → "Author (year, p. 12)".
+ * A bare `@` that isn't a real key (or sits inside an email) stays prose.
  */
+const CITE_SCAN =
+  /(\[@[^\]]*\])|(?<![\w@])@([A-Za-z0-9_](?:[A-Za-z0-9_.:-]*[A-Za-z0-9_])?)(?:[ \t]+\[(?!@)([^\]]+)\])?/g;
+
 function renderText(value: string, ctx: Ctx): InlinePart {
   const keys = ctx.citationKeys;
   if (keys === null) return { text: escapeTypstText(value), hashCall: false };
   const parts: InlinePart[] = [];
   let last = 0;
-  for (const m of value.matchAll(/\[@[^\]]*\]/g)) {
-    const cite = renderCitationSpan(m[0], keys);
-    if (cite === null) continue; // not citation syntax — stays prose
+  for (const m of value.matchAll(CITE_SCAN)) {
+    const cite =
+      m[1] !== undefined
+        ? renderCitationSpan(m[1], keys)
+        : renderNarrativeCite(m[2]!, m[3], keys);
+    if (cite === null) continue; // not a citation — stays prose
     if (m.index > last) {
       parts.push({ text: escapeTypstText(value.slice(last, m.index)), hashCall: false });
     }
@@ -353,6 +367,22 @@ function renderText(value: string, ctx: Ctx): InlinePart {
     parts.push({ text: escapeTypstText(value.slice(last)), hashCall: false });
   }
   return joinParts(parts);
+}
+
+/**
+ * Bare `@key` (with an optional `[locator]`) → a narrative ("prose") cite, or
+ * null when the key is unknown. Unlike a bracketed span, a stray `@word` is
+ * too ambiguous to hard-fail on, so an unrecognized key is left as prose.
+ */
+function renderNarrativeCite(
+  key: string,
+  locator: string | undefined,
+  keys: ReadonlySet<string>,
+): string | null {
+  if (!keys.has(key)) return null;
+  return locator === undefined
+    ? `#cite(<${key}>, form: "prose")`
+    : `#cite(<${key}>, form: "prose", supplement: [${escapeTypstText(locator)}])`;
 }
 
 /** `[@a; @b, p. 12]` → cite calls, or null when it isn't citation syntax. */
@@ -542,6 +572,12 @@ function renderParagraph(node: Paragraph, ctx: Ctx): BlockPart | null {
     if (url !== undefined) {
       const attrs = single.attrs;
       const call = imageCall(url, attrs, ctx);
+      // `{align=left|right}` positions the image inside the (full-width)
+      // figure; figures already centre their content, so center needs no wrap.
+      const body =
+        attrs?.align === "left" || attrs?.align === "right"
+          ? `align(${attrs.align}, ${call})`
+          : call;
       if (image.alt !== null && image.alt !== undefined && image.alt !== "") {
         const inlines = altInlines(image, ctx);
         // No `;` after a trailing hash call: the caption's `]` sits on its own
@@ -551,10 +587,10 @@ function renderParagraph(node: Paragraph, ctx: Ctx): BlockPart | null {
         );
         const label = attrs?.id === undefined ? "" : `\n<${attrs.id}>`;
         return {
-          text: `#figure(${call},\n  caption: [\n    ${caption}\n  ]\n)${label}`,
+          text: `#figure(${body},\n  caption: [\n    ${caption}\n  ]\n)${label}`,
         };
       }
-      return { text: `#box(${call})` };
+      return { text: `#box(${body})` };
     }
     // no definition for the reference — falls through to inline rendering
   }

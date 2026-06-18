@@ -43,8 +43,14 @@ export async function createProject(
     `language: ${lang}\n` +
     `body_cap_normalsider: 40\n` +
     `sections:\n` +
+    `  - { file: sections/00-abstract.md, role: front-matter }\n` +
     `  - { file: sections/01-introduction.md, role: body }\n`;
 
+  // An abstract is unnumbered front matter (it does not count toward the cap)
+  // and sits before the body — a SEA report opens with one, so scaffold it.
+  const abstract = da
+    ? `# Resumé\n\n[TODO: Sammenfat rapporten i et kort afsnit.]\n`
+    : `# Abstract\n\n[TODO: Summarise the report in a short paragraph.]\n`;
   const introduction = da
     ? `# Indledning\n\n[TODO: Beskriv projektet.]\n`
     : `# Introduction\n\n[TODO: Introduce the project.]\n`;
@@ -92,6 +98,7 @@ export async function createProject(
   await writeIfAbsent(platform, `${dir}/paperstack-template.typ`, SEA_TEMPLATE);
   // The chosen folder may not be empty (e.g. an existing group repo):
   // never overwrite files that are already there.
+  await writeIfAbsent(platform, `${dir}/sections/00-abstract.md`, abstract);
   await writeIfAbsent(platform, `${dir}/sections/01-introduction.md`, introduction);
   await writeIfAbsent(platform, `${dir}/references.bib`, references);
   await ensureGitignore(platform, dir);

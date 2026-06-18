@@ -58,8 +58,8 @@ discarded on close — run the whole walkthrough in one session.
 5. **Citations** — create a `references.bib` in the project folder with Notepad (one
    `@book{key, …}` entry), press the sidebar reload (⟳): a **Cite** button appears in
    the editor header. Insert a citation; the preview shows a `[key]` chip, and the
-   exported PDF shows a numbered reference plus a References section before any
-   appendix. A typo'd `[@key]` must fail the export with an error naming the section
+   exported PDF shows an APA (author, year) reference plus a References section before
+   any appendix. A typo'd `[@key]` must fail the export with an error naming the section
    and the key — not print literally.
 6. **Counters** — the status bar shows normalsider against the cap; clicking the TODO
    counter jumps to a `[TODO` marker.

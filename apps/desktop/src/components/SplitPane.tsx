@@ -34,10 +34,16 @@ export function SplitPane(props: { left: ReactNode; right: ReactNode }) {
     if (rect.width === 0) return;
     setRatio(Math.min(MAX, Math.max(MIN, (e.clientX - rect.left) / rect.width)));
   }
-  function onPointerUp(e: ReactPointerEvent<HTMLDivElement>) {
+  // pointerup, but also pointercancel / lost capture (a touch interrupted, an
+  // OS gesture): end the drag from every exit, or the panes would stay
+  // pointer-events-none and become unclickable. Reset dragging first so a
+  // later throw can't wedge it.
+  function finishDrag(e: ReactPointerEvent<HTMLDivElement>) {
     if (!dragging) return;
-    e.currentTarget.releasePointerCapture(e.pointerId);
     setDragging(false);
+    // Releasing an already-released pointer throws; the drag is over either way.
+    if (e.currentTarget.hasPointerCapture(e.pointerId))
+      e.currentTarget.releasePointerCapture(e.pointerId);
     localStorage.setItem(RATIO_KEY, ratioRef.current.toFixed(3));
   }
   function reset() {
@@ -62,7 +68,9 @@ export function SplitPane(props: { left: ReactNode; right: ReactNode }) {
         title="Drag to resize — double-click to reset"
         onPointerDown={onPointerDown}
         onPointerMove={onPointerMove}
-        onPointerUp={onPointerUp}
+        onPointerUp={finishDrag}
+        onPointerCancel={finishDrag}
+        onLostPointerCapture={finishDrag}
         onDoubleClick={reset}
         className={`z-10 -mx-1 w-2 shrink-0 cursor-col-resize ${
           dragging ? "bg-sky-500/40" : "hover:bg-sky-500/30"

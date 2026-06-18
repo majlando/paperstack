@@ -17,7 +17,7 @@ and concurrency. Chapters 8–9 evaluate the result. The glossary explains
 domain terms, and the appendices contain the installation guide, the test
 protocol, and the sprint backlogs.
 
-Citations use numbered references; figures and tables are captioned and
+Citations use APA author-date references; figures and tables are captioned and
 numbered per chapter.
 
 <!-- Front matter: this section must not count toward the normalsider cap. -->

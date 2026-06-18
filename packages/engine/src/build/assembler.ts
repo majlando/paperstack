@@ -77,8 +77,10 @@ export function generateMainTypst(
     const title = meta.language === "da" ? "Referencer" : "References";
     lines.push("");
     lines.push(`#set heading(numbering: none)`);
+    // APA (author-date): in-text citations render as (Author, year) and the
+    // reference list is alphabetized — the expected style for the SEA report.
     lines.push(
-      `#bibliography("${escapeTypstString(bibliographyPath)}", title: "${escapeTypstString(title)}", style: "ieee")`,
+      `#bibliography("${escapeTypstString(bibliographyPath)}", title: "${escapeTypstString(title)}", style: "apa")`,
     );
     current = "plain"; // the set rule above — a following mode re-switches
   };

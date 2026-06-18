@@ -23,6 +23,7 @@ export {
   countProject,
   applySectionContent,
   hashContent,
+  imageSources,
   type SectionCount,
   type ProjectCounts,
 } from "./project/counters.ts";

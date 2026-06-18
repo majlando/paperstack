@@ -6,6 +6,7 @@ import {
   findTodoOffsets,
   firstHeading,
   hashContent,
+  imageSources,
   type ProjectCounts,
 } from "./counters.ts";
 
@@ -32,9 +33,9 @@ describe("countAnslag", () => {
 describe("applySectionContent", () => {
   const base: ProjectCounts = {
     sections: [
-      { file: "sections/01-a.md", role: "body", title: "A", chars: 2400, normalsider: 1, todos: 0, hash: "0" },
-      { file: "sections/02-b.md", role: "body", title: "B", chars: 4800, normalsider: 2, todos: 1, hash: "0" },
-      { file: "appendices/a.md", role: "appendix", title: null, chars: 100, normalsider: 100 / 2400, todos: 0, hash: "0" },
+      { file: "sections/01-a.md", role: "body", title: "A", images: [], chars: 2400, normalsider: 1, todos: 0, hash: "0" },
+      { file: "sections/02-b.md", role: "body", title: "B", images: [], chars: 4800, normalsider: 2, todos: 1, hash: "0" },
+      { file: "appendices/a.md", role: "appendix", title: null, images: [], chars: 100, normalsider: 100 / 2400, todos: 0, hash: "0" },
     ],
     bodyChars: 7200,
     bodyNormalsider: 3,
@@ -69,6 +70,12 @@ describe("applySectionContent", () => {
     expect(next.sections[1]?.title).toBe("B");
   });
 
+  it("re-extracts image sources, so the sidebar thumbnails track edits live", () => {
+    const next = applySectionContent(base, "sections/01-a.md", "![a](../figures/x.png)\ntext");
+    expect(next.sections[0]?.images).toEqual(["../figures/x.png"]);
+    expect(next.sections[1]?.images).toEqual([]);
+  });
+
   it("tracks the content hash of applied edits", () => {
     const next = applySectionContent(base, "sections/01-a.md", "new text");
     expect(next.sections[0]?.hash).toBe(hashContent("new text"));
@@ -101,14 +108,52 @@ describe("firstHeading", () => {
     expect(firstHeading("~~~\n# only inside the fence\n~~~\n")).toBeNull();
   });
 
+  it("only closes a fence with its own marker, so a ~~~ inside a ``` block is content", () => {
+    expect(firstHeading("```\n~~~\n# inside the code block\n```\n\n# Real\n")).toBe("Real");
+  });
+
   it("strips inline markup and closing hashes — the sidebar renders plain text", () => {
     expect(firstHeading("# **Results** and `findings` ##")).toBe("Results and findings");
     expect(firstHeading("#    spaced   ")).toBe("spaced");
   });
 
+  it("strips underscore/link markup but keeps intraword underscores", () => {
+    expect(firstHeading("# _Results_ of the study")).toBe("Results of the study");
+    expect(firstHeading("# [Results](r.md) here")).toBe("Results here");
+    expect(firstHeading("# the my_var helper")).toBe("the my_var helper");
+  });
+
+  it("keeps a trailing # that is not a space-separated ATX closing sequence", () => {
+    expect(firstHeading("# C#")).toBe("C#");
+    expect(firstHeading("# F# basics")).toBe("F# basics");
+    expect(firstHeading("# Done ###")).toBe("Done");
+  });
+
   it("does not treat #hashtag-style lines or empty headings as titles", () => {
     expect(firstHeading("#no-space\n\n# Real\n")).toBe("Real");
     expect(firstHeading("# \n")).toBeNull();
+  });
+});
+
+describe("imageSources", () => {
+  it("returns each image src in order, de-duplicated", () => {
+    const md = "intro\n\n![one](../figures/a.png)\n\ntext ![two](/images/b.svg) more\n\n![dup](../figures/a.png)";
+    expect(imageSources(md)).toEqual(["../figures/a.png", "/images/b.svg"]);
+  });
+
+  it("keeps the src verbatim and ignores any title", () => {
+    expect(imageSources('![cap](/figures/c.png "a title")')).toEqual(["/figures/c.png"]);
+    expect(imageSources("![cap](<../has space.png>)")).toEqual(["../has space.png"]);
+  });
+
+  it("skips images written inside code fences (those are samples, not figures)", () => {
+    expect(imageSources("```md\n![x](/figures/in-code.png)\n```\n\n![real](/figures/real.png)")).toEqual([
+      "/figures/real.png",
+    ]);
+  });
+
+  it("returns an empty array when there are no images", () => {
+    expect(imageSources("# Heading\n\njust prose")).toEqual([]);
   });
 });
 

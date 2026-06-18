@@ -55,27 +55,84 @@ export function hashContent(content: string): string {
 }
 
 /**
+ * Visible text of a heading's inline markup, for the sidebar/search label:
+ * link and image labels are kept, their URLs and the emphasis/code markers
+ * dropped, so `**Results**`, `_C#_`, and `[Results](r.md)` all read as plain
+ * words. Underscores are only stripped at word boundaries — `my_var` keeps
+ * its underscore (CommonMark never treats intraword `_` as emphasis).
+ */
+function stripInlineMarkup(s: string): string {
+  return s
+    .replace(/!?\[([^\]]*)\]\([^)]*\)/g, "$1") // [text](url), ![alt](url) → label
+    .replace(/!?\[([^\]]*)\]\[[^\]]*\]/g, "$1") // [text][ref] → label
+    .replace(/`+/g, "") // inline-code backticks
+    .replace(/\*/g, "") // emphasis / strong
+    .replace(/(?<![A-Za-z0-9])_+|_+(?![A-Za-z0-9])/g, ""); // non-intraword underscores
+}
+
+/**
  * Text of the file's first ATX heading — what the sidebar shows as the
- * section's name. Headings inside fenced code blocks are not headings
- * (a section may well open with a shell snippet whose comments start
- * with `#`). Inline code and emphasis markers are stripped: the sidebar
- * renders plain text, so `**Results**` must read "Results".
+ * section's name, or null when the file has none. Headings inside fenced
+ * code blocks are not headings (a section may open with a shell snippet
+ * whose comments start with `#`); only a fence of the same marker character
+ * that opened the block closes it, so a `~~~` line inside a ``` block does
+ * not end it. A trailing `#` run is an ATX closing sequence only when it is
+ * whitespace-separated from the text, so `# C#` keeps its sharp.
+ *
+ * Deliberately a lightweight line reader, not the converter's full remark
+ * parse: project/ stays independent of build/, and this runs on every
+ * keystroke. It covers the heading forms a section title realistically takes.
  */
 export function firstHeading(markdown: string): string | null {
-  let inFence = false;
+  let fence: string | null = null; // marker char of the open fence, or null
   for (const line of markdown.split("\n")) {
-    if (/^\s*(```|~~~)/.test(line)) {
-      inFence = !inFence;
+    const fenceMatch = /^ {0,3}(`{3,}|~{3,})/.exec(line);
+    if (fenceMatch) {
+      const marker = fenceMatch[1]![0]!; // "`" or "~"
+      if (fence === null) fence = marker;
+      else if (marker === fence) fence = null;
       continue;
     }
-    if (inFence) continue;
-    const m = /^ {0,3}#{1,6}\s+(.*?)\s*#*\s*$/.exec(line);
+    if (fence !== null) continue;
+    const m = /^ {0,3}#{1,6}\s+(.*?)(?:\s+#+)?\s*$/.exec(line);
     if (m) {
-      const text = m[1]!.replace(/[`*]/g, "").trim();
+      const text = stripInlineMarkup(m[1]!).trim();
       if (text !== "") return text;
     }
   }
   return null;
+}
+
+/**
+ * Image sources (`![alt](src)`) referenced outside code fences, in document
+ * order and de-duplicated — drives the sidebar's per-section thumbnails. The
+ * src is kept exactly as written (relative or root-absolute); the UI resolves
+ * it the same way the preview does. Fenced code blocks are skipped so a path
+ * shown inside a code sample is not mistaken for a real figure.
+ */
+export function imageSources(markdown: string): string[] {
+  const out: string[] = [];
+  const seen = new Set<string>();
+  let fence: string | null = null;
+  for (const line of markdown.split("\n")) {
+    const fenceMatch = /^ {0,3}(`{3,}|~{3,})/.exec(line);
+    if (fenceMatch) {
+      const marker = fenceMatch[1]![0]!;
+      if (fence === null) fence = marker;
+      else if (marker === fence) fence = null;
+      continue;
+    }
+    if (fence !== null) continue;
+    // `![alt](src)` / `![alt](src "title")` / `![alt](<src with spaces>)`.
+    for (const m of line.matchAll(/!\[[^\]]*\]\(\s*(?:<([^>]*)>|([^)\s]+))[^)]*\)/g)) {
+      const src = (m[1] ?? m[2])!;
+      if (!seen.has(src)) {
+        seen.add(src);
+        out.push(src);
+      }
+    }
+  }
+  return out;
 }
 
 export interface SectionCount {
@@ -83,6 +140,8 @@ export interface SectionCount {
   role: SectionRole;
   /** First heading of the file, or null when it has none (display falls back to the file name). */
   title: string | null;
+  /** Image sources the section references, for the sidebar thumbnails. */
+  images: string[];
   chars: number;
   normalsider: number;
   todos: number;
@@ -128,6 +187,7 @@ export async function countProject(
       file: s.file,
       role: s.role,
       title: firstHeading(content),
+      images: imageSources(content),
       chars,
       normalsider: chars / CHARS_PER_NORMALSIDE,
       todos: countTodos(content),
@@ -153,6 +213,7 @@ export function applySectionContent(
       ? {
           ...s,
           title: firstHeading(content),
+          images: imageSources(content),
           chars,
           normalsider: chars / CHARS_PER_NORMALSIDE,
           todos: countTodos(content),

@@ -125,7 +125,7 @@ describe.skipIf(!hasBinaries)("buildReport on the demo fixture", () => {
       expect(typst).toContain("#cite(<knuth84>, supplement: [p. 42])");
       expect(typst).toContain("#cite(<knuth84>)#cite(<typst-docs>)");
       const main = await readFile(join(citeDir, "output/.build/main.typ"), "utf8");
-      expect(main).toContain('#bibliography("/references.bib", title: "References", style: "ieee")');
+      expect(main).toContain('#bibliography("/references.bib", title: "References", style: "apa")');
     } finally {
       await rm(citeDir, { recursive: true, force: true });
     }

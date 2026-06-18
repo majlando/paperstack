@@ -32,6 +32,18 @@ describe("extractMermaidBlocks", () => {
     expect(blocks).toHaveLength(0);
   });
 
+  it("reads a quoted caption from the fence and emits a captioned figure image", () => {
+    const markdown = '```mermaid "System architecture"\nflowchart TD\n    A --> B\n```';
+    const { markdown: replaced, blocks } = extractMermaidBlocks(markdown);
+    expect(blocks[0]?.caption).toBe("System architecture");
+    expect(replaced).toContain(`![System architecture](/diagrams/rendered/${blocks[0]?.hash}.svg)`);
+  });
+
+  it("treats a bare (unquoted) info string as a Mermaid hint, not a caption", () => {
+    const { blocks } = extractMermaidBlocks("```mermaid layout\nflowchart TD\n    A --> B\n```");
+    expect(blocks[0]?.caption).toBeNull();
+  });
+
   it("accepts an info string and CRLF line endings", () => {
     const markdown = "```mermaid layout\r\nflowchart TD\r\n    A --> B\r\n```\r\n";
     const { markdown: replaced, blocks } = extractMermaidBlocks(markdown);

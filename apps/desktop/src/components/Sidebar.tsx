@@ -1,7 +1,52 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
+import { convertFileSrc } from "@tauri-apps/api/core";
 import { useStore, type ProjectSearchMatch } from "../store.ts";
 import { activeEditor } from "../editor/editor-registry.ts";
-import { baseOf, type ProjectCounts, type SectionRole } from "@paperstack/engine";
+import { baseOf, dirOf, resolveProjectPath, type SectionCount, type SectionRole } from "@paperstack/engine";
+
+/** A section image's src (relative or root-absolute) → a displayable URL,
+ *  resolved the same way the preview does. */
+function imageUrl(projectDir: string, sectionFile: string, src: string): string {
+  const rel = src.startsWith("/")
+    ? src.slice(1)
+    : resolveProjectPath(dirOf(sectionFile), src).slice(1);
+  return convertFileSrc(`${projectDir}/${rel}`);
+}
+
+/** Thumbnails of the images a section references, under its sidebar row. A few
+ *  are shown; the rest collapse to a "+N". Clicking opens the section. A
+ *  missing/not-yet-saved file simply hides its thumbnail. */
+function Thumbnails(props: {
+  projectDir: string;
+  file: string;
+  images: string[];
+  onOpen: () => void;
+}) {
+  const MAX = 4;
+  const shown = props.images.slice(0, MAX);
+  const extra = props.images.length - shown.length;
+  return (
+    <div className="flex flex-wrap gap-1 px-4 pb-1.5 pl-6">
+      {shown.map((src, i) => (
+        <img
+          key={`${src}-${i}`}
+          src={imageUrl(props.projectDir, props.file, src)}
+          alt={src}
+          title={src}
+          loading="lazy"
+          onClick={props.onOpen}
+          onError={(e) => {
+            e.currentTarget.style.display = "none";
+          }}
+          className="h-8 w-12 cursor-pointer rounded border border-zinc-800 bg-white/5 object-cover hover:border-zinc-600"
+        />
+      ))}
+      {extra > 0 && (
+        <span className="flex h-8 items-center px-1 text-[10px] text-zinc-600">+{extra}</span>
+      )}
+    </div>
+  );
+}
 
 const GROUPS: { role: SectionRole; label: string; addHint: string }[] = [
   { role: "front-matter", label: "Front matter", addHint: "Add front matter" },
@@ -30,9 +75,9 @@ function displayName(file: string): string {
  */
 function sectionLabel(
   file: string,
-  counts: ProjectCounts | null,
+  count: SectionCount | undefined,
 ): { text: string; capitalized: boolean } {
-  const title = counts?.sections.find((c) => c.file === file)?.title;
+  const title = count?.title;
   return title ? { text: title, capitalized: false } : { text: displayName(file), capitalized: true };
 }
 
@@ -226,7 +271,7 @@ function SearchPanel(props: { onClose: () => void }) {
           {[...grouped].map(([file, matches]) => (
             <div key={file}>
               <div className="px-4 pt-1 text-[11px] font-semibold uppercase tracking-wider text-zinc-500">
-                {sectionLabel(file, counts).text}
+                {sectionLabel(file, counts?.sections.find((c) => c.file === file)).text}
               </div>
               {matches.map((m) => {
                 // keep the match visible even when it sits deep in a long line
@@ -287,16 +332,7 @@ export function Sidebar() {
       }
       if ((e.ctrlKey || e.metaKey) && (e.key === "PageUp" || e.key === "PageDown")) {
         e.preventDefault();
-        const state = useStore.getState();
-        if (state.metadataOpen) return; // the form is its own surface
-        const files = state.project?.meta.sections.map((x) => x.file) ?? [];
-        if (files.length === 0) return;
-        const at = files.indexOf(state.activeFile ?? "");
-        const to =
-          at === -1
-            ? 0
-            : Math.min(Math.max(at + (e.key === "PageDown" ? 1 : -1), 0), files.length - 1);
-        if (to !== at) void state.openSection(files[to]!);
+        void useStore.getState().gotoAdjacentSection(e.key === "PageDown" ? "next" : "prev");
       }
     };
     window.addEventListener("keydown", onKeyDown);
@@ -308,11 +344,25 @@ export function Sidebar() {
   return (
     <aside className="w-64 shrink-0 overflow-y-auto border-r border-zinc-800 bg-zinc-900 text-zinc-300">
       <div className="flex items-start justify-between gap-2 px-4 py-3 border-b border-zinc-800">
-        <div className="min-w-0">
-          <div className="font-semibold text-zinc-100 truncate" title={project.meta.title}>
-            {project.meta.title}
+        <div className="flex min-w-0 items-start gap-2">
+          {/* Cover logo from document.yaml — the one image on the front page. */}
+          {project.meta.logo && (
+            <img
+              src={convertFileSrc(`${project.dir}/${project.meta.logo}`)}
+              alt="Cover logo"
+              title={`Cover logo — ${project.meta.logo}`}
+              onError={(e) => {
+                e.currentTarget.style.display = "none";
+              }}
+              className="mt-0.5 h-8 w-8 shrink-0 rounded border border-zinc-800 bg-white/5 object-contain"
+            />
+          )}
+          <div className="min-w-0">
+            <div className="font-semibold text-zinc-100 truncate" title={project.meta.title}>
+              {project.meta.title}
+            </div>
+            <div className="text-xs text-zinc-500 truncate">{project.dir}</div>
           </div>
-          <div className="text-xs text-zinc-500 truncate">{project.dir}</div>
         </div>
         <span className="flex shrink-0 gap-0.5">
           <button
@@ -372,7 +422,7 @@ export function Sidebar() {
             {sections.map((s) => {
               const count = counts?.sections.find((c) => c.file === s.file);
               const active = s.file === activeFile;
-              const label = sectionLabel(s.file, counts);
+              const label = sectionLabel(s.file, count);
 
               if (renaming === s.file) {
                 return (
@@ -411,8 +461,8 @@ export function Sidebar() {
                 );
               }
               return (
+                <div key={s.file}>
                 <div
-                  key={s.file}
                   className={`group flex items-center ${
                     active ? "bg-zinc-700/60" : "hover:bg-zinc-800"
                   }`}
@@ -464,6 +514,15 @@ export function Sidebar() {
                       ✕
                     </ActionButton>
                   </span>
+                </div>
+                {count && count.images.length > 0 && (
+                  <Thumbnails
+                    projectDir={project.dir}
+                    file={s.file}
+                    images={count.images}
+                    onOpen={() => void openSection(s.file)}
+                  />
+                )}
                 </div>
               );
             })}

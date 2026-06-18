@@ -23,6 +23,21 @@ export interface MermaidBlock {
   hash: string;
   /** Project-relative path of the rendered SVG. */
   renderedPath: string;
+  /**
+   * Optional caption from the fence info string (```mermaid "My caption"```).
+   * When present the diagram is emitted as a numbered figure; null otherwise.
+   */
+  caption: string | null;
+}
+
+/**
+ * The caption in a mermaid fence info string. A caption must be a quoted
+ * string — ```mermaid "My caption"``` — so that bare info hints like
+ * ```mermaid layout``` (a Mermaid directive, not a caption) are left alone.
+ */
+function parseMermaidCaption(info: string): string | null {
+  const quoted = /^mermaid[ \t]+"(.*)"[ \t]*$/.exec(info);
+  return quoted ? quoted[1]!.trim() || null : null;
 }
 
 export interface MermaidExtraction {
@@ -113,9 +128,11 @@ export function extractMermaidBlocks(markdown: string): MermaidExtraction {
         const code = stripped.join("\n").replace(/\r\n?/g, "\n").trim();
         const hash = hashDiagram(code);
         const renderedPath = `diagrams/rendered/${hash}.svg`;
-        blocks.push({ code, hash, renderedPath });
-        // Root-absolute path; empty alt text = plain image, no forced
-        // caption. Keep the fence's prefix so a diagram in a list stays in
+        const caption = parseMermaidCaption(open.info);
+        blocks.push({ code, hash, renderedPath, caption });
+        // Root-absolute path; a caption becomes the image alt (the converter
+        // turns a standalone captioned image into a numbered figure), empty
+        // otherwise. Keep the fence's prefix so a diagram in a list stays in
         // the list and one in a quote stays in the quote. The replacement
         // fills the fence's exact line count with blank padding (bare quote
         // markers inside a quote): a fence interrupts a paragraph but an
@@ -127,7 +144,8 @@ export function extractMermaidBlocks(markdown: string): MermaidExtraction {
         const replacement: string[] = [];
         const prev = out.length > 0 ? out[out.length - 1]! : "";
         if (/\S/.test(prev) && fenceLines >= 2) replacement.push(blankLine);
-        replacement.push(`${open.prefix}![](/${renderedPath})`);
+        const alt = caption === null ? "" : caption.replace(/[[\]\\]/g, "\\$&");
+        replacement.push(`${open.prefix}![${alt}](/${renderedPath})`);
         while (replacement.length < fenceLines) replacement.push(blankLine);
         out.push(...replacement);
         i = close + 1;

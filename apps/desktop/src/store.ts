@@ -24,6 +24,7 @@ import {
   dirOf,
   baseOf,
   humanize,
+  SECTION_ROLES,
   PaperstackError,
   type BibEntry,
   type MetadataEdit,
@@ -93,7 +94,7 @@ interface AppState {
   building: boolean;
   /**
    * The project's references.bib has at least one real entry — citations
-   * are active: [@key] spans become numbered references in the PDF, the
+   * are active: [@key] spans become (author, year) references in the PDF, the
    * preview shows placeholders, and the editor offers Insert Citation.
    * (The scaffolded file ships commented-out examples only and stays inert.)
    */
@@ -138,6 +139,11 @@ interface AppState {
   closeProject(): Promise<void>;
   reloadProject(): Promise<void>;
   openSection(file: string): Promise<void>;
+  /**
+   * Opens the section before/after the active one in the order the sidebar
+   * shows them (grouped by role), for the Ctrl+PageUp/PageDown shortcuts.
+   */
+  gotoAdjacentSection(direction: "next" | "prev"): Promise<void>;
   /** Creates the section file (heading stub) and adds it to document.yaml. */
   addSection(role: SectionRole, name: string): Promise<void>;
   /** Takes the section out of the report structure; the file stays on disk. */
@@ -196,6 +202,13 @@ interface AppState {
   dismissTemplateOffer(): void;
   openMetadata(): Promise<void>;
   closeMetadata(): void;
+  /**
+   * Gate for any action that leaves the report-details form. Returns true when
+   * the caller may proceed: a clean form is closed silently, while a dirty one
+   * blocks (returns false, surfaces an error) so its edits are never dropped
+   * underneath an invisible switch.
+   */
+  leaveMetadata(): boolean;
   setMetadataDirty(dirty: boolean): void;
   /** Returns false when the save failed — the form stays open with the error visible. */
   saveMetadata(edit: MetadataEdit): Promise<boolean>;
@@ -423,6 +436,11 @@ export const useStore = create<AppState>((set, get) => {
     // Re-entrancy guard — two compiles would race in the same output/.build.
     // (The UI also disables its buttons, but the store must not rely on that.)
     if (!projectDir || building) return null;
+    // The report-details form's edits live only in the form until saved, so a
+    // build while it is dirty would compile the stale document.yaml. Settle it
+    // first (clean closes, dirty blocks) — the store owns this, not the hidden
+    // export button.
+    if (!get().leaveMetadata()) return null;
     // A blocked save (write failure or conflict) keeps its own error visible.
     if (!(await get().saveActive())) return null;
     set({ building: true });
@@ -649,20 +667,9 @@ export const useStore = create<AppState>((set, get) => {
     if (!projectDir) return;
     // The report-details form replaces the editor area, so switching sections
     // under it would be invisible — the sidebar click would appear dead. A
-    // clean form just closes; a dirty one blocks, like every other way of
-    // leaving it, so its edits are never silently dropped.
-    if (get().metadataOpen) {
-      if (get().metadataDirty) {
-        set({
-          error: {
-            message:
-              "Report details have unsaved changes — save or cancel the form before opening a section.",
-          },
-        });
-        return;
-      }
-      get().closeMetadata();
-    }
+    // clean form just closes; a dirty one blocks so its edits are never
+    // silently dropped.
+    if (!get().leaveMetadata()) return;
     // A failed save must not be papered over: stay on the current section so
     // the unsaved edits and the error stay visible.
     if (dirty && !(await saveActive())) return;
@@ -690,9 +697,36 @@ export const useStore = create<AppState>((set, get) => {
     }
   },
 
+  async gotoAdjacentSection(direction: "next" | "prev") {
+    const { project, activeFile } = get();
+    if (!project) return;
+    // Walk the sections in the same role-grouped order the sidebar shows, so
+    // the keyboard step matches what the eye sees even if document.yaml is not
+    // already grouped (e.g. after a hand-edit or merge). openSection owns the
+    // dirty-form gate, so a clean report-details form just closes here too.
+    const files = [...project.meta.sections]
+      .sort((a, b) => SECTION_ROLES.indexOf(a.role) - SECTION_ROLES.indexOf(b.role))
+      .map((s) => s.file);
+    if (files.length === 0) return;
+    const at = files.indexOf(activeFile ?? "");
+    // No active section yet: step in from the matching end (next → first,
+    // prev → last) rather than always landing on the first.
+    const to =
+      at === -1
+        ? direction === "next"
+          ? 0
+          : files.length - 1
+        : at + (direction === "next" ? 1 : -1);
+    if (to < 0 || to >= files.length || to === at) return;
+    await get().openSection(files[to]!);
+  },
+
   async addSection(role: SectionRole, name: string) {
     const { projectDir, project } = get();
     if (!projectDir || !project) return;
+    // A pending report-details form would swallow the open below; settle it
+    // first (clean closes, dirty blocks) so the add can't half-complete.
+    if (!get().leaveMetadata()) return;
     try {
       const file = newSectionFile(project.meta.sections, role, name);
       const path = `${projectDir}/${file}`;
@@ -1017,6 +1051,21 @@ export const useStore = create<AppState>((set, get) => {
 
   closeMetadata() {
     set({ metadataOpen: false, metadataDirty: false, metadataBaselineHash: null });
+  },
+
+  leaveMetadata() {
+    if (!get().metadataOpen) return true;
+    if (get().metadataDirty) {
+      set({
+        error: {
+          message:
+            "Report details have unsaved changes — save or cancel the form first.",
+        },
+      });
+      return false;
+    }
+    get().closeMetadata();
+    return true;
   },
 
   setMetadataDirty(dirty: boolean) {

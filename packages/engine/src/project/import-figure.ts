@@ -111,9 +111,21 @@ export function suggestedCaption(sourcePath: string): string {
  * The Markdown line the build pipeline turns into a captioned figure
  * ("Figure N: …"): an image alone in its paragraph, root-absolute path.
  * Brackets and backslashes in the caption are escaped so they cannot
- * terminate the alt text early.
+ * terminate the alt text early. Optional `width` (e.g. "60%", "8cm") and
+ * `align` ("left"/"right"; "center" is the default and omitted) are emitted
+ * as a `{…}` attribute the converter applies; preview and PDF both honour it.
  */
-export function figureMarkdown(file: string, caption: string): string {
+export function figureMarkdown(
+  file: string,
+  caption: string,
+  width?: string,
+  align?: "left" | "center" | "right",
+): string {
   const alt = caption.replace(/[[\]\\]/g, "\\$&");
-  return `![${alt}](/${file})`;
+  const parts: string[] = [];
+  const w = width?.trim();
+  if (w) parts.push(`width=${/\s/.test(w) ? `"${w}"` : w}`);
+  if (align && align !== "center") parts.push(`align=${align}`);
+  const attrs = parts.length > 0 ? `{${parts.join(" ")}}` : "";
+  return `![${alt}](/${file})${attrs}`;
 }

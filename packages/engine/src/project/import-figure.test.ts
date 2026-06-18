@@ -124,4 +124,22 @@ describe("figureMarkdown", () => {
       "![Flow \\[draft\\]](/figures/chart.png)",
     );
   });
+
+  it("emits an optional width attribute, quoting it only when it has spaces", () => {
+    expect(figureMarkdown("figures/chart.png", "Overview", "60%")).toBe(
+      "![Overview](/figures/chart.png){width=60%}",
+    );
+    expect(figureMarkdown("figures/chart.png", "Overview", "  ")).toBe(
+      "![Overview](/figures/chart.png)",
+    );
+  });
+
+  it("emits width and align together, omitting the default center alignment", () => {
+    expect(figureMarkdown("figures/chart.png", "Overview", "60%", "left")).toBe(
+      "![Overview](/figures/chart.png){width=60% align=left}",
+    );
+    expect(figureMarkdown("figures/chart.png", "Overview", undefined, "center")).toBe(
+      "![Overview](/figures/chart.png)",
+    );
+  });
 });

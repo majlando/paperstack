@@ -29,7 +29,7 @@ The first target is the **SEA exam report** (Danish academy CS project report), 
 - Mermaid diagrams, rendered live in preview and embedded as SVG in the PDF
 - Insert helpers for code blocks, figures (incl. paste-a-screenshot), diagrams, and tables
 - Math: inline `$x$` and display `$$…$$` — KaTeX in the preview, real Typst math in the PDF
-- Citations: drop a `references.bib` in the project and `[@key]` becomes a numbered reference with a generated bibliography
+- Citations: drop a `references.bib` in the project and `[@key]` becomes an APA (author, year) reference with a generated bibliography
 - Project-wide search and replace
 - Live length counter (normalsider vs. cap) and `[TODO]` tracker
 - **View Report** — the assembled, real PDF, shown in-app
