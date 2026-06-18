@@ -20,6 +20,11 @@ import {
   searchContent,
   replaceContent,
   parseBibliography,
+  bibliographyKeys,
+  collectProblems,
+  readBibRecords,
+  upsertBibEntry,
+  removeBibEntry,
   hashContent,
   dirOf,
   baseOf,
@@ -27,6 +32,8 @@ import {
   SECTION_ROLES,
   PaperstackError,
   type BibEntry,
+  type BibRecord,
+  type Problem,
   type MetadataEdit,
   type Project,
   type ProjectCounts,
@@ -190,6 +197,14 @@ interface AppState {
   searchProject(query: string): Promise<ProjectSearchMatch[]>;
   /** Entries of references.bib for the Insert Citation list ([] without one). */
   listReferences(): Promise<BibEntry[]>;
+  /** Full records of references.bib for the references manager. */
+  listReferenceRecords(): Promise<BibRecord[]>;
+  /** Add or replace an entry (by key) in references.bib. Returns false on failure. */
+  saveReference(record: BibRecord): Promise<boolean>;
+  /** Remove an entry from references.bib by key. Returns false on failure. */
+  deleteReference(key: string): Promise<boolean>;
+  /** Pre-hand-in checklist: TODOs, missing images, unknown citations/refs, over-cap. */
+  checkProblems(): Promise<Problem[]>;
   /**
    * Replaces every match of `query` (case-insensitive, same rules as
    * searchProject) across all sections — the active one through the editor
@@ -424,6 +439,22 @@ export const useStore = create<AppState>((set, get) => {
       await platform.writeTextFile(`${projectDir}/${activeFile}`, content);
       void renderDiagramsToDisk(projectDir, content);
       return settle();
+    } catch (e) {
+      set({ error: toError(e) });
+      return false;
+    }
+  }
+
+  /** Apply an edit to references.bib and refresh whether citations are active. */
+  async function writeReferences(edit: (text: string) => string): Promise<boolean> {
+    const { projectDir } = get();
+    if (!projectDir) return false;
+    try {
+      const path = `${projectDir}/references.bib`;
+      const current = await platform.readTextFile(path).catch(() => "");
+      await platform.writeTextFile(path, edit(current));
+      set({ hasReferences: await projectHasReferences(projectDir) });
+      return true;
     } catch (e) {
       set({ error: toError(e) });
       return false;
@@ -973,6 +1004,38 @@ export const useStore = create<AppState>((set, get) => {
     } catch {
       return []; // no file or unreadable — the Cite button simply lists nothing
     }
+  },
+
+  async listReferenceRecords() {
+    const { projectDir } = get();
+    if (!projectDir) return [];
+    try {
+      return readBibRecords(await platform.readTextFile(`${projectDir}/references.bib`));
+    } catch {
+      return [];
+    }
+  },
+
+  async saveReference(record) {
+    return writeReferences((text) => upsertBibEntry(text, record));
+  },
+
+  async deleteReference(key) {
+    return writeReferences((text) => removeBibEntry(text, key));
+  },
+
+  async checkProblems() {
+    const { projectDir, project, counts } = get();
+    if (!projectDir || !project || !counts) return [];
+    // Flush the open section so the check sees the latest text, not stale disk.
+    await get().saveActive();
+    let bibKeys = new Set<string>();
+    try {
+      bibKeys = bibliographyKeys(await platform.readTextFile(`${projectDir}/references.bib`));
+    } catch {
+      // no references.bib — citations are inactive, nothing to validate
+    }
+    return collectProblems(platform, project, get().counts!, bibKeys);
   },
 
   async replaceAll(query: string, replacement: string) {

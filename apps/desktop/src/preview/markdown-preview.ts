@@ -119,7 +119,7 @@ export class MarkdownPreview {
     // exists in the compiled report, the same one-rendering-path rule as
     // everything else. Only active for projects with a references.bib, so
     // the preview never suggests a citation the PDF would print literally.
-    if (options?.citations) renderCitationPlaceholders(this.container);
+    renderCitationPlaceholders(this.container, options?.citations ?? false);
 
     // Math is rendered after sanitization, like Mermaid below: KaTeX builds
     // its DOM from the math source text directly, so nothing it produces
@@ -239,12 +239,21 @@ export class MarkdownPreview {
   }
 }
 
+const CROSSREF_RE = /^fig:[A-Za-z0-9_-]+$/;
+
+/** "fig:arch" → "Fig. arch" for the preview chip. */
+function crossLabel(key: string): string {
+  const [type, name] = key.split(":");
+  return `${type![0]!.toUpperCase()}${type!.slice(1)}. ${name}`;
+}
+
 /**
- * Citation spans in prose → styled chips, mirroring the PDF forms:
- * bracketed `[@key]` / `[@a; @b, p. 12]` as parenthetical `[key]` chips, and
- * bare `@key` as a narrative `key` chip. Matches the converter's CITE_SCAN.
+ * Reference spans in prose → styled chips, mirroring the PDF. Cross-references
+ * (`@fig:label`) render as a green "Fig. label" chip and work always; citation
+ * chips (parenthetical `[@key]`, narrative `@key`) render in blue only when the
+ * project has a references.bib. Matches the converter's CITE_SCAN.
  */
-function renderCitationPlaceholders(root: HTMLElement): void {
+function renderCitationPlaceholders(root: HTMLElement, citations: boolean): void {
   const ITEM = /^@([A-Za-z0-9_][A-Za-z0-9_.:-]*)(?:\s*,\s*(.+))?$/;
   const SCAN =
     /(\[@[^\]]*\])|(?<![\w@])@([A-Za-z0-9_](?:[A-Za-z0-9_.:-]*[A-Za-z0-9_])?)(?:[ \t]+\[(?!@)([^\]]+)\])?/g;
@@ -252,28 +261,42 @@ function renderCitationPlaceholders(root: HTMLElement): void {
   const texts: Text[] = [];
   for (let n = walker.nextNode(); n; n = walker.nextNode()) texts.push(n as Text);
   for (const text of texts) {
-    // citations live in prose — never rewrite code samples
+    // references live in prose — never rewrite code samples
     if (text.parentElement?.closest("pre, code")) continue;
     const value = text.nodeValue ?? "";
     let fragment: DocumentFragment | null = null;
     let last = 0;
     for (const m of value.matchAll(SCAN)) {
       let label: string;
+      let cross = false;
       if (m[1] !== undefined) {
-        const items = m[1].slice(1, -1).split(";").map((s) => ITEM.exec(s.trim()));
-        if (items.some((i) => i === null)) continue; // not citation syntax
-        label = `[${items
-          .map((i) => (i![2] === undefined ? i![1]! : `${i![1]}, ${i![2]}`))
-          .join("; ")}]`;
-      } else {
+        const ref = /^\[@(fig:[A-Za-z0-9_-]+)\]$/.exec(m[1]);
+        if (ref) {
+          label = crossLabel(ref[1]!);
+          cross = true;
+        } else if (citations) {
+          const items = m[1].slice(1, -1).split(";").map((s) => ITEM.exec(s.trim()));
+          if (items.some((i) => i === null)) continue; // not citation syntax
+          label = `[${items
+            .map((i) => (i![2] === undefined ? i![1]! : `${i![1]}, ${i![2]}`))
+            .join("; ")}]`;
+        } else continue;
+      } else if (CROSSREF_RE.test(m[2]!)) {
+        label = crossLabel(m[2]!);
+        cross = true;
+      } else if (citations) {
         // bare @key (with optional [locator]) → narrative "key" chip
         label = m[3] === undefined ? m[2]! : `${m[2]}, ${m[3]}`;
-      }
+      } else continue;
       fragment ??= document.createDocumentFragment();
       if (m.index > last) fragment.append(value.slice(last, m.index));
       const chip = document.createElement("span");
-      chip.className = "rounded bg-sky-500/15 px-1 text-[0.85em] text-sky-300";
-      chip.title = "Citation — appears as an (author, year) reference in the report";
+      chip.className = cross
+        ? "rounded bg-emerald-500/15 px-1 text-[0.85em] text-emerald-300"
+        : "rounded bg-sky-500/15 px-1 text-[0.85em] text-sky-300";
+      chip.title = cross
+        ? "Cross-reference — appears as Figure N in the report"
+        : "Citation — appears as an (author, year) reference in the report";
       chip.textContent = label;
       fragment.append(chip);
       last = m.index + m[0].length;

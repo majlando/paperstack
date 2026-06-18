@@ -1,6 +1,9 @@
+import { useState } from "react";
 import { findTodoOffsets } from "@paperstack/engine";
 import { useStore } from "../store.ts";
 import { activeEditor } from "../editor/editor-registry.ts";
+import { LengthBudget } from "./LengthBudget.tsx";
+import { ProblemsPanel } from "./ProblemsPanel.tsx";
 
 /**
  * Cycle to the next [TODO] in the active section; when it has none, open the
@@ -37,6 +40,8 @@ export function StatusBar() {
   const counts = useStore((s) => s.counts);
   const activeFile = useStore((s) => s.activeFile);
   const dirty = useStore((s) => s.dirty);
+  const [budgetOpen, setBudgetOpen] = useState(false);
+  const [problemsOpen, setProblemsOpen] = useState(false);
 
   if (!counts) return null;
 
@@ -48,15 +53,18 @@ export function StatusBar() {
 
   return (
     <footer className="flex h-7 shrink-0 items-center gap-4 border-t border-zinc-800 bg-zinc-900 px-4 text-xs text-zinc-400">
-      <span
-        className={
-          over ? "font-semibold text-red-400" : nearCap ? "font-medium text-amber-400" : ""
-        }
+      <button
+        onClick={() => setBudgetOpen(true)}
+        title="Length budget — per-section breakdown"
+        className={`rounded px-1 hover:bg-zinc-800 ${
+          over ? "font-semibold text-red-400" : nearCap ? "font-medium text-amber-400" : "text-zinc-400"
+        }`}
       >
         Body: {counts.bodyNormalsider.toFixed(2)} / {counts.cap} normalsider
         {over && " — over the cap"}
         {nearCap && " — nearing the cap"}
-      </span>
+      </button>
+      {budgetOpen && <LengthBudget onClose={() => setBudgetOpen(false)} />}
       {counts.todosTotal > 0 && (
         <button
           onClick={() => void jumpToNextTodo()}
@@ -66,6 +74,14 @@ export function StatusBar() {
           {counts.todosTotal} TODO
         </button>
       )}
+      <button
+        onClick={() => setProblemsOpen(true)}
+        title="Check the report before hand-in — TODOs, missing images, citations, length"
+        className="rounded px-1 text-zinc-400 hover:bg-zinc-800 hover:text-zinc-200"
+      >
+        Check
+      </button>
+      {problemsOpen && <ProblemsPanel onClose={() => setProblemsOpen(false)} />}
       <span className="ml-auto flex items-center gap-3">
         {active && (
           <span>

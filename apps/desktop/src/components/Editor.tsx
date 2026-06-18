@@ -13,6 +13,7 @@ import { InsertControls } from "./InsertControls.tsx";
 export function Editor() {
   const activeFile = useStore((s) => s.activeFile);
   const contentVersion = useStore((s) => s.contentVersion);
+  const language = useStore((s) => s.project?.meta.language ?? "en");
   const containerRef = useRef<HTMLDivElement | null>(null);
   const editorRef = useRef<MarkdownEditor | null>(null);
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -49,6 +50,11 @@ export function Editor() {
       editorRef.current = null;
     };
   }, []);
+
+  // Spell check follows the report's language (set in Report details).
+  useEffect(() => {
+    editorRef.current?.setLanguage(language);
+  }, [language]);
 
   // Content was replaced from outside the editor (section switch, reload).
   // Only grab focus when the user moved to a different section — a project

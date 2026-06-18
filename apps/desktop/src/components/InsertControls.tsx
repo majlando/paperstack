@@ -78,6 +78,7 @@ export function InsertControls() {
   const [caption, setCaption] = useState("");
   const [figureWidth, setFigureWidth] = useState("");
   const [figureAlign, setFigureAlign] = useState<"left" | "center" | "right">("center");
+  const [figureLabel, setFigureLabel] = useState("");
   const [references, setReferences] = useState<BibEntry[] | null>(null);
   const [citationForm, setCitationForm] = useState<"parenthetical" | "narrative">("parenthetical");
   const [tableShape, setTableShape] = useState<{ rows: string; cols: string } | null>(null);
@@ -130,6 +131,7 @@ export function InsertControls() {
     setCaption(pendingFigure?.suggestedCaption ?? "");
     setFigureWidth("");
     setFigureAlign("center");
+    setFigureLabel("");
   }, [pendingFigure]);
 
   async function pickFigure() {
@@ -145,7 +147,13 @@ export function InsertControls() {
     const rel = await useStore.getState().confirmFigure();
     if (!rel) return; // error banner already explains
     activeEditor()?.insertBlock(
-      figureMarkdown(rel, caption.trim(), figureWidth.trim() || undefined, figureAlign),
+      figureMarkdown(
+        rel,
+        caption.trim(),
+        figureWidth.trim() || undefined,
+        figureAlign,
+        figureLabel.trim() || undefined,
+      ),
     );
   }
 
@@ -429,6 +437,19 @@ export function InsertControls() {
                 ))}
               </div>
             </div>
+            <label className="mt-3 block text-xs text-zinc-500">
+              Label (optional) — cross-reference it with @fig:label
+              <input
+                value={figureLabel}
+                onChange={(e) => setFigureLabel(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") void confirmFigure();
+                  if (e.key === "Escape") cancelFigure();
+                }}
+                placeholder="e.g. architecture"
+                className="mt-1 w-full rounded border border-zinc-700 bg-zinc-950 px-2.5 py-1.5 text-sm text-zinc-100 outline-none focus:border-zinc-500"
+              />
+            </label>
             <div className="flex justify-end gap-2 pt-3">
               <button
                 onClick={cancelFigure}

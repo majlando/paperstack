@@ -3,7 +3,7 @@
  * side mounts this once via a ref and talks to it through this small API
  * (see docs/STACK.md, "React, used thin").
  */
-import { EditorState } from "@codemirror/state";
+import { Compartment, EditorState } from "@codemirror/state";
 import {
   EditorView,
   keymap,
@@ -101,6 +101,13 @@ export class MarkdownEditor {
   private readonly states = new Map<string, EditorState>();
   private currentKey: string | null = null;
   /**
+   * Native (OS/WebView) spell check, switched to the report's language so a
+   * Danish report is checked against the Danish dictionary. Lives in a
+   * compartment so the language can be reconfigured without rebuilding state.
+   */
+  private readonly spellCheck = new Compartment();
+  private lang = "en";
+  /**
    * The user has actually put the cursor somewhere in this document — a
    * click, arrow key, typing, or a programmatic jump. Until then the
    * selection is just CodeMirror's default offset 0, and a toolbar insert
@@ -113,6 +120,23 @@ export class MarkdownEditor {
     private readonly options: MarkdownEditorOptions,
   ) {
     this.view = new EditorView({ parent, state: this.createState(options.doc) });
+  }
+
+  /** `spellcheck`/`lang` attributes on the editable content — the WebView's
+   *  native spell checker reads these to pick the dictionary. */
+  private spellCheckAttrs() {
+    return EditorView.contentAttributes.of({ spellcheck: "true", lang: this.lang });
+  }
+
+  /**
+   * Point spell check at the report's language (BCP-47, e.g. "en"/"da"). The
+   * live state reconfigures in place; freshly created states already pick up
+   * the new value through `createState`.
+   */
+  setLanguage(lang: string): void {
+    if (lang === this.lang) return;
+    this.lang = lang;
+    this.view.dispatch({ effects: this.spellCheck.reconfigure(this.spellCheckAttrs()) });
   }
 
   private createState(doc: string): EditorState {
@@ -128,6 +152,7 @@ export class MarkdownEditor {
         EditorView.lineWrapping,
         markdown({ base: markdownLanguage, codeLanguages: languages }),
         syntaxHighlighting(highlight, { fallback: true }),
+        this.spellCheck.of(this.spellCheckAttrs()),
         keymap.of([...markdownKeymap, ...defaultKeymap, ...historyKeymap, indentWithTab]),
         theme,
         EditorView.updateListener.of((update) => {
@@ -184,6 +209,11 @@ export class MarkdownEditor {
     const parked = key === null ? undefined : this.states.get(key);
     const restored = parked !== undefined && parked.doc.toString() === doc;
     this.view.setState(restored ? parked : this.createState(doc));
+    // A parked state carries the language it had when parked — reapply the
+    // current one in case the report's language changed meanwhile.
+    if (restored) {
+      this.view.dispatch({ effects: this.spellCheck.reconfigure(this.spellCheckAttrs()) });
+    }
     // A restored park carries the cursor the user left there; a fresh state
     // sits at CodeMirror's default offset 0, which nobody chose.
     this.cursorPlaced = restored;
