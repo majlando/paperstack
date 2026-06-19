@@ -16,6 +16,7 @@ import { unified } from "unified";
 import remarkParse from "remark-parse";
 import remarkGfm from "remark-gfm";
 import remarkMath from "remark-math";
+import { scanReferences } from "./reference-scan.ts";
 import type {
   Code,
   Definition,
@@ -334,70 +335,42 @@ function withLine<T>(node: { position?: { start: { line: number } } }, fn: () =>
 const CITE_ITEM = /^@([A-Za-z0-9_][A-Za-z0-9_.:-]*)(?:\s*,\s*(.+))?$/;
 
 /**
- * Plain text, with citations turned into Typst #cite calls when the project
- * has a references.bib. Two forms, following pandoc:
- *  - bracketed `[@key]` / `[@a; @b]` / `[@key, p. 12]` → parenthetical
- *    "(Author, year)"; adjacent calls collapse into one group in the PDF.
- *  - bare `@key` → narrative "Author (year)" via `form: "prose"`, with an
- *    optional `@key [p. 12]` locator suffix → "Author (year, p. 12)".
- * A bare `@` that isn't a real key (or sits inside an email) stays prose.
+ * Plain text, with citations and cross-references turned into Typst calls.
+ * The spans are found by the shared `scanReferences` (the same scanner the
+ * live preview uses), then mapped to Typst here:
+ *  - `@fig:label` cross-references → a Typst `@label`, independent of
+ *    citations (a project needs no references.bib to cross-reference);
+ *  - bracketed `[@key]` / `[@a; @b]` / `[@key, p. 12]` → parenthetical cites;
+ *  - bare `@key` (with optional `[locator]`) → a narrative cite.
+ * Citations are only emitted when the project has a references.bib.
  */
-const CITE_SCAN =
-  /(\[@[^\]]*\])|(?<![\w@])@([A-Za-z0-9_](?:[A-Za-z0-9_.:-]*[A-Za-z0-9_])?)(?:[ \t]+\[(?!@)([^\]]+)\])?/g;
-
 function renderText(value: string, ctx: Ctx): InlinePart {
   const keys = ctx.citationKeys;
   const parts: InlinePart[] = [];
   let last = 0;
-  for (const m of value.matchAll(CITE_SCAN)) {
-    // Cross-references (`@fig:label`) resolve to a Typst `@label`, independent
-    // of citations — a project needs no references.bib to cross-reference a
-    // figure. Citations are only recognized when the project has one.
+  for (const tok of scanReferences(value)) {
     let rendered: InlinePart | null = null;
-    if (m[1] !== undefined) {
-      const ref = crossRefFromBracket(m[1]);
-      if (ref !== null) rendered = { text: ref, hashCall: false };
-      else if (keys !== null) {
-        const cite = renderCitationSpan(m[1], keys);
-        if (cite !== null) rendered = { text: cite, hashCall: true };
-      }
-    } else {
-      const ref = crossRef(m[2]!);
-      if (ref !== null) rendered = { text: ref, hashCall: false };
-      else if (keys !== null) {
-        const cite = renderNarrativeCite(m[2]!, m[3], keys);
-        if (cite !== null) rendered = { text: cite, hashCall: true };
-      }
+    if (tok.kind === "crossref") {
+      rendered = { text: `@${tok.label}`, hashCall: false };
+    } else if (keys !== null) {
+      const cite =
+        tok.kind === "citation-bracketed"
+          ? renderCitationSpan(tok.span, keys)
+          : renderNarrativeCite(tok.key, tok.locator, keys);
+      if (cite !== null) rendered = { text: cite, hashCall: true };
     }
     if (rendered === null) continue; // neither a reference nor a citation — stays prose
-    if (m.index > last) {
-      parts.push({ text: escapeTypstText(value.slice(last, m.index)), hashCall: false });
+    if (tok.index > last) {
+      parts.push({ text: escapeTypstText(value.slice(last, tok.index)), hashCall: false });
     }
     parts.push(rendered);
-    last = m.index + m[0].length;
+    last = tok.index + tok.length;
   }
   if (parts.length === 0) return { text: escapeTypstText(value), hashCall: false };
   if (last < value.length) {
     parts.push({ text: escapeTypstText(value.slice(last)), hashCall: false });
   }
   return joinParts(parts);
-}
-
-/**
- * A figure cross-reference key (`fig:label`) → a Typst `@fig:label` reference,
- * which renders as "Figure N". Figures carry the matching label via the
- * `{#fig:label}` image attribute. Other prefixes (sec/tbl) are not yet
- * label-backed, so they are left to citation/prose handling.
- */
-const CROSSREF_RE = /^fig:[A-Za-z0-9_-]+$/;
-
-function crossRef(key: string): string | null {
-  return CROSSREF_RE.test(key) ? `@${key}` : null;
-}
-
-function crossRefFromBracket(span: string): string | null {
-  const m = /^\[@(fig:[A-Za-z0-9_-]+)\]$/.exec(span);
-  return m === null ? null : `@${m[1]}`;
 }
 
 /**

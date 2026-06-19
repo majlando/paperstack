@@ -13,7 +13,7 @@ import rehypeHighlight from "rehype-highlight";
 import rehypeStringify from "rehype-stringify";
 import katex from "katex";
 import "katex/dist/katex.min.css";
-import { extractMermaidBlocks, hashDiagram } from "@paperstack/engine";
+import { extractMermaidBlocks, hashDiagram, scanReferences } from "@paperstack/engine";
 import { renderMermaidSvg } from "./mermaid.ts";
 
 export interface MarkdownPreviewOptions {
@@ -239,7 +239,7 @@ export class MarkdownPreview {
   }
 }
 
-const CROSSREF_RE = /^fig:[A-Za-z0-9_-]+$/;
+const CITE_ITEM = /^@([A-Za-z0-9_][A-Za-z0-9_.:-]*)(?:\s*,\s*(.+))?$/;
 
 /** "fig:arch" → "Fig. arch" for the preview chip. */
 function crossLabel(key: string): string {
@@ -248,15 +248,13 @@ function crossLabel(key: string): string {
 }
 
 /**
- * Reference spans in prose → styled chips, mirroring the PDF. Cross-references
- * (`@fig:label`) render as a green "Fig. label" chip and work always; citation
- * chips (parenthetical `[@key]`, narrative `@key`) render in blue only when the
- * project has a references.bib. Matches the converter's CITE_SCAN.
+ * Reference spans in prose → styled chips, mirroring the PDF. Spans are found
+ * by the engine's shared `scanReferences` — the same scanner the Typst
+ * converter uses, so the preview can never disagree with the export on what is
+ * a reference. Cross-references (`@fig:label`) render as a green "Fig. label"
+ * chip always; citation chips render in blue only with a references.bib.
  */
 function renderCitationPlaceholders(root: HTMLElement, citations: boolean): void {
-  const ITEM = /^@([A-Za-z0-9_][A-Za-z0-9_.:-]*)(?:\s*,\s*(.+))?$/;
-  const SCAN =
-    /(\[@[^\]]*\])|(?<![\w@])@([A-Za-z0-9_](?:[A-Za-z0-9_.:-]*[A-Za-z0-9_])?)(?:[ \t]+\[(?!@)([^\]]+)\])?/g;
   const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
   const texts: Text[] = [];
   for (let n = walker.nextNode(); n; n = walker.nextNode()) texts.push(n as Text);
@@ -266,30 +264,24 @@ function renderCitationPlaceholders(root: HTMLElement, citations: boolean): void
     const value = text.nodeValue ?? "";
     let fragment: DocumentFragment | null = null;
     let last = 0;
-    for (const m of value.matchAll(SCAN)) {
+    for (const tok of scanReferences(value)) {
       let label: string;
-      let cross = false;
-      if (m[1] !== undefined) {
-        const ref = /^\[@(fig:[A-Za-z0-9_-]+)\]$/.exec(m[1]);
-        if (ref) {
-          label = crossLabel(ref[1]!);
-          cross = true;
-        } else if (citations) {
-          const items = m[1].slice(1, -1).split(";").map((s) => ITEM.exec(s.trim()));
-          if (items.some((i) => i === null)) continue; // not citation syntax
-          label = `[${items
-            .map((i) => (i![2] === undefined ? i![1]! : `${i![1]}, ${i![2]}`))
-            .join("; ")}]`;
-        } else continue;
-      } else if (CROSSREF_RE.test(m[2]!)) {
-        label = crossLabel(m[2]!);
-        cross = true;
-      } else if (citations) {
-        // bare @key (with optional [locator]) → narrative "key" chip
-        label = m[3] === undefined ? m[2]! : `${m[2]}, ${m[3]}`;
-      } else continue;
+      const cross = tok.kind === "crossref";
+      if (tok.kind === "crossref") {
+        label = crossLabel(tok.label);
+      } else if (!citations) {
+        continue; // citations only shown when the project has a references.bib
+      } else if (tok.kind === "citation-bracketed") {
+        const items = tok.span.slice(1, -1).split(";").map((s) => CITE_ITEM.exec(s.trim()));
+        if (items.some((i) => i === null)) continue; // not citation syntax
+        label = `[${items
+          .map((i) => (i![2] === undefined ? i![1]! : `${i![1]}, ${i![2]}`))
+          .join("; ")}]`;
+      } else {
+        label = tok.locator === undefined ? tok.key : `${tok.key}, ${tok.locator}`;
+      }
       fragment ??= document.createDocumentFragment();
-      if (m.index > last) fragment.append(value.slice(last, m.index));
+      if (tok.index > last) fragment.append(value.slice(last, tok.index));
       const chip = document.createElement("span");
       chip.className = cross
         ? "rounded bg-emerald-500/15 px-1 text-[0.85em] text-emerald-300"
@@ -299,7 +291,7 @@ function renderCitationPlaceholders(root: HTMLElement, citations: boolean): void
         : "Citation — appears as an (author, year) reference in the report";
       chip.textContent = label;
       fragment.append(chip);
-      last = m.index + m[0].length;
+      last = tok.index + tok.length;
     }
     if (fragment === null) continue;
     if (last < value.length) fragment.append(value.slice(last));

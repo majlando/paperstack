@@ -771,3 +771,43 @@ describe("metadata", () => {
     expect(useStore.getState().error?.message).not.toMatch(/exit|code \d+/i);
   });
 });
+
+describe("references manager", () => {
+  it("adds an entry to references.bib and activates citations", async () => {
+    await openProject();
+    expect(useStore.getState().hasReferences).toBe(false);
+    const ok = await useStore.getState().saveReference({
+      key: "knuth84",
+      type: "book",
+      fields: [{ name: "title", value: "The TeXbook" }],
+    });
+    expect(ok).toBe(true);
+    expect(fake.files.get("/p/references.bib")).toContain("@book{knuth84,");
+    expect(useStore.getState().hasReferences).toBe(true);
+  });
+
+  it("edits an entry in place and deletes by key", async () => {
+    await openProject();
+    await useStore.getState().saveReference({ key: "a", type: "misc", fields: [{ name: "title", value: "A" }] });
+    await useStore.getState().saveReference({ key: "b", type: "misc", fields: [{ name: "title", value: "B" }] });
+    await useStore.getState().saveReference({ key: "a", type: "misc", fields: [{ name: "title", value: "A2" }] });
+    await useStore.getState().deleteReference("b");
+    const bib = fake.files.get("/p/references.bib")!;
+    expect(bib).toContain("title = {A2}");
+    expect(bib).not.toContain("@misc{b,");
+  });
+});
+
+describe("report check", () => {
+  it("reports a TODO left in a section", async () => {
+    await openProject();
+    fake.files.set("/p/sections/b.md", "# B\n\n[TODO: finish this]\n");
+    const problems = await useStore.getState().checkProblems();
+    expect(problems.some((p) => p.kind === "todo" && p.file === "sections/b.md")).toBe(true);
+  });
+
+  it("is clean for a project with no issues", async () => {
+    await openProject();
+    expect(await useStore.getState().checkProblems()).toEqual([]);
+  });
+});

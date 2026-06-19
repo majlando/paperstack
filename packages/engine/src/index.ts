@@ -79,6 +79,7 @@ export {
   type RemarkConverterOptions,
 } from "./build/remark-typst.ts";
 export { parseBibliography, bibliographyKeys, type BibEntry } from "./build/bibliography.ts";
+export { scanReferences, type RefToken } from "./build/reference-scan.ts";
 export {
   readBibRecords,
   formatBibEntry,

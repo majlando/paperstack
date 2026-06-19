@@ -24,18 +24,19 @@ export interface GitStatus {
   changed: number;
 }
 
-/** Current branch, tracking position, and working-tree dirtiness. */
-export async function gitStatus(dir: string): Promise<GitStatus> {
-  const out = await runGit(dir, ["status", "--porcelain=v2", "--branch"]);
-  if (out.exit_code !== 0) {
-    return { isRepo: false, branch: null, upstream: null, ahead: 0, behind: 0, changed: 0 };
-  }
+/**
+ * Parse `git status --porcelain=v2 --branch` output. Pure (no Tauri) so it is
+ * unit-tested: one mis-parsed header would silently misreport ahead/behind.
+ * The `# branch.*` headers carry the branch, upstream, and ab counts; every
+ * other non-`#` line is one changed/untracked entry.
+ */
+export function parseGitStatus(stdout: string): Omit<GitStatus, "isRepo"> {
   let branch: string | null = null;
   let upstream: string | null = null;
   let ahead = 0;
   let behind = 0;
   let changed = 0;
-  for (const line of out.stdout.split("\n")) {
+  for (const line of stdout.split("\n")) {
     if (line.startsWith("# branch.head ")) {
       const b = line.slice("# branch.head ".length).trim();
       branch = b === "(detached)" || b === "" ? null : b;
@@ -51,7 +52,16 @@ export async function gitStatus(dir: string): Promise<GitStatus> {
       changed++;
     }
   }
-  return { isRepo: true, branch, upstream, ahead, behind, changed };
+  return { branch, upstream, ahead, behind, changed };
+}
+
+/** Current branch, tracking position, and working-tree dirtiness. */
+export async function gitStatus(dir: string): Promise<GitStatus> {
+  const out = await runGit(dir, ["status", "--porcelain=v2", "--branch"]);
+  if (out.exit_code !== 0) {
+    return { isRepo: false, branch: null, upstream: null, ahead: 0, behind: 0, changed: 0 };
+  }
+  return { isRepo: true, ...parseGitStatus(out.stdout) };
 }
 
 function check(out: GitOutput): void {
