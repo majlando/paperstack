@@ -1,0 +1,85 @@
+name: Release
+
+# Cross-platform release builds. Tauri can only build each OS natively, so the
+# three desktop targets are produced on their own runners and uploaded to one
+# GitHub release. Triggered by pushing a v* tag (e.g. v0.2.0); the release is
+# created as a pre-release. workflow_dispatch allows a manual rebuild.
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+
+# tauri-action needs to create the release and upload assets.
+permissions:
+  contents: write
+
+jobs:
+  release:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-latest
+            target: x86_64-pc-windows-msvc
+          - os: ubuntu-22.04
+            target: x86_64-unknown-linux-gnu
+          # macos-latest is Apple Silicon; arm64-only by request.
+          - os: macos-latest
+            target: aarch64-apple-darwin
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 22
+          cache: pnpm
+
+      # Tauri's Linux bundler (webkit2gtk-4.1) plus patchelf for the AppImage.
+      # ubuntu-22.04 keeps the glibc/webkit floor low so the artifacts run on
+      # older distros than the build host.
+      - name: Install Linux build dependencies
+        if: matrix.os == 'ubuntu-22.04'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libwebkit2gtk-4.1-dev libgtk-3-dev libayatana-appindicator3-dev librsvg2-dev patchelf
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: apps/desktop/src-tauri
+
+      - run: pnpm install --frozen-lockfile
+      # Fetches the typst + pandoc sidecars for THIS runner's platform and
+      # names them after the matching target triple, which is what
+      # tauri.conf.json's externalBin resolves at bundle time.
+      - run: pnpm fetch-binaries
+
+      - uses: tauri-apps/tauri-action@v0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          projectPath: apps/desktop
+          # __VERSION__ is read from tauri.conf.json, so the tag/release name
+          # always matches the bundled version.
+          tagName: v__VERSION__
+          releaseName: "Paperstack v__VERSION__"
+          releaseBody: |
+            Pre-release build of Paperstack.
+
+            **Downloads** — pick the file for your OS:
+            - **Windows** — `.msi` or `.exe` (NSIS) installer
+            - **macOS (Apple Silicon)** — `.dmg`
+            - **Linux** — `.AppImage` (portable) or `.deb`
+
+            These builds are **unsigned**, so the OS will warn on first launch:
+            - macOS: right-click the app → Open, or allow it in System Settings → Privacy & Security.
+            - Windows: SmartScreen → More info → Run anyway.
+
+            Typst and Pandoc are bundled — no separate install needed.
+          prerelease: true
+          args: --target ${{ matrix.target }}

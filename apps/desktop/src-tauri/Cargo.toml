@@ -1,6 +1,6 @@
 [package]
 name = "paperstack"
-version = "0.1.0"
+version = "0.2.0"
 description = "Paperstack — professional reports from Markdown sections"
 authors = ["majlando"]
 license = "MIT"
