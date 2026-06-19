@@ -10,6 +10,8 @@
     "build:demo": "tsx scripts/build-report.ts fixtures/demo-report",
     "build:showcase": "tsx scripts/build-report.ts fixtures/showcase-report",
     "build:tiffany": "tsx scripts/build-report.ts fixtures/tiffany-demo",
+    "check": "tsx scripts/check-report.ts",
+    "check:demo": "tsx scripts/check-report.ts fixtures/demo-report",
     "fetch-binaries": "tsx scripts/fetch-binaries.ts",
     "smoke": "tsx scripts/smoke-app.ts"
   },
