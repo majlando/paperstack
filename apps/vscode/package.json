@@ -11,12 +11,18 @@
   },
   "categories": ["Other"],
   "main": "./dist/extension.js",
-  "activationEvents": ["workspaceContains:document.yaml"],
+  "activationEvents": ["workspaceContains:document.yaml", "onCommand:paperstack.new"],
   "contributes": {
     "commands": [
+      { "command": "paperstack.new", "title": "Paperstack: New Report" },
       { "command": "paperstack.preview", "title": "Paperstack: Preview Report" },
       { "command": "paperstack.check", "title": "Paperstack: Check Report" },
-      { "command": "paperstack.export", "title": "Paperstack: Export PDF" }
+      { "command": "paperstack.export", "title": "Paperstack: Export PDF" },
+      { "command": "paperstack.newSection", "title": "Paperstack: New Section" },
+      { "command": "paperstack.insertFigure", "title": "Paperstack: Insert Figure" },
+      { "command": "paperstack.insertDiagram", "title": "Paperstack: Insert Diagram" },
+      { "command": "paperstack.insertTable", "title": "Paperstack: Insert Table" },
+      { "command": "paperstack.insertCitation", "title": "Paperstack: Insert Citation" }
     ],
     "configuration": {
       "title": "Paperstack",

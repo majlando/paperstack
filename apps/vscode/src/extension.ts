@@ -1,5 +1,5 @@
 /**
- * Paperstack VS Code extension — a spike proving the v-next direction
+ * Paperstack VS Code extension — the v-next direction made real
  * (docs/DIRECTION.md): the report engine is the product and the shell is
  * replaceable. The extension host runs Node, so this reuses the engine's own
  * `NodePlatform` and its checks verbatim — the length count and the
@@ -7,10 +7,11 @@
  * surfaced in VS Code's native Problems panel and status bar instead of a
  * bespoke UI.
  *
- * Commands: "Paperstack: Check Report", "Paperstack: Export PDF".
+ * This file owns the franchise commands (Preview, Check, Export) and keeps the
+ * status bar and Problems panel live; the authoring commands (New Report, the
+ * Insert helpers, New Section) live in ./authoring.ts.
  */
 import * as vscode from "vscode";
-import { existsSync } from "node:fs";
 import { join } from "node:path";
 import {
   loadProject,
@@ -19,13 +20,11 @@ import {
   bibliographyKeys,
   findMathProblems,
   buildReport,
-  PaperstackError,
-  type Problem,
 } from "@paperstack/engine";
-import { NodePlatform } from "@paperstack/engine/node";
 import { ensureTypst } from "./typst.ts";
+import { platform, findProjectDir, errorMessage } from "./project.ts";
+import { registerAuthoringCommands } from "./authoring.ts";
 
-const platform = new NodePlatform();
 let diagnostics: vscode.DiagnosticCollection;
 let status: vscode.StatusBarItem;
 let previewPanel: vscode.WebviewPanel | undefined;
@@ -42,27 +41,38 @@ export function activate(context: vscode.ExtensionContext): void {
     vscode.commands.registerCommand("paperstack.check", () => runCheck(true)),
     vscode.commands.registerCommand("paperstack.export", () => exportPdf(context)),
     // A save to any section, the manifest, or the bibliography can change the
-    // length or the problem set — re-check quietly so the panel stays live.
+    // length or the problem set — re-check quietly so the panel stays live, and
+    // rebuild the report preview if it is open so it tracks the source.
     vscode.workspace.onDidSaveTextDocument((doc) => {
-      if (/\.md$|[/\\]document\.yaml$|[/\\]references\.bib$/.test(doc.fileName)) void runCheck(false);
+      if (/\.md$|[/\\]document\.yaml$|[/\\]references\.bib$/.test(doc.fileName)) {
+        void runCheck(false);
+        if (previewPanel) scheduleRebuild(context);
+      }
     }),
   );
+  registerAuthoringCommands(context, () => void runCheck(false));
 
   void runCheck(false);
+}
+
+let rebuildTimer: ReturnType<typeof setTimeout> | undefined;
+
+/**
+ * Rebuild the open preview after a short quiet period — a burst of saves (e.g.
+ * "Save All") coalesces into one Typst compile instead of one per file.
+ */
+function scheduleRebuild(context: vscode.ExtensionContext): void {
+  if (rebuildTimer) clearTimeout(rebuildTimer);
+  rebuildTimer = setTimeout(() => {
+    rebuildTimer = undefined;
+    const dir = findProjectDir();
+    if (dir && previewPanel) void buildAndRender(dir, previewPanel, context, true);
+  }, 400);
 }
 
 export function deactivate(): void {
   diagnostics?.dispose();
   status?.dispose();
-}
-
-/** First workspace folder that holds a document.yaml — the project root loadProject expects. */
-function findProjectDir(): string | null {
-  for (const folder of vscode.workspace.workspaceFolders ?? []) {
-    const dir = folder.uri.fsPath;
-    if (existsSync(join(dir, "document.yaml"))) return dir.replaceAll("\\", "/");
-  }
-  return null;
 }
 
 /** Character offset → editor position, for diagnostics that line up with the cursor. */
@@ -160,8 +170,7 @@ async function runCheck(interactive: boolean): Promise<void> {
       }
     }
   } catch (e) {
-    const msg = e instanceof PaperstackError ? e.userMessage : `Paperstack check failed: ${String(e)}`;
-    void vscode.window.showErrorMessage(msg);
+    void vscode.window.showErrorMessage(errorMessage(e, "Paperstack check failed"));
   }
 }
 
@@ -184,8 +193,7 @@ async function exportPdf(context: vscode.ExtensionContext): Promise<void> {
           await vscode.commands.executeCommand("vscode.open", vscode.Uri.file(result.pdfPath));
         }
       } catch (e) {
-        const msg = e instanceof PaperstackError ? e.userMessage : `Export failed: ${String(e)}`;
-        void vscode.window.showErrorMessage(msg);
+        void vscode.window.showErrorMessage(errorMessage(e, "Export failed"));
       }
     },
   );
@@ -245,11 +253,16 @@ async function buildAndRender(
   dir: string,
   panel: vscode.WebviewPanel,
   context: vscode.ExtensionContext,
+  // Auto-rebuilds (on save) report in the status bar, not a notification per save.
+  quiet = false,
 ): Promise<void> {
   const { webview } = panel;
   try {
     const result = await vscode.window.withProgress(
-      { location: vscode.ProgressLocation.Notification, title: "Paperstack: building report…" },
+      {
+        location: quiet ? vscode.ProgressLocation.Window : vscode.ProgressLocation.Notification,
+        title: "Paperstack: building report…",
+      },
       async (progress) => {
         const typst = await resolveTypst(context, (m) => progress.report({ message: m }));
         return buildReport(platform, dir, { typst });
@@ -261,8 +274,7 @@ async function buildAndRender(
     const pdfUrl = `${webview.asWebviewUri(vscode.Uri.file(result.pdfPath))}?t=${Date.now()}`;
     webview.html = previewHtml(webview, asset("preview.js"), pdfUrl, asset("pdf.worker.min.mjs"), result.warnings);
   } catch (e) {
-    const msg = e instanceof PaperstackError ? e.userMessage : `Build failed: ${String(e)}`;
-    webview.html = messageHtml(webview, msg);
+    webview.html = messageHtml(webview, errorMessage(e, "Build failed"));
   }
 }
 
