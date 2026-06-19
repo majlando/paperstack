@@ -110,7 +110,7 @@ Two parts, with the engine UI-independent:
 
 ## Future directions (explicitly not v1)
 
-- Git/GitHub integration and group collaboration workflows
+- ~~Git/GitHub integration~~ — basic Git (commit, push, fetch, pull) shipped in the v0.2 stream; deeper GitHub integration and group collaboration workflows stay deferred
 - ~~Citations / BibTeX~~ — shipped in the v0.2 stream (2026-06-11): a `references.bib` activates `[@key]` → numbered references + generated bibliography
 - ~~Math/equations (Typst math)~~ — shipped in the v0.2 stream (2026-06-11): `$…$`/`$$…$$`, KaTeX preview, Typst math in the PDF
 - More templates and template customization
