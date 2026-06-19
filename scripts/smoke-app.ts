@@ -41,6 +41,27 @@ await createProject(new NodePlatform(), scratch, {
   date: "2026-01-01",
 });
 console.log(`Scratch project: ${scratch}`);
+
+// Make the scratch a Git repo with a bare remote and an upstream, so the
+// Git-panel steps in the in-app scenario have a branch, an upstream, and
+// something to push. The scenario's section edit is left uncommitted.
+const remote = (await mkdtemp(join(tmpdir(), "paperstack-smoke-remote-"))).replaceAll("\\", "/");
+const git = (args: string, cwd = scratch) => execSync(`git ${args}`, { cwd, stdio: "ignore" });
+try {
+  execSync("git init --bare --initial-branch=main", { cwd: remote, stdio: "ignore" });
+  git("init --initial-branch=main");
+  git("config user.email smoke@example.com");
+  git('config user.name "Smoke Test"');
+  git("config commit.gpgsign false");
+  git("add -A");
+  git('commit -m "initial"');
+  git(`remote add origin "${remote}"`);
+  git("push -u origin main");
+} catch (e) {
+  console.error(`Could not set up the Git scratch repo (is git on PATH?): ${String(e)}`);
+  process.exit(1);
+}
+
 console.log("Launching the app (tauri dev)…");
 
 // One command string: shell:true (needed to resolve pnpm.cmd on Windows)
@@ -95,6 +116,7 @@ for (const step of result.steps) {
 }
 if (result.pass) {
   await rm(scratch, { recursive: true, force: true });
+  await rm(remote, { recursive: true, force: true });
   console.log("\nSmoke test passed.");
 } else {
   console.error(`\nSmoke test FAILED — scratch kept for inspection: ${scratch}`);

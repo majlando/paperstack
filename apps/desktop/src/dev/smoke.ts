@@ -7,6 +7,7 @@
  */
 import { useStore } from "../store.ts";
 import { platform, allowExistingProjectScope } from "../platform/tauri-platform.ts";
+import { gitStatus, gitCommitAll, gitPush, gitFetch } from "../platform/git.ts";
 
 interface Step {
   name: string;
@@ -60,6 +61,32 @@ export async function runScriptedSmoke(projectDir: string): Promise<void> {
       [state().error?.message, state().error?.details].filter(Boolean).join(" | ") || undefined,
     );
     check("the exported PDF exists", await platform.fileExists(`${dir}/output/report.pdf`));
+
+    // --- Git panel: drive the live run_git command end to end. The harness
+    // makes the scratch a Git repo with a remote and leaves the section edit
+    // above uncommitted, so there is a real branch, upstream, and change. ---
+    const before = await gitStatus(dir);
+    check("git status reads the repository", before.isRepo, before.isRepo ? undefined : "not a repo");
+    check(
+      "git status reports branch and upstream",
+      before.branch !== null && before.upstream !== null,
+      `branch=${before.branch} upstream=${before.upstream}`,
+    );
+    check("git status sees the uncommitted edit", before.changed >= 1, `changed=${before.changed}`);
+
+    await gitCommitAll(dir, "smoke: commit the edited section");
+    const committed = await gitStatus(dir);
+    check(
+      "commit clears the tree and goes ahead of upstream",
+      committed.changed === 0 && committed.ahead >= 1,
+      `changed=${committed.changed} ahead=${committed.ahead}`,
+    );
+
+    await gitPush(dir);
+    check("push clears the ahead count", (await gitStatus(dir)).ahead === 0);
+
+    await gitFetch(dir);
+    check("fetch against the remote succeeds", true);
   } catch (e) {
     // a failed check is already recorded; anything else becomes its own step
     if (steps.every((s) => s.ok)) steps.push({ name: "scenario crashed", ok: false, detail: String(e) });
