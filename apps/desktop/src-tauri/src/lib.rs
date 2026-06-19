@@ -145,53 +145,6 @@ async fn run_sidecar(
     })
 }
 
-/// Runs Git inside an opened project for the collaboration panel. Only the
-/// fixed porcelain invocations in `validate_git_args` are accepted, and
-/// `GIT_TERMINAL_PROMPT=0` makes a missing credential fail loudly instead of
-/// hanging the webview on a password prompt.
-#[tauri::command]
-async fn run_git(
-    roots: tauri::State<'_, ProjectRoots>,
-    dir: String,
-    args: Vec<String>,
-) -> Result<SidecarOutput, String> {
-    let allowed = roots.0.lock().map_err(|e| e.to_string())?.clone();
-    let root = canonical_allowed_dir(&dir, &allowed)?;
-    validate_git_args(&args)?;
-    let output = tauri::async_runtime::spawn_blocking(move || {
-        std::process::Command::new("git")
-            .current_dir(&root)
-            .args(&args)
-            .env("GIT_TERMINAL_PROMPT", "0")
-            .output()
-    })
-    .await
-    .map_err(|e| e.to_string())?
-    .map_err(|e| format!("Git is not available, or this is not a Git repository: {e}"))?;
-    Ok(SidecarOutput {
-        exit_code: output.status.code().unwrap_or(-1),
-        stdout: String::from_utf8_lossy(&output.stdout).into_owned(),
-        stderr: String::from_utf8_lossy(&output.stderr).into_owned(),
-    })
-}
-
-/// Git runs only through this fixed allowlist of porcelain invocations — no
-/// arbitrary subcommands and no `-c`/alias/hook-triggering flags reach the
-/// shell. The commit message is the only free-form argument and sits in a
-/// fixed position, so it cannot smuggle in flags.
-fn validate_git_args(args: &[String]) -> Result<(), String> {
-    let a: Vec<&str> = args.iter().map(String::as_str).collect();
-    match a.as_slice() {
-        ["status", "--porcelain=v2", "--branch"]
-        | ["fetch", "--quiet"]
-        | ["pull", "--ff-only", "--quiet"]
-        | ["push", "--quiet"]
-        | ["add", "--all"]
-        | ["commit", "--quiet", "-m", _] => Ok(()),
-        _ => Err("Unsupported git invocation.".into()),
-    }
-}
-
 fn canonical_dir(dir: &str) -> Result<std::path::PathBuf, String> {
     let path = std::path::PathBuf::from(dir)
         .canonicalize()
@@ -470,22 +423,6 @@ mod tests {
     }
 
     #[test]
-    fn git_allowlist_accepts_porcelain_and_rejects_everything_else() {
-        let ok = |a: &[&str]| validate_git_args(&a.iter().map(|s| s.to_string()).collect::<Vec<_>>());
-        assert!(ok(&["status", "--porcelain=v2", "--branch"]).is_ok());
-        assert!(ok(&["fetch", "--quiet"]).is_ok());
-        assert!(ok(&["pull", "--ff-only", "--quiet"]).is_ok());
-        assert!(ok(&["push", "--quiet"]).is_ok());
-        assert!(ok(&["commit", "--quiet", "-m", "any message"]).is_ok());
-        // arbitrary subcommands, dangerous flags, and looser shapes are refused
-        assert!(ok(&["status"]).is_err());
-        assert!(ok(&["pull"]).is_err()); // a non-ff pull is not allowed
-        assert!(ok(&["config", "--global", "core.pager", "sh"]).is_err());
-        assert!(ok(&["-c", "core.pager=sh", "status"]).is_err());
-        assert!(ok(&["push", "--force"]).is_err());
-    }
-
-    #[test]
     fn symlink_at_the_output_name_is_rejected() {
         let root = scratch_project("symlink");
         let target = root.join("outside-target.pdf");
@@ -516,8 +453,7 @@ pub fn run() {
             allow_existing_project_scope,
             allow_new_project_scope,
             reveal_in_folder,
-            run_sidecar,
-            run_git
+            run_sidecar
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

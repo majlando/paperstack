@@ -34,7 +34,7 @@ then shipped in the v0.2 stream on 2026-06-11 — see DEVELOPMENT.md, M5.)*
 - Drag-and-drop reordering
 - Full-report HTML view (the PDF pane *is* the full-report view)
 - DOCX export, CLI, collaboration, comments
-- ~~Git integration~~ — basic Git (commit, push, fetch, pull) shipped in the v0.2 stream; group collaboration/sync/comments stay deferred
+- In-app Git client — tried in the v0.2 stream, then removed (see docs/DIRECTION.md): projects stay Git-friendly, but you bring your own Git tooling (VS Code, terminal). Group collaboration/sync/comments remain deferred
 - Cloud anything
 
 ## Milestones

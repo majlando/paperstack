@@ -110,7 +110,7 @@ Two parts, with the engine UI-independent:
 
 ## Future directions (explicitly not v1)
 
-- ~~Git/GitHub integration~~ — basic Git (commit, push, fetch, pull) shipped in the v0.2 stream; deeper GitHub integration and group collaboration workflows stay deferred
+- Git/GitHub integration stays out of the app by design — projects are plain Git-friendly folders managed with your own client; an in-app panel was tried in the v0.2 stream and removed (docs/DIRECTION.md). Deeper GitHub integration and group collaboration workflows remain future directions
 - ~~Citations / BibTeX~~ — shipped in the v0.2 stream (2026-06-11): a `references.bib` activates `[@key]` → numbered references + generated bibliography
 - ~~Math/equations (Typst math)~~ — shipped in the v0.2 stream (2026-06-11): `$…$`/`$$…$$`, KaTeX preview, Typst math in the PDF
 - More templates and template customization

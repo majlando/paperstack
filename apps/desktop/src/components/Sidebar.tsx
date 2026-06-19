@@ -5,7 +5,6 @@ import { activeEditor } from "../editor/editor-registry.ts";
 import { baseOf, documentOutline, type SectionCount, type SectionRole } from "@paperstack/engine";
 import { FileTree } from "./FileTree.tsx";
 import { ReferencesManager } from "./ReferencesManager.tsx";
-import { GitPanel } from "./GitPanel.tsx";
 
 const GROUPS: { role: SectionRole; label: string; addHint: string }[] = [
   { role: "front-matter", label: "Front matter", addHint: "Add front matter" },
@@ -102,15 +101,6 @@ const referencesIcon = (
   <Icon>
     <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20" />
     <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z" />
-  </Icon>
-);
-const gitIcon = (
-  <Icon>
-    <circle cx="6" cy="6" r="3" />
-    <circle cx="6" cy="18" r="3" />
-    <circle cx="18" cy="8" r="3" />
-    <path d="M6 9v6" />
-    <path d="M18 11a6 6 0 0 1-6 6H9" />
   </Icon>
 );
 
@@ -321,7 +311,6 @@ export function Sidebar() {
   const [searching, setSearching] = useState(false);
   const [view, setView] = useState<"sections" | "files">("sections");
   const [managingRefs, setManagingRefs] = useState(false);
-  const [managingGit, setManagingGit] = useState(false);
 
   // Writers expect the IDE shortcuts: Ctrl+Shift+F for project-wide search,
   // Ctrl+PageUp/PageDown to walk the sections in report order.
@@ -396,14 +385,6 @@ export function Sidebar() {
             className="rounded px-1.5 py-1 text-zinc-500 hover:bg-zinc-800 hover:text-zinc-200"
           >
             {referencesIcon}
-          </button>
-          <button
-            onClick={() => setManagingGit(true)}
-            title="Share over Git — pull, push, and commit with your group"
-            aria-label="Git"
-            className="rounded px-1.5 py-1 text-zinc-500 hover:bg-zinc-800 hover:text-zinc-200"
-          >
-            {gitIcon}
           </button>
           <button
             onClick={() => void reloadProject()}
@@ -577,7 +558,6 @@ export function Sidebar() {
         </>
       )}
       {managingRefs && <ReferencesManager onClose={() => setManagingRefs(false)} />}
-      {managingGit && <GitPanel onClose={() => setManagingGit(false)} />}
     </aside>
   );
 }
