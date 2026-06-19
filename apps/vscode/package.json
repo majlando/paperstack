@@ -1,0 +1,46 @@
+{
+  "name": "paperstack-vscode",
+  "displayName": "Paperstack",
+  "description": "Length tracking, submission-readiness checks, and PDF export for Paperstack report projects — inside VS Code.",
+  "version": "0.2.0",
+  "private": true,
+  "license": "MIT",
+  "publisher": "paperstack",
+  "engines": {
+    "vscode": "^1.90.0"
+  },
+  "categories": ["Other"],
+  "main": "./dist/extension.js",
+  "activationEvents": ["workspaceContains:document.yaml"],
+  "contributes": {
+    "commands": [
+      { "command": "paperstack.check", "title": "Paperstack: Check Report" },
+      { "command": "paperstack.export", "title": "Paperstack: Export PDF" }
+    ],
+    "configuration": {
+      "title": "Paperstack",
+      "properties": {
+        "paperstack.typstPath": {
+          "type": "string",
+          "default": "typst",
+          "description": "Path to the Typst binary used for PDF export (defaults to `typst` on PATH)."
+        }
+      }
+    }
+  },
+  "scripts": {
+    "build": "esbuild src/extension.ts --bundle --platform=node --target=node18 --format=cjs --external:vscode --sourcemap --outfile=dist/extension.js",
+    "watch": "pnpm build --watch",
+    "typecheck": "tsc --noEmit",
+    "vscode:prepublish": "esbuild src/extension.ts --bundle --platform=node --target=node18 --format=cjs --external:vscode --minify --outfile=dist/extension.js"
+  },
+  "dependencies": {
+    "@paperstack/engine": "workspace:*"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.0",
+    "@types/vscode": "^1.90.0",
+    "esbuild": "^0.24.0",
+    "typescript": "~5.8.3"
+  }
+}
