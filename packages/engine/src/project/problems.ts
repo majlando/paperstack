@@ -9,7 +9,8 @@ export type ProblemKind =
   | "todo"
   | "missing-image"
   | "unknown-citation"
-  | "unknown-reference";
+  | "unknown-reference"
+  | "unsupported-math";
 
 export interface Problem {
   kind: ProblemKind;
@@ -93,12 +94,17 @@ function definedLabels(contents: Iterable<string>): Set<string> {
  * remaining TODOs, an over-cap body, missing image files, unknown citation
  * keys, and figure cross-references with no matching label. Each carries a
  * location so the UI can jump to it.
+ *
+ * `validateMath` is injected (so project/ stays independent of the build/
+ * math translator): given a section's Markdown, it returns the math the
+ * export cannot convert. Omit it to skip the math pre-check.
  */
 export async function collectProblems(
   platform: Platform,
   project: Project,
   counts: ProjectCounts,
   bibKeys: ReadonlySet<string>,
+  validateMath?: (markdown: string) => { offset: number; message: string }[],
 ): Promise<Problem[]> {
   const problems: Problem[] = [];
   if (counts.overCap) {
@@ -183,6 +189,16 @@ export async function collectProblems(
           message: `Citation [@${ref.key}] has no entry in references.bib.`,
         });
       }
+    }
+
+    for (const math of validateMath?.(content) ?? []) {
+      problems.push({
+        kind: "unsupported-math",
+        severity: "error",
+        file: s.file,
+        offset: math.offset,
+        message: math.message,
+      });
     }
   }
   return problems;

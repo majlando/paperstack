@@ -80,6 +80,7 @@ export {
 } from "./build/remark-typst.ts";
 export { parseBibliography, bibliographyKeys, type BibEntry } from "./build/bibliography.ts";
 export { scanReferences, type RefToken } from "./build/reference-scan.ts";
+export { findMathProblems, type MathProblem } from "./build/math-check.ts";
 export {
   readBibRecords,
   formatBibEntry,

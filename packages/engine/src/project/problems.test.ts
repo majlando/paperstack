@@ -61,6 +61,20 @@ describe("collectProblems", () => {
     expect(refs[0]!.message).toContain("fig:ghost");
   });
 
+  it("surfaces unsupported math through the injected validator", async () => {
+    const { platform, project } = setup({ "/p/sections/a.md": "see $\\foobar$ here\n" });
+    const validate = (md: string) =>
+      md.includes("$\\foobar$") ? [{ offset: md.indexOf("$"), message: "bad math" }] : [];
+    const ps = await collectProblems(platform, project, counts(), new Set(), validate);
+    expect(ps.some((p) => p.kind === "unsupported-math" && p.file === "sections/a.md")).toBe(true);
+  });
+
+  it("skips the math check when no validator is injected", async () => {
+    const { platform, project } = setup({ "/p/sections/a.md": "see $\\foobar$ here\n" });
+    const ps = await collectProblems(platform, project, counts(), new Set());
+    expect(ps.some((p) => p.kind === "unsupported-math")).toBe(false);
+  });
+
   it("reports an over-cap body at the project level", async () => {
     const { platform, project } = setup({ "/p/sections/a.md": "# A\n" });
     const ps = await collectProblems(platform, project, counts(true), new Set());

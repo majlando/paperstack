@@ -24,8 +24,9 @@ async function jumpTo(problem: Problem): Promise<void> {
 /**
  * The pre-hand-in checklist: a single place that surfaces everything blocking a
  * clean submission — TODOs, missing images, unknown citations and figure
- * references, an over-cap body — with click-to-jump. Errors break the export
- * or render wrong; warnings (TODOs) just shouldn't reach a hand-in.
+ * references, unsupported math, an over-cap body — with click-to-jump. Errors
+ * break the export or render wrong; warnings (TODOs) just shouldn't reach a
+ * hand-in.
  */
 export function ProblemsPanel(props: { onClose: () => void }) {
   const [problems, setProblems] = useState<Problem[] | null>(null);

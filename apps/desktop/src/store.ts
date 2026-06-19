@@ -22,6 +22,7 @@ import {
   parseBibliography,
   bibliographyKeys,
   collectProblems,
+  findMathProblems,
   readBibRecords,
   upsertBibEntry,
   removeBibEntry,
@@ -1035,7 +1036,7 @@ export const useStore = create<AppState>((set, get) => {
     } catch {
       // no references.bib — citations are inactive, nothing to validate
     }
-    return collectProblems(platform, project, get().counts!, bibKeys);
+    return collectProblems(platform, project, get().counts!, bibKeys, findMathProblems);
   },
 
   async replaceAll(query: string, replacement: string) {
