@@ -1,14 +1,15 @@
-# Paperstack — VS Code extension (spike)
+# Paperstack — VS Code extension
 
-A proof-of-concept that the Paperstack **engine is the product and the shell is
-replaceable** (see `docs/DIRECTION.md`). The extension host runs Node, so this
-reuses the engine's `NodePlatform` and its checks *verbatim* — the same length
-counter and submission-readiness checks the desktop app runs, surfaced in VS
-Code's **native** Problems panel and status bar instead of a bespoke UI.
+**This is the direction Paperstack is converging on** — the single form of the
+product, replacing the standalone desktop app (see `docs/DIRECTION.md`). The
+extension host runs Node, so it reuses the engine's `NodePlatform` and its checks
+*verbatim* — the same length counter and submission-readiness checks the desktop
+app runs, surfaced in VS Code's **native** Problems panel and status bar instead
+of a bespoke UI.
 
-This is deliberately thin: it exists to put the v-next direction in front of a
-real CS-student user and see whether "check + length + export, inside the editor
-I already use" beats the standalone app. It is **not** wired into CI yet.
+Still maturing toward franchise-parity with the desktop app (the gaps are a live
+PDF preview and zero-setup Typst — see *Status* below); length, checks, and
+export already work. Not wired into CI yet.
 
 ## What it does
 
@@ -44,9 +45,15 @@ To try it on your own report, open any folder containing a `document.yaml`.
 `pnpm build` bundles `src/extension.ts` (plus the engine and its deps) into
 `dist/extension.js` with esbuild. `pnpm typecheck` runs `tsc --noEmit`.
 
-## Status / next steps
+## Status / roadmap to replacing the desktop app
 
-Spike only. Obvious follow-ups if the direction is validated: a live **PDF
-preview** webview (pdf.js — also the desktop viewer fix), bundling the
-Typst/Pandoc sidecars so Export works with zero setup, and marketplace
-packaging (which sidesteps the desktop app's code-signing pain).
+Working today: status-bar length, the Problems-panel checks, and Export. To reach
+parity and become the sole product (see `docs/DIRECTION.md`):
+
+1. **Live PDF preview** — a pdf.js webview (the same pdf.js the desktop viewer
+   wanted), the one franchise feature still missing here.
+2. **Zero-setup Typst** — auto-provision the pinned sidecar (as `pnpm
+   fetch-binaries` does) so Export needs nothing on PATH.
+3. **Retire `apps/desktop`** — once 1–2 land.
+4. **Package the `.vsix` / publish** — marketplace distribution (sidesteps the
+   desktop app's code-signing pain). Publisher account is the user's call.

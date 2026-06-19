@@ -38,20 +38,30 @@ For a CS audience that already lives in VS Code + a terminal + git, investing in
 competes with a tool they already prefer and loses. The defensible value above
 does **not** require owning the editor.
 
-Two paths, bold and conservative — validate before committing to either:
+## Decided (2026-06-19): the VS Code extension is the product
 
-- **Bold — a VS Code extension.** Preview pane, length in the status bar, checks
-  in VS Code's native Problems tab, an Export command — inside the editor they
-  already use, with their own git/files/search. Deletes huge surface area
-  (CodeMirror bridge, file panel, git panel, window chrome), reuses the engine
-  via a thin `VsCodePlatform` (the extension host is Node, so `NodePlatform`
-  largely already fits). Bonus: marketplace distribution **sidesteps the
-  code-signing/Gatekeeper/SmartScreen pain** that unsigned desktop installers
-  hit.
-- **Conservative — narrow the desktop app to a dashboard over a folder.** Open a
-  report folder → live PDF + length gauge + problems list + Export. Editing
-  happens in your own editor; Paperstack watches and re-renders. Far less to
-  build and learn.
+After confirming the user base — CS-student report groups where **VS Code is
+universal**, all comfortable with git/YAML, and the near-term goal is real groups
+using it soon with the least friction — Paperstack converges on **a single form:
+the VS Code extension** (`apps/vscode`). The standalone Tauri desktop app is to
+be **retired**.
+
+Why this wins on every axis we care about:
+
+- **Reach** — everyone already runs VS Code, so an extension reaches all users
+  with nothing new to install-and-trust.
+- **Friction** — marketplace / `.vsix` distribution is one-click with
+  auto-update and **no code-signing**, which directly removes the unsigned-
+  installer Gatekeeper/SmartScreen pain the desktop app hits.
+- **Less is more** — one shell, not two; the pure-TS engine is already proven
+  portable (the spike bundles it in 791 KB); the entire Tauri/Rust/CodeMirror/
+  window-chrome surface eventually goes away.
+- **Native UI** — length in the status bar, checks in VS Code's own Problems
+  tab, the user's own files/search/git — instead of bespoke chrome we maintain.
+
+The discarded alternative (narrow the desktop app to a dashboard) loses only
+because the desktop shell buys nothing once the editor is VS Code: it still needs
+signing, still ships a second app, still maintains a window.
 
 ## Simplify / remove / keep
 
@@ -65,19 +75,26 @@ Two paths, bold and conservative — validate before committing to either:
 | Extra diagram engines, DOCX, CLI-as-product | **Don't build** | Mermaid covers CS needs; rest are audience-narrow or invisible plumbing. |
 | PDF viewer (WebView2 built-in) | **Swap to pdf.js** | Fixes scroll-reset-on-recompile *and* unblocks Linux (WebKitGTK has no built-in PDF viewer). Same task, double payoff. |
 
-## How to decide (don't pivot on theory)
+## Phased plan toward the extension as the product
 
-Cheapest test first: ship the **narrow-dashboard framing** and watch whether real
-users edit in their own tools and ignore the built-in editor/git panels. If they
-do, the VS Code extension is justified. If they lean on the built-in editor, the
-IDE ambition was right and this rethink is wrong — a cheap thing to learn before
-a rewrite. Validate with ~3 target users (one each on Windows/macOS/Linux from a
-real group) before choosing.
+Retire the desktop app *after* the extension covers the franchise, so users are
+never left without a working tool.
 
-## First step taken
+1. **Engine portability — done.** `scripts/check-report.ts` (`pnpm check`) and
+   the `apps/vscode` spike both drive the franchise (length + pre-submission
+   checks) with no desktop app, proving the engine is the product.
+2. **Git panel removed — done.** First reduction banked (see git log); the
+   engine's git-*safe* writes stay.
+3. **Extension to franchise-parity — next.** The gap vs. the desktop app is the
+   live **PDF preview** (a pdf.js webview — the same pdf.js the desktop viewer
+   wanted) and **zero-setup Typst** (auto-provision the pinned sidecar instead of
+   requiring it on PATH). Length + checks + export already work.
+4. **Retire the desktop app.** Delete `apps/desktop` (Tauri/React/CodeMirror),
+   the `src-tauri` Rust crate, the desktop release workflow, and the desktop
+   smoke test. Keep `packages/engine` and `apps/vscode`. This is the big
+   `less is more` payoff and a deliberate, separately-reviewed deletion.
+5. **Distribute.** Package the `.vsix` / publish to the marketplace (a publisher
+   account is the user's call).
 
-`scripts/check-report.ts` (`pnpm check <dir>`): the franchise — length + the
-pre-submission checks — distilled to one headless, CI-friendly command with no
-Typst binary required, reusing `countProject` + `collectProblems` so the
-terminal and the app can't disagree. A small, additive proof that the engine is
-the product and the shell is replaceable.
+The `apps/desktop` Tauri app is now **frozen** — no new feature work; it stays
+shippable (v0.2.0) only until step 4.
