@@ -23,8 +23,8 @@
       "properties": {
         "paperstack.typstPath": {
           "type": "string",
-          "default": "typst",
-          "description": "Path to the Typst binary used for PDF export (defaults to `typst` on PATH)."
+          "default": "",
+          "description": "Optional path to a Typst binary. Leave empty to let Paperstack download and manage the pinned Typst version automatically (recommended)."
         }
       }
     }

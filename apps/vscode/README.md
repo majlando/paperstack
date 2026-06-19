@@ -7,9 +7,9 @@ extension host runs Node, so it reuses the engine's `NodePlatform` and its check
 app runs, surfaced in VS Code's **native** Problems panel and status bar instead
 of a bespoke UI.
 
-Nearly at franchise-parity with the desktop app: live PDF preview, length, checks,
-and export all work. The one remaining gap is zero-setup Typst — see *Status*
-below. Not wired into CI yet.
+At franchise-parity with the desktop app: live PDF preview, length, checks, and
+export all work, and Typst is **zero-setup** — downloaded and cached
+automatically on the first build. Not wired into CI yet.
 
 ## What it does
 
@@ -22,9 +22,11 @@ below. Not wired into CI yet.
   unsupported math as native diagnostics with `file:line`, refreshed on every
   save of a section / `document.yaml` / `references.bib`.
 - **Command: Paperstack: Check Report** — run the checks on demand.
-- **Command: Paperstack: Export PDF** — build the report via the engine.
-  Needs a Typst binary; set `paperstack.typstPath` (defaults to `typst` on
-  PATH). Errors surface as readable messages, never raw exit codes.
+- **Command: Paperstack: Export PDF** — build the report via the engine and
+  save the PDF. Errors surface as readable messages, never raw exit codes.
+- **Zero-setup Typst** — the first preview/export downloads and caches the
+  pinned, checksum-verified Typst automatically; `paperstack.typstPath`
+  overrides it with your own binary.
 
 ## Run it (Extension Development Host)
 
@@ -40,8 +42,8 @@ config builds the bundle and opens an Extension Development Host with
 `fixtures/demo-report` as the workspace. The status bar shows the length
 immediately; open the Problems panel to see the two demo TODOs, or run
 **Paperstack: Preview Report** / **Paperstack: Check Report** from the command
-palette. (Preview needs a `typst` on PATH for now — or set `paperstack.typstPath`;
-zero-setup Typst is the next item below.)
+palette. (The first build downloads Typst automatically — no setup; set
+`paperstack.typstPath` to use your own instead.)
 
 To try it on your own report, open any folder containing a `document.yaml`.
 
@@ -52,13 +54,12 @@ To try it on your own report, open any folder containing a `document.yaml`.
 
 ## Status / roadmap to replacing the desktop app
 
-Working today: status-bar length, the Problems-panel checks, Export, and the
-live PDF preview. To reach full parity and become the sole product (see
-`docs/DIRECTION.md`):
+The extension now covers the franchise (length, checks, preview, export, and
+zero-setup Typst). Remaining to become the sole product (see `docs/DIRECTION.md`):
 
 1. ✅ **Live PDF preview** — pdf.js webview pane with Rebuild (`media/preview.js`).
-2. **Zero-setup Typst** — auto-provision the pinned sidecar (as `pnpm
-   fetch-binaries` does) so preview/export need nothing on PATH. **Next.**
-3. **Retire `apps/desktop`** — once 2 lands.
+2. ✅ **Zero-setup Typst** — downloads + caches the pinned, checksum-verified
+   Typst on first build (`src/typst.ts`); `paperstack.typstPath` overrides.
+3. **Retire `apps/desktop`** — **next.**
 4. **Package the `.vsix` / publish** — marketplace distribution (sidesteps the
    desktop app's code-signing pain). Publisher account is the user's call.

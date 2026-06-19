@@ -23,6 +23,7 @@ import {
   type Problem,
 } from "@paperstack/engine";
 import { NodePlatform } from "@paperstack/engine/node";
+import { ensureTypst } from "./typst.ts";
 
 const platform = new NodePlatform();
 let diagnostics: vscode.DiagnosticCollection;
@@ -39,7 +40,7 @@ export function activate(context: vscode.ExtensionContext): void {
     status,
     vscode.commands.registerCommand("paperstack.preview", () => preview(context)),
     vscode.commands.registerCommand("paperstack.check", () => runCheck(true)),
-    vscode.commands.registerCommand("paperstack.export", exportPdf),
+    vscode.commands.registerCommand("paperstack.export", () => exportPdf(context)),
     // A save to any section, the manifest, or the bibliography can change the
     // length or the problem set — re-check quietly so the panel stays live.
     vscode.workspace.onDidSaveTextDocument((doc) => {
@@ -164,18 +165,18 @@ async function runCheck(interactive: boolean): Promise<void> {
   }
 }
 
-async function exportPdf(): Promise<void> {
+async function exportPdf(context: vscode.ExtensionContext): Promise<void> {
   const dir = findProjectDir();
   if (!dir) {
     void vscode.window.showWarningMessage("No Paperstack project (document.yaml) found in this workspace.");
     return;
   }
-  const typst = getTypstPath();
 
   await vscode.window.withProgress(
     { location: vscode.ProgressLocation.Notification, title: "Paperstack: exporting PDF…" },
-    async () => {
+    async (progress) => {
       try {
+        const typst = await resolveTypst(context, (m) => progress.report({ message: m }));
         const result = await buildReport(platform, dir, { typst });
         const tail = result.warnings.length ? ` (${result.warnings.length} warning(s))` : "";
         const choice = await vscode.window.showInformationMessage(`Report exported${tail}.`, "Open PDF");
@@ -190,9 +191,18 @@ async function exportPdf(): Promise<void> {
   );
 }
 
-/** The PDF engine: a configured path, else `typst` on PATH (zero-setup Typst is a follow-up). */
-function getTypstPath(): string {
-  return vscode.workspace.getConfiguration("paperstack").get<string>("typstPath") || "typst";
+/**
+ * The PDF engine path: an explicit `paperstack.typstPath` if the user set one,
+ * otherwise the pinned Typst the extension downloads and caches itself (zero
+ * setup — see ./typst.ts).
+ */
+async function resolveTypst(
+  context: vscode.ExtensionContext,
+  onProgress?: (message: string) => void,
+): Promise<string> {
+  const configured = vscode.workspace.getConfiguration("paperstack").get<string>("typstPath")?.trim();
+  if (configured) return configured;
+  return ensureTypst(context.globalStorageUri.fsPath, onProgress);
 }
 
 /**
@@ -239,8 +249,11 @@ async function buildAndRender(
   const { webview } = panel;
   try {
     const result = await vscode.window.withProgress(
-      { location: vscode.ProgressLocation.Window, title: "Paperstack: building report…" },
-      () => buildReport(platform, dir, { typst: getTypstPath() }),
+      { location: vscode.ProgressLocation.Notification, title: "Paperstack: building report…" },
+      async (progress) => {
+        const typst = await resolveTypst(context, (m) => progress.report({ message: m }));
+        return buildReport(platform, dir, { typst });
+      },
     );
     const asset = (...p: string[]) =>
       webview.asWebviewUri(vscode.Uri.joinPath(context.extensionUri, "media", ...p)).toString();
