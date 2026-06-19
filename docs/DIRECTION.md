@@ -86,10 +86,14 @@ never left without a working tool.
 2. **Git panel removed — done.** First reduction banked (see git log); the
    engine's git-*safe* writes stay.
 3. **Extension to franchise-parity — done.** Live **PDF preview** (pdf.js webview
-   pane with Rebuild) and **zero-setup Typst** (the extension downloads + caches
-   the pinned, checksum-verified Typst on first build — `apps/vscode/src/typst.ts`)
-   both landed, alongside length, checks, and export. The extension now covers the
-   franchise.
+   pane with Rebuild, plus debounced auto-rebuild on save) and **zero-setup Typst**
+   (the extension downloads + caches the pinned, checksum-verified Typst on first
+   build — `apps/vscode/src/typst.ts`) both landed, alongside length, checks, and
+   export. The extension now covers the franchise. A **standalone authoring loop**
+   also landed (`apps/vscode/src/authoring.ts`): New Report, New Section, and the
+   Insert commands (Figure / Diagram / Table / Citation) via the Command Palette,
+   each wired straight to the engine helpers — so the extension can start *and*
+   write a report with no desktop app.
 4. **Retire the desktop app.** Delete `apps/desktop` (Tauri/React/CodeMirror),
    the `src-tauri` Rust crate, the desktop release workflow, and the desktop
    smoke test. Keep `packages/engine` and `apps/vscode`. This is the big
