@@ -1,0 +1,42 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="480" height="290" viewBox="0 0 480 290">
+  <g font-family="sans-serif">
+    <!-- gridlines -->
+    <g stroke="#e2e8f0" stroke-width="1">
+      <line x1="60" y1="40" x2="440" y2="40"/>
+      <line x1="60" y1="90" x2="440" y2="90"/>
+      <line x1="60" y1="140" x2="440" y2="140"/>
+      <line x1="60" y1="190" x2="440" y2="190"/>
+    </g>
+    <!-- axes -->
+    <line x1="60" y1="30" x2="60" y2="240" stroke="#334155" stroke-width="1.5"/>
+    <line x1="60" y1="240" x2="445" y2="240" stroke="#334155" stroke-width="1.5"/>
+    <!-- y ticks -->
+    <g font-size="10" fill="#64748b" text-anchor="end">
+      <text x="54" y="44">40</text>
+      <text x="54" y="94">30</text>
+      <text x="54" y="144">20</text>
+      <text x="54" y="194">10</text>
+      <text x="54" y="244">0</text>
+    </g>
+    <!-- x ticks -->
+    <g font-size="10" fill="#64748b" text-anchor="middle">
+      <text x="60" y="256">0</text>
+      <text x="250" y="256">5</text>
+      <text x="440" y="256">10</text>
+    </g>
+    <text x="252" y="278" text-anchor="middle" font-size="11" fill="#475569">Sprint day</text>
+    <text x="18" y="135" text-anchor="middle" font-size="11" fill="#475569" transform="rotate(-90 18 135)">Story points left</text>
+
+    <!-- ideal -->
+    <line x1="60" y1="40" x2="440" y2="240" stroke="#94a3b8" stroke-width="1.5" stroke-dasharray="5 4"/>
+    <!-- actual -->
+    <polyline fill="none" stroke="#2563eb" stroke-width="2.5"
+      points="60,40 98,40 136,60 174,90 212,100 250,130 288,140 326,165 364,180 402,210 440,240"/>
+
+    <!-- legend -->
+    <line x1="300" y1="40" x2="330" y2="40" stroke="#94a3b8" stroke-width="1.5" stroke-dasharray="5 4"/>
+    <text x="336" y="44" font-size="11" fill="#475569">ideal</text>
+    <line x1="300" y1="58" x2="330" y2="58" stroke="#2563eb" stroke-width="2.5"/>
+    <text x="336" y="62" font-size="11" fill="#475569">actual</text>
+  </g>
+</svg>

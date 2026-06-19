@@ -1,0 +1,35 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="620" height="150" viewBox="0 0 620 150">
+  <defs>
+    <marker id="h-arrow" markerWidth="9" markerHeight="9" refX="7" refY="3" orient="auto">
+      <path d="M0,0 L7,3 L0,6 z" fill="#475569"/>
+    </marker>
+  </defs>
+  <!-- four nested entities -->
+  <g font-family="sans-serif">
+    <rect x="20" y="40" width="120" height="64" rx="8" fill="#e0f2fe" stroke="#0369a1" stroke-width="1.5"/>
+    <text x="80" y="68" text-anchor="middle" font-size="15" font-weight="bold" fill="#0c4a6e">Profile</text>
+    <text x="80" y="88" text-anchor="middle" font-size="11" fill="#334155">a customer</text>
+
+    <rect x="180" y="40" width="120" height="64" rx="8" fill="#dcfce7" stroke="#166534" stroke-width="1.5"/>
+    <text x="240" y="68" text-anchor="middle" font-size="15" font-weight="bold" fill="#14532d">Box</text>
+    <text x="240" y="88" text-anchor="middle" font-size="11" fill="#334155">a physical box</text>
+
+    <rect x="340" y="40" width="120" height="64" rx="8" fill="#fef9c3" stroke="#854d0e" stroke-width="1.5"/>
+    <text x="400" y="68" text-anchor="middle" font-size="15" font-weight="bold" fill="#713f12">Document</text>
+    <text x="400" y="88" text-anchor="middle" font-size="11" fill="#334155">split on barcode</text>
+
+    <rect x="500" y="40" width="120" height="64" rx="8" fill="#fae8ff" stroke="#86198f" stroke-width="1.5"/>
+    <text x="560" y="68" text-anchor="middle" font-size="15" font-weight="bold" fill="#701a75">File</text>
+    <text x="560" y="88" text-anchor="middle" font-size="11" fill="#334155">a scanned page</text>
+
+    <!-- 1..* edges -->
+    <line x1="140" y1="72" x2="178" y2="72" stroke="#475569" stroke-width="1.5" marker-end="url(#h-arrow)"/>
+    <text x="159" y="64" text-anchor="middle" font-size="10" fill="#475569">1..*</text>
+    <line x1="300" y1="72" x2="338" y2="72" stroke="#475569" stroke-width="1.5" marker-end="url(#h-arrow)"/>
+    <text x="319" y="64" text-anchor="middle" font-size="10" fill="#475569">1..*</text>
+    <line x1="460" y1="72" x2="498" y2="72" stroke="#475569" stroke-width="1.5" marker-end="url(#h-arrow)"/>
+    <text x="479" y="64" text-anchor="middle" font-size="10" fill="#475569">1..*</text>
+
+    <text x="320" y="132" text-anchor="middle" font-size="11" fill="#64748b">A Profile groups Boxes; a Box holds Documents; a Document holds scanned page Files.</text>
+  </g>
+</svg>

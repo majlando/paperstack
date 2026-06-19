@@ -1,0 +1,25 @@
+# A short demo report that showcases Paperstack — a condensed, feature-led cut
+# of a real SEA exam project ("Tiffany", a scanning desktop tool for WebLager).
+# Hero image on the cover, SVG figures with cross-references, citations,
+# Mermaid diagrams, and math. Nothing here is pinned by tests.
+title: "Tiffany"
+subtitle: "A keyboard-driven scanning desktop tool for WebLager A/S"
+course: "SEA — 2nd semester"
+institution: "Example Academy"
+logo: figures/logo.svg
+authors:
+  - name: "Ada Demo"
+    student_id: "100001"
+date: 2026-06-08
+language: en
+body_cap_normalsider: 40
+sections:
+  - { file: sections/00-abstract.md, role: front-matter }
+  - { file: sections/01-introduction.md, role: body }
+  - { file: sections/02-process-and-method.md, role: body }
+  - { file: sections/03-architecture-and-design.md, role: body }
+  - { file: sections/04-implementation.md, role: body }
+  - { file: sections/05-testing.md, role: body }
+  - { file: sections/06-conclusion.md, role: body }
+  - { file: sections/07-glossary.md, role: back-matter }
+  - { file: appendices/appendix-a-setup.md, role: appendix }
