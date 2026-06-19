@@ -85,10 +85,10 @@ never left without a working tool.
    checks) with no desktop app, proving the engine is the product.
 2. **Git panel removed — done.** First reduction banked (see git log); the
    engine's git-*safe* writes stay.
-3. **Extension to franchise-parity — next.** The gap vs. the desktop app is the
-   live **PDF preview** (a pdf.js webview — the same pdf.js the desktop viewer
-   wanted) and **zero-setup Typst** (auto-provision the pinned sidecar instead of
-   requiring it on PATH). Length + checks + export already work.
+3. **Extension to franchise-parity — in progress.** Live **PDF preview** (a
+   pdf.js webview pane with Rebuild) landed; length, checks, and export already
+   work. Remaining gap: **zero-setup Typst** (auto-provision the pinned sidecar
+   instead of requiring it on PATH).
 4. **Retire the desktop app.** Delete `apps/desktop` (Tauri/React/CodeMirror),
    the `src-tauri` Rust crate, the desktop release workflow, and the desktop
    smoke test. Keep `packages/engine` and `apps/vscode`. This is the big

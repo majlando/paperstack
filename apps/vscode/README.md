@@ -7,12 +7,15 @@ extension host runs Node, so it reuses the engine's `NodePlatform` and its check
 app runs, surfaced in VS Code's **native** Problems panel and status bar instead
 of a bespoke UI.
 
-Still maturing toward franchise-parity with the desktop app (the gaps are a live
-PDF preview and zero-setup Typst — see *Status* below); length, checks, and
-export already work. Not wired into CI yet.
+Nearly at franchise-parity with the desktop app: live PDF preview, length, checks,
+and export all work. The one remaining gap is zero-setup Typst — see *Status*
+below. Not wired into CI yet.
 
 ## What it does
 
+- **Command: Paperstack: Preview Report** — builds the report and shows the real
+  PDF in a pane beside the editor (pdf.js), with a Rebuild button. The
+  extension's "View Report".
 - **Status bar** — live body length vs the cap (e.g. `📖 11.1/40 ns`); turns
   amber when over. Click it to re-check.
 - **Problems panel** — TODOs, missing images, unknown citations/references, and
@@ -36,7 +39,9 @@ Then open the `apps/vscode` folder in VS Code and press **F5** — the launch
 config builds the bundle and opens an Extension Development Host with
 `fixtures/demo-report` as the workspace. The status bar shows the length
 immediately; open the Problems panel to see the two demo TODOs, or run
-**Paperstack: Check Report** from the command palette.
+**Paperstack: Preview Report** / **Paperstack: Check Report** from the command
+palette. (Preview needs a `typst` on PATH for now — or set `paperstack.typstPath`;
+zero-setup Typst is the next item below.)
 
 To try it on your own report, open any folder containing a `document.yaml`.
 
@@ -47,13 +52,13 @@ To try it on your own report, open any folder containing a `document.yaml`.
 
 ## Status / roadmap to replacing the desktop app
 
-Working today: status-bar length, the Problems-panel checks, and Export. To reach
-parity and become the sole product (see `docs/DIRECTION.md`):
+Working today: status-bar length, the Problems-panel checks, Export, and the
+live PDF preview. To reach full parity and become the sole product (see
+`docs/DIRECTION.md`):
 
-1. **Live PDF preview** — a pdf.js webview (the same pdf.js the desktop viewer
-   wanted), the one franchise feature still missing here.
+1. ✅ **Live PDF preview** — pdf.js webview pane with Rebuild (`media/preview.js`).
 2. **Zero-setup Typst** — auto-provision the pinned sidecar (as `pnpm
-   fetch-binaries` does) so Export needs nothing on PATH.
-3. **Retire `apps/desktop`** — once 1–2 land.
+   fetch-binaries` does) so preview/export need nothing on PATH. **Next.**
+3. **Retire `apps/desktop`** — once 2 lands.
 4. **Package the `.vsix` / publish** — marketplace distribution (sidesteps the
    desktop app's code-signing pain). Publisher account is the user's call.

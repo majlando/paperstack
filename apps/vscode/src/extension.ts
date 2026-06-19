@@ -27,6 +27,7 @@ import { NodePlatform } from "@paperstack/engine/node";
 const platform = new NodePlatform();
 let diagnostics: vscode.DiagnosticCollection;
 let status: vscode.StatusBarItem;
+let previewPanel: vscode.WebviewPanel | undefined;
 
 export function activate(context: vscode.ExtensionContext): void {
   diagnostics = vscode.languages.createDiagnosticCollection("paperstack");
@@ -36,6 +37,7 @@ export function activate(context: vscode.ExtensionContext): void {
   context.subscriptions.push(
     diagnostics,
     status,
+    vscode.commands.registerCommand("paperstack.preview", () => preview(context)),
     vscode.commands.registerCommand("paperstack.check", () => runCheck(true)),
     vscode.commands.registerCommand("paperstack.export", exportPdf),
     // A save to any section, the manifest, or the bibliography can change the
@@ -168,7 +170,7 @@ async function exportPdf(): Promise<void> {
     void vscode.window.showWarningMessage("No Paperstack project (document.yaml) found in this workspace.");
     return;
   }
-  const typst = vscode.workspace.getConfiguration("paperstack").get<string>("typstPath") || "typst";
+  const typst = getTypstPath();
 
   await vscode.window.withProgress(
     { location: vscode.ProgressLocation.Notification, title: "Paperstack: exporting PDF…" },
@@ -186,4 +188,132 @@ async function exportPdf(): Promise<void> {
       }
     },
   );
+}
+
+/** The PDF engine: a configured path, else `typst` on PATH (zero-setup Typst is a follow-up). */
+function getTypstPath(): string {
+  return vscode.workspace.getConfiguration("paperstack").get<string>("typstPath") || "typst";
+}
+
+/**
+ * Build the report and show it in a live PDF preview beside the editor — the
+ * extension's "View Report". One reusable panel; the in-webview Rebuild button
+ * recompiles. Rendering is pdf.js in the webview (media/preview.js).
+ */
+async function preview(context: vscode.ExtensionContext): Promise<void> {
+  const dir = findProjectDir();
+  if (!dir) {
+    void vscode.window.showWarningMessage("No Paperstack project (document.yaml) found in this workspace.");
+    return;
+  }
+
+  if (!previewPanel) {
+    previewPanel = vscode.window.createWebviewPanel(
+      "paperstackPreview",
+      "Report Preview",
+      { viewColumn: vscode.ViewColumn.Beside, preserveFocus: true },
+      {
+        enableScripts: true,
+        retainContextWhenHidden: true,
+        localResourceRoots: [
+          vscode.Uri.joinPath(context.extensionUri, "media"),
+          ...(vscode.workspace.workspaceFolders ?? []).map((f) => f.uri),
+        ],
+      },
+    );
+    previewPanel.onDidDispose(() => {
+      previewPanel = undefined;
+    });
+    previewPanel.webview.onDidReceiveMessage((m: { type?: string }) => {
+      if (m?.type === "rebuild") void preview(context);
+    });
+  }
+  await buildAndRender(dir, previewPanel, context);
+}
+
+async function buildAndRender(
+  dir: string,
+  panel: vscode.WebviewPanel,
+  context: vscode.ExtensionContext,
+): Promise<void> {
+  const { webview } = panel;
+  try {
+    const result = await vscode.window.withProgress(
+      { location: vscode.ProgressLocation.Window, title: "Paperstack: building report…" },
+      () => buildReport(platform, dir, { typst: getTypstPath() }),
+    );
+    const asset = (...p: string[]) =>
+      webview.asWebviewUri(vscode.Uri.joinPath(context.extensionUri, "media", ...p)).toString();
+    // Cache-bust the PDF so a rebuild re-fetches it rather than re-showing the old one.
+    const pdfUrl = `${webview.asWebviewUri(vscode.Uri.file(result.pdfPath))}?t=${Date.now()}`;
+    webview.html = previewHtml(webview, asset("preview.js"), pdfUrl, asset("pdf.worker.min.mjs"), result.warnings);
+  } catch (e) {
+    const msg = e instanceof PaperstackError ? e.userMessage : `Build failed: ${String(e)}`;
+    webview.html = messageHtml(webview, msg);
+  }
+}
+
+function nonce(): string {
+  const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
+  let s = "";
+  for (let i = 0; i < 24; i++) s += chars[Math.floor(Math.random() * chars.length)];
+  return s;
+}
+
+function escapeHtml(s: string): string {
+  return s.replace(/[&<>"']/g, (c) =>
+    c === "&" ? "&amp;" : c === "<" ? "&lt;" : c === ">" ? "&gt;" : c === '"' ? "&quot;" : "&#39;",
+  );
+}
+
+function pageShell(webview: vscode.Webview, n: string, body: string, headExtra = ""): string {
+  const csp = [
+    `default-src 'none'`,
+    `img-src ${webview.cspSource} data:`,
+    `style-src ${webview.cspSource} 'unsafe-inline'`,
+    `script-src 'nonce-${n}' ${webview.cspSource}`,
+    `worker-src ${webview.cspSource} blob:`,
+    `connect-src ${webview.cspSource}`,
+  ].join("; ");
+  return `<!doctype html><html><head><meta charset="utf-8">
+<meta http-equiv="Content-Security-Policy" content="${csp}">
+<style>
+  body { margin: 0; font: 13px var(--vscode-font-family); color: var(--vscode-foreground); }
+  #bar { position: sticky; top: 0; display: flex; gap: 12px; align-items: center;
+         padding: 6px 12px; background: var(--vscode-editor-background);
+         border-bottom: 1px solid var(--vscode-panel-border); }
+  #bar button { font: inherit; color: var(--vscode-button-foreground);
+                background: var(--vscode-button-background); border: none;
+                padding: 3px 10px; border-radius: 3px; cursor: pointer; }
+  #status { color: var(--vscode-descriptionForeground); }
+  .warn { padding: 6px 12px; color: var(--vscode-editorWarning-foreground); }
+  #pages { display: flex; flex-direction: column; align-items: center; gap: 12px; padding: 16px; }
+  canvas.page { box-shadow: 0 0 0 1px var(--vscode-panel-border); background: #fff; max-width: 100%; }
+  .msg { padding: 24px; line-height: 1.5; }
+</style>${headExtra}</head><body>${body}</body></html>`;
+}
+
+function previewHtml(
+  webview: vscode.Webview,
+  scriptUrl: string,
+  pdfUrl: string,
+  workerUrl: string,
+  warnings: string[],
+): string {
+  const n = nonce();
+  const warn = warnings.length
+    ? `<div class="warn">${warnings.map(escapeHtml).join("<br>")}</div>`
+    : "";
+  const body = `
+<div id="bar"><button id="rebuild">Rebuild</button><span id="status">Rendering…</span></div>
+${warn}
+<div id="pages"></div>
+<script nonce="${n}">window.__paperstack = ${JSON.stringify({ url: pdfUrl, worker: workerUrl })};</script>
+<script nonce="${n}" type="module" src="${scriptUrl}"></script>`;
+  return pageShell(webview, n, body);
+}
+
+function messageHtml(webview: vscode.Webview, message: string): string {
+  const n = nonce();
+  return pageShell(webview, n, `<div class="msg">${escapeHtml(message)}</div>`);
 }

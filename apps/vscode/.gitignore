@@ -1,0 +1,3 @@
+# pdf.js runtime copied in by scripts/prepare-media.mjs (media/preview.js is ours).
+media/pdf.min.mjs
+media/pdf.worker.min.mjs
